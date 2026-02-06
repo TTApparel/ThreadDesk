@@ -16,6 +16,8 @@ class TTA_ThreadDesk_Data {
 			'section'           => $section,
 			'cover_image'       => get_option( 'tta_threaddesk_cover_image_url', '' ),
 			'company'           => get_option( 'tta_threaddesk_default_company', '' ),
+			'client_name'       => $this->get_customer_name( $user_id ),
+			'avatar_url'        => $this->get_avatar_url( $user_id ),
 			'order_stats'       => $stats,
 			'design_count'      => $this->get_post_count( 'tta_design', $user_id ),
 			'layout_count'      => $this->get_post_count( 'tta_layout', $user_id ),
@@ -220,5 +222,36 @@ class TTA_ThreadDesk_Data {
 		}
 
 		return $total;
+	}
+
+	private function get_customer_name( $user_id ) {
+		if ( function_exists( 'wc_get_customer' ) ) {
+			$customer = wc_get_customer( $user_id );
+			if ( $customer ) {
+				$name = trim( $customer->get_shipping_first_name() . ' ' . $customer->get_shipping_last_name() );
+				if ( $name ) {
+					return $name;
+				}
+				$name = trim( $customer->get_billing_first_name() . ' ' . $customer->get_billing_last_name() );
+				if ( $name ) {
+					return $name;
+				}
+			}
+		}
+
+		$user = get_user_by( 'id', $user_id );
+		return $user ? $user->display_name : __( 'Client Name', 'threaddesk' );
+	}
+
+	private function get_avatar_url( $user_id ) {
+		$attachment_id = (int) get_user_meta( $user_id, 'tta_threaddesk_avatar_id', true );
+		if ( $attachment_id ) {
+			$avatar_url = wp_get_attachment_image_url( $attachment_id, 'thumbnail' );
+			if ( $avatar_url ) {
+				return $avatar_url;
+			}
+		}
+
+		return '';
 	}
 }

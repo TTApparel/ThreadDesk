@@ -7,6 +7,8 @@ $context = isset( $context ) ? $context : array();
 $user    = isset( $context['user'] ) ? $context['user'] : null;
 $cover   = ! empty( $context['cover_image'] ) ? $context['cover_image'] : 'https://via.placeholder.com/1200x240.png?text=ThreadDesk+Cover';
 $company = ! empty( $context['company'] ) ? $context['company'] : __( 'Client Company', 'threaddesk' );
+$client_name = ! empty( $context['client_name'] ) ? $context['client_name'] : __( 'Client Name', 'threaddesk' );
+$avatar_url  = ! empty( $context['avatar_url'] ) ? $context['avatar_url'] : '';
 $stats   = isset( $context['order_stats'] ) ? $context['order_stats'] : array();
 $currency = isset( $context['currency'] ) ? $context['currency'] : 'USD';
 
@@ -33,13 +35,21 @@ $format_price = function ( $amount ) use ( $currency ) {
 		<div class="threaddesk__content-inner">
 			<div class="threaddesk__main">
 				<div class="threaddesk__header" style="background-image: url('<?php echo esc_url( $cover ); ?>');">
-					<div class="threaddesk__profile">
-						<div class="threaddesk__avatar"></div>
-						<div>
-							<h2><?php echo esc_html( $user ? $user->display_name : __( 'Client Name', 'threaddesk' ) ); ?></h2>
-							<p><?php echo esc_html( $company ); ?></p>
+					<form class="threaddesk__profile" method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" enctype="multipart/form-data">
+						<input type="hidden" name="action" value="tta_threaddesk_avatar_upload" />
+						<?php wp_nonce_field( 'tta_threaddesk_avatar_upload' ); ?>
+						<label class="threaddesk__avatar" for="threaddesk_avatar">
+							<?php if ( $avatar_url ) : ?>
+								<img src="<?php echo esc_url( $avatar_url ); ?>" alt="<?php echo esc_attr__( 'Company avatar', 'threaddesk' ); ?>" />
+							<?php endif; ?>
+							<span class="threaddesk__avatar-overlay"><?php echo esc_html__( 'Upload', 'threaddesk' ); ?></span>
+						</label>
+						<input class="threaddesk__avatar-input" id="threaddesk_avatar" name="threaddesk_avatar" type="file" accept="image/*" onchange="this.form.submit();" />
+						<div class="threaddesk__profile-text">
+							<h2><?php echo esc_html( $client_name ); ?></h2>
+							<p><?php echo esc_html( $user ? $user->user_login : __( 'Username', 'threaddesk' ) ); ?></p>
 						</div>
-					</div>
+					</form>
 				</div>
 
 				<div class="threaddesk__stats">

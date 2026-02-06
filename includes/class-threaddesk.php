@@ -33,6 +33,7 @@ class TTA_ThreadDesk {
 		add_action( 'admin_post_tta_threaddesk_generate_demo', array( $this, 'handle_generate_demo' ) );
 		add_action( 'admin_post_tta_threaddesk_request_order', array( $this, 'handle_request_order' ) );
 		add_action( 'admin_post_tta_threaddesk_reorder', array( $this, 'handle_reorder' ) );
+		add_action( 'admin_post_tta_threaddesk_avatar_upload', array( $this, 'handle_avatar_upload' ) );
 		add_shortcode( 'threaddesk', array( $this, 'render_shortcode' ) );
 	}
 
@@ -293,6 +294,51 @@ class TTA_ThreadDesk {
 		}
 
 		wp_safe_redirect( $added ? wc_get_cart_url() : wc_get_account_endpoint_url( 'thread-desk' ) . 'invoices/' );
+		exit;
+	}
+
+	public function handle_avatar_upload() {
+		if ( ! is_user_logged_in() ) {
+			wp_die( esc_html__( 'Unauthorized.', 'threaddesk' ) );
+		}
+
+		check_admin_referer( 'tta_threaddesk_avatar_upload' );
+
+		if ( empty( $_FILES['threaddesk_avatar']['name'] ) ) {
+			wp_safe_redirect( wc_get_account_endpoint_url( 'thread-desk' ) );
+			exit;
+		}
+
+		require_once ABSPATH . 'wp-admin/includes/file.php';
+		require_once ABSPATH . 'wp-admin/includes/image.php';
+
+		$upload = wp_handle_upload( $_FILES['threaddesk_avatar'], array( 'test_form' => false ) );
+
+		if ( isset( $upload['error'] ) ) {
+			if ( function_exists( 'wc_add_notice' ) ) {
+				wc_add_notice( __( 'Avatar upload failed.', 'threaddesk' ), 'error' );
+			}
+			wp_safe_redirect( wc_get_account_endpoint_url( 'thread-desk' ) );
+			exit;
+		}
+
+		$attachment_id = wp_insert_attachment(
+			array(
+				'post_mime_type' => $upload['type'],
+				'post_title'     => sanitize_file_name( wp_basename( $upload['file'] ) ),
+				'post_content'   => '',
+				'post_status'    => 'inherit',
+			),
+			$upload['file']
+		);
+
+		if ( $attachment_id ) {
+			$metadata = wp_generate_attachment_metadata( $attachment_id, $upload['file'] );
+			wp_update_attachment_metadata( $attachment_id, $metadata );
+			update_user_meta( get_current_user_id(), 'tta_threaddesk_avatar_id', $attachment_id );
+		}
+
+		wp_safe_redirect( wc_get_account_endpoint_url( 'thread-desk' ) );
 		exit;
 	}
 
