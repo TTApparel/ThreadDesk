@@ -39,9 +39,7 @@ $format_price = function ( $amount ) use ( $currency ) {
 						<input type="hidden" name="action" value="tta_threaddesk_avatar_upload" />
 						<?php wp_nonce_field( 'tta_threaddesk_avatar_upload' ); ?>
 						<label class="threaddesk__avatar" for="threaddesk_avatar">
-							<?php if ( $avatar_url ) : ?>
-								<img src="<?php echo esc_url( $avatar_url ); ?>" alt="<?php echo esc_attr__( 'Company avatar', 'threaddesk' ); ?>" />
-							<?php endif; ?>
+							<img src="<?php echo esc_url( $avatar_url ); ?>" alt="<?php echo esc_attr__( 'Company avatar', 'threaddesk' ); ?>" />
 							<span class="threaddesk__avatar-overlay"><?php echo esc_html__( 'Upload', 'threaddesk' ); ?></span>
 						</label>
 						<input class="threaddesk__avatar-input" id="threaddesk_avatar" name="threaddesk_avatar" type="file" accept="image/*" onchange="this.form.submit();" />

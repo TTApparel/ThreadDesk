@@ -252,6 +252,10 @@ class TTA_ThreadDesk_Data {
 			}
 		}
 
+		if ( function_exists( 'get_avatar_url' ) ) {
+			return get_avatar_url( $user_id, array( 'size' => 200 ) );
+		}
+
 		return '';
 	}
 }
