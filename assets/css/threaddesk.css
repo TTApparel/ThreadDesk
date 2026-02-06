@@ -4,6 +4,12 @@
 	margin-top: 24px;
 	font-family: "Helvetica Neue", Arial, sans-serif;
 	color: #1f1f1f;
+	max-width: 90%;
+}
+
+.threaddesk,
+.threaddesk__content {
+	width: 100%;
 }
 
 .threaddesk__sidebar {
@@ -266,4 +272,8 @@
 	.threaddesk__nav-item {
 		flex: 1 1 45%;
 	}
+}
+.woocommerce-account,
+.page {
+	background-color: #f6f6f6;
 }

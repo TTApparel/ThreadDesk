@@ -12,6 +12,7 @@ class TTA_ThreadDesk_Endpoints {
 		add_action( 'woocommerce_account_thread-desk_endpoint', array( $this, 'render_endpoint' ) );
 		add_filter( 'woocommerce_get_query_vars', array( $this, 'register_wc_query_vars' ) );
 		add_action( 'template_redirect', array( $this, 'redirect_account_to_threaddesk' ) );
+		add_action( 'wp', array( $this, 'remove_account_navigation' ) );
 	}
 
 	public function register_endpoints() {
@@ -68,5 +69,13 @@ class TTA_ThreadDesk_Endpoints {
 			wp_safe_redirect( wc_get_account_endpoint_url( 'thread-desk' ) );
 			exit;
 		}
+	}
+
+	public function remove_account_navigation() {
+		if ( ! function_exists( 'is_account_page' ) || ! is_account_page() ) {
+			return;
+		}
+
+		remove_action( 'woocommerce_account_navigation', 'woocommerce_account_navigation' );
 	}
 }
