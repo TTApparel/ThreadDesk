@@ -8,6 +8,7 @@ ThreadDesk is a WooCommerce customer portal that adds a dedicated "ThreadDesk" s
 2. Activate **ThreadDesk** in the WordPress admin.
 3. Visit **WooCommerce → ThreadDesk** to configure the cover image and default company name.
 4. Navigate to **My Account → ThreadDesk** to view the customer portal.
+5. For Elementor pages, add a Shortcode widget and insert `[threaddesk]`.
 
 ## Features
 
@@ -16,6 +17,7 @@ ThreadDesk is a WooCommerce customer portal that adds a dedicated "ThreadDesk" s
 - Quotes, Designs, and Layouts stored as private custom post types.
 - Invoice/Order list with reorder actions.
 - Demo data generator for quick previews.
+- Shortcode support via `[threaddesk]` for Elementor or custom pages.
 
 ## Roadmap
 
@@ -29,4 +31,3 @@ ThreadDesk is a WooCommerce customer portal that adds a dedicated "ThreadDesk" s
 - Quotes are stored as `tta_quote` custom post types with metadata (`status`, `total`, `currency`, `items_json`, `created_at`).
 - Designs and Layouts are stored as `tta_design` and `tta_layout` placeholders.
 - Outstanding balance is calculated from unpaid WooCommerce orders with statuses `pending`, `on-hold`, and `failed`.
-

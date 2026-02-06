@@ -33,6 +33,7 @@ class TTA_ThreadDesk {
 		add_action( 'admin_post_tta_threaddesk_generate_demo', array( $this, 'handle_generate_demo' ) );
 		add_action( 'admin_post_tta_threaddesk_request_order', array( $this, 'handle_request_order' ) );
 		add_action( 'admin_post_tta_threaddesk_reorder', array( $this, 'handle_reorder' ) );
+		add_shortcode( 'threaddesk', array( $this, 'render_shortcode' ) );
 	}
 
 	public static function activate() {
@@ -293,5 +294,18 @@ class TTA_ThreadDesk {
 
 		wp_safe_redirect( $added ? wc_get_cart_url() : wc_get_account_endpoint_url( 'thread-desk' ) . 'invoices/' );
 		exit;
+	}
+
+	public function render_shortcode() {
+		if ( ! is_user_logged_in() ) {
+			return esc_html__( 'Please log in to view ThreadDesk.', 'threaddesk' );
+		}
+
+		ob_start();
+
+		$section = get_query_var( 'td_section', 'profile' );
+		$this->render->render_section( $section );
+
+		return ob_get_clean();
 	}
 }
