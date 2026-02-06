@@ -37,6 +37,12 @@
 	flex: 1;
 }
 
+.threaddesk__content-inner {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr) 280px;
+	gap: 24px;
+}
+
 .threaddesk__header {
 	border-radius: 16px;
 	background-size: cover;
@@ -189,6 +195,10 @@
 	}
 
 	.threaddesk__grid {
+		grid-template-columns: 1fr;
+	}
+
+	.threaddesk__content-inner {
 		grid-template-columns: 1fr;
 	}
 }
