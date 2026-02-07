@@ -85,6 +85,10 @@
 	flex-shrink: 0;
 }
 
+.threaddesk__avatar.has-image {
+	background: transparent;
+}
+
 .threaddesk__avatar img {
 	width: 100%;
 	height: 100%;

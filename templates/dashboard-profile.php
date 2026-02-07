@@ -38,7 +38,7 @@ $format_price = function ( $amount ) use ( $currency ) {
 					<form class="threaddesk__profile" method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" enctype="multipart/form-data">
 						<input type="hidden" name="action" value="tta_threaddesk_avatar_upload" />
 						<?php wp_nonce_field( 'tta_threaddesk_avatar_upload' ); ?>
-						<label class="threaddesk__avatar" for="threaddesk_avatar">
+						<label class="threaddesk__avatar<?php echo $avatar_url ? ' has-image' : ''; ?>" for="threaddesk_avatar">
 							<img src="<?php echo esc_url( $avatar_url ); ?>" alt="<?php echo esc_attr__( 'Company avatar', 'threaddesk' ); ?>" />
 							<span class="threaddesk__avatar-overlay"><?php echo esc_html__( 'Upload', 'threaddesk' ); ?></span>
 						</label>
