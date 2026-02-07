@@ -176,9 +176,13 @@ class TTA_ThreadDesk_Data {
 	}
 
 	public function get_account_links() {
+		$account_base = function_exists( 'wc_get_page_permalink' ) ? wc_get_page_permalink( 'myaccount' ) : '';
+		$billing_link = function_exists( 'wc_get_endpoint_url' ) ? wc_get_endpoint_url( 'edit-address', 'billing', $account_base ) : '';
+		$shipping_link = function_exists( 'wc_get_endpoint_url' ) ? wc_get_endpoint_url( 'edit-address', 'shipping', $account_base ) : '';
+
 		return array(
-			'edit_billing'  => wc_get_account_endpoint_url( 'edit-address' ),
-			'edit_shipping' => wc_get_account_endpoint_url( 'edit-address' ),
+			'edit_billing'  => $billing_link ? $billing_link : wc_get_account_endpoint_url( 'edit-address' ),
+			'edit_shipping' => $shipping_link ? $shipping_link : wc_get_account_endpoint_url( 'edit-address' ),
 			'edit_account'  => wc_get_account_endpoint_url( 'edit-account' ),
 		);
 	}
