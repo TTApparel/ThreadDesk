@@ -24,6 +24,15 @@ $map_parts = array_filter(
 );
 $map_query = trim( implode( ', ', $map_parts ) );
 $map_url   = $map_query ? sprintf( 'https://www.google.com/maps?q=%s&output=embed', rawurlencode( $map_query ) ) : '';
+$profile_name = '';
+if ( $user ) {
+	$profile_name = trim( $user->first_name . ' ' . $user->last_name );
+	if ( '' === $profile_name ) {
+		$profile_name = $user->display_name;
+	}
+}
+$profile_name = $profile_name ? $profile_name : $client_name;
+$profile_username = $user ? $user->user_login : __( 'Username', 'threaddesk' );
 
 $nav_base = trailingslashit( wc_get_account_endpoint_url( 'thread-desk' ) );
 
@@ -66,8 +75,8 @@ $format_price = function ( $amount ) use ( $currency ) {
 						</label>
 						<input class="threaddesk__avatar-input" id="threaddesk_avatar" name="threaddesk_avatar" type="file" accept="image/*" onchange="this.form.submit();" />
 						<div class="threaddesk__profile-text">
-							<h2><?php echo esc_html( $client_name ); ?></h2>
-							<p><?php echo esc_html( $user ? $user->user_login : __( 'Username', 'threaddesk' ) ); ?></p>
+							<h2><?php echo esc_html( $profile_name ); ?></h2>
+							<p><?php echo esc_html( $profile_username ); ?></p>
 						</div>
 					</form>
 				</div>
