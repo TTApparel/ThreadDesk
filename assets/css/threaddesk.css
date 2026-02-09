@@ -362,7 +362,7 @@
 	text-decoration: underline;
 }
 
-.threaddesk-auth-modal__form-inner label {
+.threaddesk-auth-modal__form-inner > p > label {
 	display: block;
 	margin-bottom: 6px;
 	font-size: 14px;
