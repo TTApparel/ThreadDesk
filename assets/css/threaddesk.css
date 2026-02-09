@@ -169,32 +169,58 @@
 }
 
 .threaddesk-auth__menu {
+	--dropdown-top-offset: 15px;
+	--theme-font-size: 14px;
+	--dropdown-background-color: var(--theme-palette-color-8);
+	--dropdown-items-background-hover-color: rgba(0, 0, 0, 0.05);
+	--theme-border: 1px solid rgba(0, 0, 0, 0.05);
+	--theme-box-shadow: 0px 10px 20px rgba(41, 51, 61, 0.1);
 	position: absolute;
-	top: calc(100% + 8px);
-	left: 0;
-	display: grid;
-	gap: 8px;
-	min-width: 200px;
-	padding: 12px;
-	border-radius: 12px;
-	background: #fff;
-	box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+	right: var(--theme-submenu-inline-offset, -20px);
+	top: 100%;
+	z-index: 15;
 	opacity: 0;
 	visibility: hidden;
-	transform: translateY(-4px);
-	transition: opacity 0.2s ease, transform 0.2s ease, visibility 0.2s ease;
-	z-index: 20;
+	transform: translate3d(0, 10px, 0);
+	transition: opacity 0.2s ease, visibility 0.2s ease, transform 0.2s ease;
+	list-style-type: none;
+	margin-bottom: 0;
+	padding-inline-start: 0;
+	width: 250px;
+	color: var(--theme-text-color);
+	margin-top: var(--sticky-state-dropdown-top-offset, var(--dropdown-top-offset, 15px));
+	padding-block: var(--menu-items-spacing, 10px);
+	box-shadow: var(--theme-box-shadow);
+	border-radius: var(--theme-border-radius, 2px);
+	background-color: var(--dropdown-background-color, var(--theme-palette-color-4));
+	--theme-link-initial-color: var(--theme-text-color);
+	--theme-icon-color: currentColor;
+	font-family: var(--theme-font-family);
+	font-size: var(--theme-font-size);
+	font-weight: var(--theme-font-weight);
+	font-style: var(--theme-font-style, inherit);
+	line-height: var(--theme-line-height);
+	letter-spacing: var(--theme-letter-spacing);
+	text-transform: var(--theme-text-transform);
+	-webkit-text-decoration: var(--theme-text-decoration);
+	text-decoration: var(--theme-text-decoration);
+	margin: 0;
+	padding: 0;
+	border: none;
+	font: inherit;
 }
 
 .threaddesk-auth__menu a {
-	color: #1f1f1f;
+	color: var(--theme-link-initial-color);
 	text-decoration: none;
-	font-size: 14px;
+	font-size: var(--theme-font-size);
+	padding: 8px 16px;
 }
 
 .threaddesk-auth__menu a:hover,
 .threaddesk-auth__menu a:focus {
-	text-decoration: underline;
+	background-color: var(--dropdown-items-background-hover-color);
+	text-decoration: none;
 }
 
 .threaddesk-auth:hover .threaddesk-auth__menu,
