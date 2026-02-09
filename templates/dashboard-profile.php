@@ -14,8 +14,26 @@ $currency = isset( $context['currency'] ) ? $context['currency'] : 'USD';
 $shipping_address = ! empty( $context['shipping_address'] ) && is_array( $context['shipping_address'] ) ? $context['shipping_address'] : array();
 $billing_address  = ! empty( $context['billing_address'] ) && is_array( $context['billing_address'] ) ? $context['billing_address'] : array();
 $address_source   = $shipping_address ? $shipping_address : $billing_address;
-$billing_display  = ! empty( $billing_address['formatted'] ) ? $billing_address['formatted'] : __( 'Not provided yet.', 'threaddesk' );
-$shipping_display = ! empty( $shipping_address['formatted'] ) ? $shipping_address['formatted'] : __( 'Not provided yet.', 'threaddesk' );
+$format_address_display = function ( $address ) {
+	if ( ! empty( $address['formatted'] ) ) {
+		return $address['formatted'];
+	}
+
+	$lines = array_filter(
+		array(
+			isset( $address['address_1'] ) ? $address['address_1'] : '',
+			isset( $address['address_2'] ) ? $address['address_2'] : '',
+			isset( $address['city'] ) ? $address['city'] : '',
+			isset( $address['state'] ) ? $address['state'] : '',
+			isset( $address['postcode'] ) ? $address['postcode'] : '',
+			isset( $address['country'] ) ? $address['country'] : '',
+		)
+	);
+
+	return $lines ? implode( "\n", $lines ) : __( 'Not provided yet.', 'threaddesk' );
+};
+$billing_display  = $format_address_display( $billing_address );
+$shipping_display = $format_address_display( $shipping_address );
 $map_parts = array_filter(
 	array(
 		isset( $address_source['address_1'] ) ? $address_source['address_1'] : '',
