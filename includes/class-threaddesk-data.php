@@ -188,12 +188,30 @@ class TTA_ThreadDesk_Data {
 	}
 
 	public function get_user_address( $user_id, $type ) {
-		if ( ! function_exists( 'wc_get_account_formatted_address' ) ) {
-			return '';
+		if ( ! function_exists( 'wc_get_customer' ) ) {
+			return array();
 		}
 
-		$address = wc_get_account_formatted_address( $type );
-		return $address ? $address : __( 'Not provided yet.', 'threaddesk' );
+		$customer = wc_get_customer( $user_id );
+		if ( ! $customer ) {
+			return array();
+		}
+
+		$address = array(
+			'address_1' => $customer->{"get_{$type}_address_1"}(),
+			'address_2' => $customer->{"get_{$type}_address_2"}(),
+			'city'      => $customer->{"get_{$type}_city"}(),
+			'state'     => $customer->{"get_{$type}_state"}(),
+			'postcode'  => $customer->{"get_{$type}_postcode"}(),
+			'country'   => $customer->{"get_{$type}_country"}(),
+			'formatted' => '',
+		);
+
+		if ( function_exists( 'wc_format_address' ) ) {
+			$address['formatted'] = wc_format_address( $address );
+		}
+
+		return $address;
 	}
 
 	public function get_account_details( $user ) {
