@@ -94,6 +94,7 @@
 	height: 100%;
 	object-fit: cover;
 	object-position: center;
+	border-radius: 50%;
 	display: block;
 }
 
@@ -249,6 +250,10 @@
 .threaddesk-auth__avatar {
 	border-radius: 50%;
 	flex-shrink: 0;
+	width: 40px;
+	height: 40px;
+	object-fit: cover;
+	display: block;
 }
 
 .threaddesk-auth__user-text {
@@ -414,13 +419,13 @@
 	border-radius: 4px;
 	font-size: 13px;
 	color: #444;
-	text-align: center;
+	text-align: left;
 }
 
 .threaddesk-auth-modal__notice ul {
 	margin: 8px 0 0;
-	padding-left: 18px;
-	list-style-position: inside;
+	padding-left: 0;
+	list-style: none;
 }
 
 .threaddesk-auth-modal__notice li {
