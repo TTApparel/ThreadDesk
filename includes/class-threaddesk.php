@@ -35,6 +35,7 @@ class TTA_ThreadDesk {
 		add_action( 'admin_post_tta_threaddesk_reorder', array( $this, 'handle_reorder' ) );
 		add_action( 'admin_post_tta_threaddesk_avatar_upload', array( $this, 'handle_avatar_upload' ) );
 		add_shortcode( 'threaddesk', array( $this, 'render_shortcode' ) );
+		add_shortcode( 'threaddesk_auth', array( $this, 'render_auth_shortcode' ) );
 	}
 
 	public static function activate() {
@@ -351,6 +352,126 @@ class TTA_ThreadDesk {
 
 		$section = get_query_var( 'td_section', 'profile' );
 		$this->render->render_section( $section );
+
+		return ob_get_clean();
+	}
+
+	public function render_auth_shortcode() {
+		if ( is_user_logged_in() ) {
+			return '';
+		}
+
+		wp_enqueue_style( 'threaddesk', THREDDESK_URL . 'assets/css/threaddesk.css', array(), THREDDESK_VERSION );
+		wp_enqueue_script( 'threaddesk', THREDDESK_URL . 'assets/js/threaddesk.js', array( 'jquery' ), THREDDESK_VERSION, true );
+
+		$login_url    = wp_login_url();
+		$register_url = wp_registration_url();
+		$lost_url     = wp_lostpassword_url();
+
+		ob_start();
+		?>
+		<div class="threaddesk-auth" role="navigation" aria-label="<?php echo esc_attr__( 'Account links', 'threaddesk' ); ?>">
+			<button type="button" class="threaddesk-auth__trigger" aria-label="<?php echo esc_attr__( 'Log in or register', 'threaddesk' ); ?>">
+				<svg class="threaddesk-auth__icon" aria-hidden="true" viewBox="0 0 15 15" focusable="false">
+					<path d="M7.5 0C3.4 0 0 3.4 0 7.5S3.4 15 7.5 15 15 11.6 15 7.5 11.6 0 7.5 0zm0 2.1c1.4 0 2.5 1.1 2.5 2.4S8.9 7 7.5 7 5 5.9 5 4.5s1.1-2.4 2.5-2.4zm0 11.4c-2.1 0-3.9-1-5-2.6C3.4 9.6 6 9 7.5 9s4.1.6 5 1.9c-1.1 1.6-2.9 2.6-5 2.6z"></path>
+				</svg>
+				</button>
+				<div class="threaddesk-auth__menu" aria-hidden="true">
+					<button type="button" class="threaddesk-auth__menu-button" data-threaddesk-auth="login">
+						<?php echo esc_html__( 'Sign in', 'threaddesk' ); ?>
+					</button>
+					<button type="button" class="threaddesk-auth__menu-button" data-threaddesk-auth="register">
+						<?php echo esc_html__( 'Register', 'threaddesk' ); ?>
+					</button>
+					<button type="button" class="threaddesk-auth__menu-button" data-threaddesk-auth="forgot">
+						<?php echo esc_html__( 'Forgot password', 'threaddesk' ); ?>
+					</button>
+				</div>
+			</div>
+			<div class="threaddesk-auth-modal" aria-hidden="true">
+				<div class="threaddesk-auth-modal__overlay" data-threaddesk-auth-close></div>
+				<div class="threaddesk-auth-modal__panel" role="dialog" aria-label="<?php echo esc_attr__( 'Account modal', 'threaddesk' ); ?>" aria-modal="true">
+					<div class="threaddesk-auth-modal__actions">
+						<button type="button" class="threaddesk-auth-modal__close" data-threaddesk-auth-close aria-label="<?php echo esc_attr__( 'Close account modal', 'threaddesk' ); ?>">
+							<svg class="threaddesk-auth-modal__close-icon" width="12" height="12" viewBox="0 0 15 15" aria-hidden="true" focusable="false">
+								<path d="M1 15a1 1 0 01-.71-.29 1 1 0 010-1.41l5.8-5.8-5.8-5.8A1 1 0 011.7.29l5.8 5.8 5.8-5.8a1 1 0 011.41 1.41l-5.8 5.8 5.8 5.8a1 1 0 01-1.41 1.41l-5.8-5.8-5.8 5.8A1 1 0 011 15z"></path>
+							</svg>
+						</button>
+					</div>
+					<div class="threaddesk-auth-modal__content">
+						<div class="threaddesk-auth-modal__tabs" role="tablist">
+							<button type="button" class="threaddesk-auth-modal__tab is-active" role="tab" aria-selected="true" data-threaddesk-auth-tab="login">
+								<?php echo esc_html__( 'Login', 'threaddesk' ); ?>
+							</button>
+							<button type="button" class="threaddesk-auth-modal__tab" role="tab" aria-selected="false" data-threaddesk-auth-tab="register">
+								<?php echo esc_html__( 'Sign Up', 'threaddesk' ); ?>
+							</button>
+						</div>
+						<div class="threaddesk-auth-modal__forms">
+							<div class="threaddesk-auth-modal__form is-active" data-threaddesk-auth-panel="login">
+								<form class="threaddesk-auth-modal__form-inner" action="<?php echo esc_url( $login_url ); ?>" method="post">
+									<p>
+										<label for="threaddesk_user_login"><?php echo esc_html__( 'Username or Email Address', 'threaddesk' ); ?></label>
+										<input type="text" name="log" id="threaddesk_user_login" autocomplete="username" autocapitalize="off" />
+									</p>
+									<p>
+										<label for="threaddesk_user_pass"><?php echo esc_html__( 'Password', 'threaddesk' ); ?></label>
+										<input type="password" name="pwd" id="threaddesk_user_pass" autocomplete="current-password" />
+									</p>
+									<p class="threaddesk-auth-modal__form-row">
+										<label class="threaddesk-auth-modal__checkbox">
+											<input type="checkbox" name="rememberme" value="forever" />
+											<?php echo esc_html__( 'Remember Me', 'threaddesk' ); ?>
+										</label>
+										<button type="button" class="threaddesk-auth-modal__link" data-threaddesk-auth="forgot">
+											<?php echo esc_html__( 'Forgot Password?', 'threaddesk' ); ?>
+										</button>
+									</p>
+									<p class="threaddesk-auth-modal__submit">
+										<button type="submit" class="threaddesk-auth-modal__button">
+											<?php echo esc_html__( 'Log In', 'threaddesk' ); ?>
+										</button>
+									</p>
+								</form>
+							</div>
+							<div class="threaddesk-auth-modal__form" data-threaddesk-auth-panel="register">
+								<form class="threaddesk-auth-modal__form-inner" action="<?php echo esc_url( $register_url ); ?>" method="post">
+									<p>
+										<label for="threaddesk_register_email"><?php echo esc_html__( 'Email', 'threaddesk' ); ?></label>
+										<input type="email" name="user_email" id="threaddesk_register_email" autocomplete="email" />
+									</p>
+									<p>
+										<label for="threaddesk_register_pass"><?php echo esc_html__( 'Password', 'threaddesk' ); ?></label>
+										<input type="password" name="user_pass" id="threaddesk_register_pass" autocomplete="new-password" />
+									</p>
+									<p class="threaddesk-auth-modal__submit">
+										<button type="submit" class="threaddesk-auth-modal__button">
+											<?php echo esc_html__( 'Register', 'threaddesk' ); ?>
+										</button>
+									</p>
+								</form>
+							</div>
+							<div class="threaddesk-auth-modal__form" data-threaddesk-auth-panel="forgot">
+								<form class="threaddesk-auth-modal__form-inner" action="<?php echo esc_url( $lost_url ); ?>" method="post">
+									<p>
+										<label for="threaddesk_forgot_login"><?php echo esc_html__( 'Username or Email Address', 'threaddesk' ); ?></label>
+										<input type="text" name="user_login" id="threaddesk_forgot_login" autocomplete="username" autocapitalize="off" />
+									</p>
+									<p class="threaddesk-auth-modal__submit">
+										<button type="submit" class="threaddesk-auth-modal__button">
+											<?php echo esc_html__( 'Get New Password', 'threaddesk' ); ?>
+										</button>
+									</p>
+									<button type="button" class="threaddesk-auth-modal__link" data-threaddesk-auth="login">
+										<?php echo esc_html__( '← Back to login', 'threaddesk' ); ?>
+									</button>
+								</form>
+							</div>
+						</div>
+					</div>
+				</div>
+			</div>
+			<?php
 
 		return ob_get_clean();
 	}
