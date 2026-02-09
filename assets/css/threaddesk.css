@@ -378,10 +378,10 @@
 }
 
 .threaddesk-auth-modal__form-row {
-	display: flex;
-	align-items: center;
-	justify-content: space-between;
-	gap: 12px;
+	display: grid;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	gap: 16px;
+	align-items: start;
 	font-size: 13px;
 	color: #555;
 }

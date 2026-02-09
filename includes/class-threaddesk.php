@@ -436,6 +436,24 @@ class TTA_ThreadDesk {
 							</div>
 								<div class="threaddesk-auth-modal__form" data-threaddesk-auth-panel="register">
 									<form class="threaddesk-auth-modal__form-inner" action="<?php echo esc_url( $register_url ); ?>" method="post">
+										<div class="threaddesk-auth-modal__form-row">
+											<p>
+												<label for="threaddesk_register_first_name"><?php echo esc_html__( 'First Name', 'threaddesk' ); ?></label>
+												<input type="text" name="first_name" id="threaddesk_register_first_name" autocomplete="given-name" />
+											</p>
+											<p>
+												<label for="threaddesk_register_last_name"><?php echo esc_html__( 'Last Name', 'threaddesk' ); ?></label>
+												<input type="text" name="last_name" id="threaddesk_register_last_name" autocomplete="family-name" />
+											</p>
+										</div>
+										<p>
+											<label for="threaddesk_register_company"><?php echo esc_html__( 'Company Name', 'threaddesk' ); ?></label>
+											<input type="text" name="user_login" id="threaddesk_register_company" autocomplete="organization" />
+										</p>
+										<p>
+											<label for="threaddesk_register_website"><?php echo esc_html__( 'Website (optional)', 'threaddesk' ); ?></label>
+											<input type="url" name="user_url" id="threaddesk_register_website" autocomplete="url" />
+										</p>
 										<p>
 											<label for="threaddesk_register_email"><?php echo esc_html__( 'Email', 'threaddesk' ); ?></label>
 											<input type="email" name="user_email" id="threaddesk_register_email" autocomplete="email" />
