@@ -34,6 +34,7 @@ class TTA_ThreadDesk {
 		add_action( 'admin_post_tta_threaddesk_request_order', array( $this, 'handle_request_order' ) );
 		add_action( 'admin_post_tta_threaddesk_reorder', array( $this, 'handle_reorder' ) );
 		add_action( 'admin_post_tta_threaddesk_avatar_upload', array( $this, 'handle_avatar_upload' ) );
+		add_action( 'user_register', array( $this, 'handle_user_register' ) );
 		add_shortcode( 'threaddesk', array( $this, 'render_shortcode' ) );
 		add_shortcode( 'threaddesk_auth', array( $this, 'render_auth_shortcode' ) );
 	}
@@ -436,6 +437,7 @@ class TTA_ThreadDesk {
 							</div>
 								<div class="threaddesk-auth-modal__form" data-threaddesk-auth-panel="register">
 									<form class="threaddesk-auth-modal__form-inner" action="<?php echo esc_url( $register_url ); ?>" method="post">
+										<input type="hidden" name="threaddesk_register" value="1" />
 										<div class="threaddesk-auth-modal__form-row">
 											<p>
 												<label for="threaddesk_register_first_name"><?php echo esc_html__( 'First Name', 'threaddesk' ); ?></label>
@@ -507,5 +509,29 @@ class TTA_ThreadDesk {
 			<?php
 
 		return ob_get_clean();
+	}
+
+	public function handle_user_register( $user_id ) {
+		if ( empty( $_POST['threaddesk_register'] ) ) {
+			return;
+		}
+
+		$first_name = isset( $_POST['first_name'] ) ? sanitize_text_field( wp_unslash( $_POST['first_name'] ) ) : '';
+		$last_name  = isset( $_POST['last_name'] ) ? sanitize_text_field( wp_unslash( $_POST['last_name'] ) ) : '';
+
+		if ( $first_name || $last_name ) {
+			wp_update_user(
+				array(
+					'ID'         => $user_id,
+					'first_name' => $first_name,
+					'last_name'  => $last_name,
+				)
+			);
+		}
+
+		if ( get_role( 'customer' ) ) {
+			$user = new WP_User( $user_id );
+			$user->set_role( 'customer' );
+		}
 	}
 }
