@@ -414,6 +414,10 @@ body.threaddesk-modal-open {
 	border-bottom: 1px solid #eee;
 }
 
+.threaddesk-address-modal .threaddesk-auth-modal__tabs {
+	grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
 .threaddesk-auth-modal__tab {
 	border: none;
 	background: transparent;
