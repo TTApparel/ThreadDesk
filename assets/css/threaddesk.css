@@ -130,6 +130,69 @@
 	margin: 0;
 	color: #555;
 }
+
+.threaddesk-auth {
+	position: relative;
+	display: inline-flex;
+	flex-direction: column;
+	align-items: flex-start;
+	font-family: "Helvetica Neue", Arial, sans-serif;
+}
+
+.threaddesk-auth__trigger {
+	border: 1px solid #1f1f1f;
+	border-radius: 999px;
+	padding: 8px 18px;
+	background: #fff;
+	color: #1f1f1f;
+	font-size: 12px;
+	text-transform: uppercase;
+	letter-spacing: 0.08em;
+	cursor: pointer;
+	transition: all 0.2s ease;
+}
+
+.threaddesk-auth__trigger:hover,
+.threaddesk-auth__trigger:focus {
+	background: #1f1f1f;
+	color: #fff;
+}
+
+.threaddesk-auth__menu {
+	position: absolute;
+	top: calc(100% + 8px);
+	left: 0;
+	display: grid;
+	gap: 8px;
+	min-width: 200px;
+	padding: 12px;
+	border-radius: 12px;
+	background: #fff;
+	box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+	opacity: 0;
+	visibility: hidden;
+	transform: translateY(-4px);
+	transition: opacity 0.2s ease, transform 0.2s ease, visibility 0.2s ease;
+	z-index: 20;
+}
+
+.threaddesk-auth__menu a {
+	color: #1f1f1f;
+	text-decoration: none;
+	font-size: 14px;
+}
+
+.threaddesk-auth__menu a:hover,
+.threaddesk-auth__menu a:focus {
+	text-decoration: underline;
+}
+
+.threaddesk-auth:hover .threaddesk-auth__menu,
+.threaddesk-auth:focus-within .threaddesk-auth__menu {
+	opacity: 1;
+	visibility: visible;
+	transform: translateY(0);
+}
 .threaddesk__stats,
 .threaddesk__secondary-stats {
 	display: grid;

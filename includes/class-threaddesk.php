@@ -35,6 +35,7 @@ class TTA_ThreadDesk {
 		add_action( 'admin_post_tta_threaddesk_reorder', array( $this, 'handle_reorder' ) );
 		add_action( 'admin_post_tta_threaddesk_avatar_upload', array( $this, 'handle_avatar_upload' ) );
 		add_shortcode( 'threaddesk', array( $this, 'render_shortcode' ) );
+		add_shortcode( 'threaddesk_auth', array( $this, 'render_auth_shortcode' ) );
 	}
 
 	public static function activate() {
@@ -351,6 +352,40 @@ class TTA_ThreadDesk {
 
 		$section = get_query_var( 'td_section', 'profile' );
 		$this->render->render_section( $section );
+
+		return ob_get_clean();
+	}
+
+	public function render_auth_shortcode() {
+		if ( is_user_logged_in() ) {
+			return '';
+		}
+
+		wp_enqueue_style( 'threaddesk', THREDDESK_URL . 'assets/css/threaddesk.css', array(), THREDDESK_VERSION );
+
+		$login_url    = wp_login_url();
+		$register_url = wp_registration_url();
+		$lost_url     = wp_lostpassword_url();
+
+		ob_start();
+		?>
+		<div class="threaddesk-auth" role="navigation" aria-label="<?php echo esc_attr__( 'Account links', 'threaddesk' ); ?>">
+			<button type="button" class="threaddesk-auth__trigger">
+				<?php echo esc_html__( 'Log in/Register', 'threaddesk' ); ?>
+			</button>
+			<div class="threaddesk-auth__menu" aria-hidden="true">
+				<a href="<?php echo esc_url( $login_url ); ?>">
+					<?php echo esc_html__( 'Sign in', 'threaddesk' ); ?>
+				</a>
+				<a href="<?php echo esc_url( $register_url ); ?>">
+					<?php echo esc_html__( 'Register', 'threaddesk' ); ?>
+				</a>
+				<a href="<?php echo esc_url( $lost_url ); ?>">
+					<?php echo esc_html__( 'Forgot password', 'threaddesk' ); ?>
+				</a>
+			</div>
+		</div>
+		<?php
 
 		return ob_get_clean();
 	}
