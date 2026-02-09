@@ -23,10 +23,8 @@ $format_address_display = function ( $address ) {
 		array(
 			isset( $address['address_1'] ) ? $address['address_1'] : '',
 			isset( $address['address_2'] ) ? $address['address_2'] : '',
-			isset( $address['city'] ) ? $address['city'] : '',
-			isset( $address['state'] ) ? $address['state'] : '',
-			isset( $address['postcode'] ) ? $address['postcode'] : '',
-			isset( $address['country'] ) ? $address['country'] : '',
+			trim( implode( ' ', array_filter( array( isset( $address['city'] ) ? $address['city'] : '', isset( $address['state'] ) ? $address['state'] : '' ) ) ) ),
+			trim( implode( ' ', array_filter( array( isset( $address['postcode'] ) ? $address['postcode'] : '', isset( $address['country'] ) ? $address['country'] : '' ) ) ) ),
 		)
 	);
 
