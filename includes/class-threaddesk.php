@@ -370,8 +370,10 @@ class TTA_ThreadDesk {
 		ob_start();
 		?>
 		<div class="threaddesk-auth" role="navigation" aria-label="<?php echo esc_attr__( 'Account links', 'threaddesk' ); ?>">
-			<button type="button" class="threaddesk-auth__trigger">
-				<?php echo esc_html__( 'Log in/Register', 'threaddesk' ); ?>
+			<button type="button" class="threaddesk-auth__trigger" aria-label="<?php echo esc_attr__( 'Log in or register', 'threaddesk' ); ?>">
+				<svg class="threaddesk-auth__icon" aria-hidden="true" viewBox="0 0 15 15" focusable="false">
+					<path d="M7.5 0C3.4 0 0 3.4 0 7.5S3.4 15 7.5 15 15 11.6 15 7.5 11.6 0 7.5 0zm0 2.1c1.4 0 2.5 1.1 2.5 2.4S8.9 7 7.5 7 5 5.9 5 4.5s1.1-2.4 2.5-2.4zm0 11.4c-2.1 0-3.9-1-5-2.6C3.4 9.6 6 9 7.5 9s4.1.6 5 1.9c-1.1 1.6-2.9 2.6-5 2.6z"></path>
+				</svg>
 			</button>
 			<div class="threaddesk-auth__menu" aria-hidden="true">
 				<a href="<?php echo esc_url( $login_url ); ?>">

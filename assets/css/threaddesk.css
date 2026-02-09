@@ -142,7 +142,7 @@
 .threaddesk-auth__trigger {
 	border: 1px solid #1f1f1f;
 	border-radius: 999px;
-	padding: 8px 18px;
+	padding: 8px 12px;
 	background: #fff;
 	color: #1f1f1f;
 	font-size: 12px;
@@ -150,12 +150,22 @@
 	letter-spacing: 0.08em;
 	cursor: pointer;
 	transition: all 0.2s ease;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
 }
 
 .threaddesk-auth__trigger:hover,
 .threaddesk-auth__trigger:focus {
 	background: #1f1f1f;
 	color: #fff;
+}
+
+.threaddesk-auth__icon {
+	width: 16px;
+	height: 16px;
+	fill: currentColor;
+	display: block;
 }
 
 .threaddesk-auth__menu {
