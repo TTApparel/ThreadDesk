@@ -351,6 +351,17 @@
 	gap: 12px;
 }
 
+.threaddesk-auth-modal__privacy {
+	font-size: 12px;
+	color: #666;
+	line-height: 1.5;
+}
+
+.threaddesk-auth-modal__privacy a {
+	color: inherit;
+	text-decoration: underline;
+}
+
 .threaddesk-auth-modal__form-inner label {
 	display: block;
 	margin-bottom: 6px;

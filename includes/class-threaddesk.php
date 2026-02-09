@@ -434,21 +434,36 @@ class TTA_ThreadDesk {
 									</p>
 								</form>
 							</div>
-							<div class="threaddesk-auth-modal__form" data-threaddesk-auth-panel="register">
-								<form class="threaddesk-auth-modal__form-inner" action="<?php echo esc_url( $register_url ); ?>" method="post">
-									<p>
-										<label for="threaddesk_register_email"><?php echo esc_html__( 'Email', 'threaddesk' ); ?></label>
-										<input type="email" name="user_email" id="threaddesk_register_email" autocomplete="email" />
-									</p>
-									<p>
-										<label for="threaddesk_register_pass"><?php echo esc_html__( 'Password', 'threaddesk' ); ?></label>
-										<input type="password" name="user_pass" id="threaddesk_register_pass" autocomplete="new-password" />
-									</p>
-									<p class="threaddesk-auth-modal__submit">
-										<button type="submit" class="threaddesk-auth-modal__button">
-											<?php echo esc_html__( 'Register', 'threaddesk' ); ?>
-										</button>
-									</p>
+								<div class="threaddesk-auth-modal__form" data-threaddesk-auth-panel="register">
+									<form class="threaddesk-auth-modal__form-inner" action="<?php echo esc_url( $register_url ); ?>" method="post">
+										<p>
+											<label for="threaddesk_register_email"><?php echo esc_html__( 'Email', 'threaddesk' ); ?></label>
+											<input type="email" name="user_email" id="threaddesk_register_email" autocomplete="email" />
+										</p>
+										<p>
+											<label for="threaddesk_register_pass"><?php echo esc_html__( 'Password', 'threaddesk' ); ?></label>
+											<input type="password" name="user_pass" id="threaddesk_register_pass" autocomplete="new-password" />
+										</p>
+										<p class="threaddesk-auth-modal__privacy">
+											<?php
+											printf(
+												wp_kses(
+													__( 'Your personal data will be used to support your experience throughout this website, to manage access to your account, and for other purposes described in our <a href="%s">privacy policy.</a>', 'threaddesk' ),
+													array(
+														'a' => array(
+															'href' => array(),
+														),
+													)
+												),
+												esc_url( get_privacy_policy_url() )
+											);
+											?>
+										</p>
+										<p class="threaddesk-auth-modal__submit">
+											<button type="submit" class="threaddesk-auth-modal__button">
+												<?php echo esc_html__( 'Register', 'threaddesk' ); ?>
+											</button>
+										</p>
 								</form>
 							</div>
 							<div class="threaddesk-auth-modal__form" data-threaddesk-auth-panel="forgot">
