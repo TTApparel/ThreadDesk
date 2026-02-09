@@ -11,6 +11,19 @@ $client_name = ! empty( $context['client_name'] ) ? $context['client_name'] : __
 $avatar_url  = ! empty( $context['avatar_url'] ) ? $context['avatar_url'] : '';
 $stats   = isset( $context['order_stats'] ) ? $context['order_stats'] : array();
 $currency = isset( $context['currency'] ) ? $context['currency'] : 'USD';
+$shipping_address = ! empty( $context['shipping_address'] ) ? $context['shipping_address'] : array();
+$map_parts = array_filter(
+	array(
+		isset( $shipping_address['address_1'] ) ? $shipping_address['address_1'] : '',
+		isset( $shipping_address['address_2'] ) ? $shipping_address['address_2'] : '',
+		isset( $shipping_address['city'] ) ? $shipping_address['city'] : '',
+		isset( $shipping_address['state'] ) ? $shipping_address['state'] : '',
+		isset( $shipping_address['postcode'] ) ? $shipping_address['postcode'] : '',
+		isset( $shipping_address['country'] ) ? $shipping_address['country'] : '',
+	)
+);
+$map_query = trim( implode( ', ', $map_parts ) );
+$map_url   = $map_query ? sprintf( 'https://www.google.com/maps?q=%s&output=embed', rawurlencode( $map_query ) ) : '';
 
 $nav_base = trailingslashit( wc_get_account_endpoint_url( 'thread-desk' ) );
 
@@ -35,6 +48,15 @@ $format_price = function ( $amount ) use ( $currency ) {
 		<div class="threaddesk__content-inner">
 			<div class="threaddesk__main">
 				<div class="threaddesk__header" style="background-image: url('<?php echo esc_url( $cover ); ?>');">
+					<?php if ( $map_url ) : ?>
+						<div class="threaddesk__header-map" aria-hidden="true">
+							<iframe
+								title="<?php echo esc_attr__( 'Shipping address map', 'threaddesk' ); ?>"
+								src="<?php echo esc_url( $map_url ); ?>"
+								loading="lazy"
+								referrerpolicy="no-referrer-when-downgrade"></iframe>
+						</div>
+					<?php endif; ?>
 					<form class="threaddesk__profile" method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" enctype="multipart/form-data">
 						<input type="hidden" name="action" value="tta_threaddesk_avatar_upload" />
 						<?php wp_nonce_field( 'tta_threaddesk_avatar_upload' ); ?>
