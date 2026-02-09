@@ -263,6 +263,8 @@
 	position: absolute;
 	inset: 0;
 	background: rgba(0, 0, 0, 0.55);
+	opacity: 0;
+	transition: opacity 0.2s ease;
 }
 
 .threaddesk-auth-modal__panel {
@@ -270,12 +272,24 @@
 	z-index: 1;
 	background: #fff;
 	width: min(480px, 90vw);
-	border-radius: 12px;
+	border-radius: 3px;
 	box-shadow: 0 20px 60px rgba(0, 0, 0, 0.25);
-	padding: 24px;
+	padding: 60px 70px;
 	display: flex;
 	flex-direction: column;
 	gap: 16px;
+	opacity: 0;
+	transform: translate3d(0, -10px, 0);
+	transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.threaddesk-auth-modal.is-active .threaddesk-auth-modal__overlay {
+	opacity: 1;
+}
+
+.threaddesk-auth-modal.is-active .threaddesk-auth-modal__panel {
+	opacity: 1;
+	transform: translate3d(0, 0, 0);
 }
 
 .threaddesk-auth-modal__actions {
