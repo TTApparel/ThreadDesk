@@ -50,6 +50,7 @@
 }
 
 .threaddesk__header {
+	position: relative;
 	border-radius: 12px;
 	background-size: cover;
 	background-position: center;
@@ -59,16 +60,38 @@
 	display: flex;
 	align-items: flex-end;
 	margin-bottom: 16px;
+	overflow: hidden;
+}
+
+.threaddesk__header-map {
+	position: absolute;
+	inset: 0;
+}
+
+.threaddesk__header-map iframe {
+	width: 100%;
+	height: 100%;
+	border: 0;
+	opacity: 0.85;
 }
 
 .threaddesk__profile {
+	position: relative;
 	display: flex;
 	gap: 16px;
-	align-items: center;
+	align-items: flex-end;
 	background: rgba(255, 255, 255, 0.9);
 	padding: 12px 16px;
 	border-radius: 12px;
 	width: 100%;
+	min-height: 200px;
+	z-index: 1;
+}
+
+.threaddesk__profile-details {
+	display: flex;
+	align-items: center;
+	gap: 16px;
 }
 
 .threaddesk__avatar {
@@ -94,6 +117,7 @@
 	height: 100%;
 	object-fit: cover;
 	object-position: center;
+	border-radius: 50%;
 	display: block;
 }
 
@@ -119,6 +143,16 @@
 .threaddesk__avatar-input {
 	position: absolute;
 	left: -9999px;
+}
+
+.threaddesk__link-button {
+	border: none;
+	background: transparent;
+	padding: 0;
+	color: var(--theme-link-initial-color);
+	cursor: pointer;
+	text-decoration: underline;
+	font: inherit;
 }
 
 .threaddesk__profile-text h2 {
@@ -249,6 +283,10 @@
 .threaddesk-auth__avatar {
 	border-radius: 50%;
 	flex-shrink: 0;
+	width: 40px;
+	height: 40px;
+	object-fit: cover;
+	display: block;
 }
 
 .threaddesk-auth__user-text {
@@ -292,7 +330,8 @@
 	transform: translateY(0);
 }
 
-.threaddesk-auth-modal {
+.threaddesk-auth-modal,
+.threaddesk-address-modal {
 	position: fixed;
 	inset: 0;
 	display: none;
@@ -301,7 +340,8 @@
 	z-index: 1000;
 }
 
-.threaddesk-auth-modal.is-active {
+.threaddesk-auth-modal.is-active,
+.threaddesk-address-modal.is-active {
 	display: flex;
 }
 
@@ -324,16 +364,24 @@
 	display: flex;
 	flex-direction: column;
 	gap: 16px;
+	max-height: calc(100vh - 40px);
+	overflow-y: auto;
 	opacity: 0;
 	transform: translate3d(0, -10px, 0);
 	transition: opacity 0.2s ease, transform 0.2s ease;
 }
 
-.threaddesk-auth-modal.is-active .threaddesk-auth-modal__overlay {
+body.threaddesk-modal-open {
+	overflow: hidden;
+}
+
+.threaddesk-auth-modal.is-active .threaddesk-auth-modal__overlay,
+.threaddesk-address-modal.is-active .threaddesk-auth-modal__overlay {
 	opacity: 1;
 }
 
-.threaddesk-auth-modal.is-active .threaddesk-auth-modal__panel {
+.threaddesk-auth-modal.is-active .threaddesk-auth-modal__panel,
+.threaddesk-address-modal.is-active .threaddesk-auth-modal__panel {
 	opacity: 1;
 	transform: translate3d(0, 0, 0);
 }
@@ -360,6 +408,10 @@
 	display: grid;
 	grid-template-columns: repeat(2, minmax(0, 1fr));
 	border-bottom: 1px solid #eee;
+}
+
+.threaddesk-address-modal .threaddesk-auth-modal__tabs {
+	grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
 .threaddesk-auth-modal__tab {
@@ -414,13 +466,13 @@
 	border-radius: 4px;
 	font-size: 13px;
 	color: #444;
-	text-align: center;
+	text-align: left;
 }
 
 .threaddesk-auth-modal__notice ul {
 	margin: 8px 0 0;
-	padding-left: 18px;
-	list-style-position: inside;
+	padding-left: 0;
+	list-style: none;
 }
 
 .threaddesk-auth-modal__notice li {
@@ -496,22 +548,30 @@
 	border-radius: 12px;
 	background: #fff;
 	box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: flex-start;
 }
 
 .threaddesk__stat span,
 .threaddesk__secondary-stats span {
-	display: block;
+	display: flex;
+	align-items: center;
+	justify-content: center;
 	font-size: 12px;
 	color: #666;
 	text-transform: uppercase;
 	letter-spacing: 0.08em;
 	margin-bottom: 8px;
+	min-height: 2.6em;
 }
 
 .threaddesk__stat strong,
 .threaddesk__secondary-stats strong {
 	display: block;
 	font-size: 18px;
+	margin-top: 0;
 }
 
 .threaddesk__stat-note {
