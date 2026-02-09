@@ -384,15 +384,6 @@ class TTA_ThreadDesk {
 			wp_die( esc_html__( 'Invalid address type.', 'threaddesk' ) );
 		}
 
-		if ( ! function_exists( 'wc_get_customer' ) ) {
-			wp_die( esc_html__( 'WooCommerce is required.', 'threaddesk' ) );
-		}
-
-		$customer = wc_get_customer( get_current_user_id() );
-		if ( ! $customer ) {
-			wp_die( esc_html__( 'Unable to load customer.', 'threaddesk' ) );
-		}
-
 		$fields_by_type = array(
 			'billing'  => array( 'address_1', 'address_2', 'city', 'state', 'postcode', 'country' ),
 			'shipping' => array( 'address_1', 'address_2', 'city', 'state', 'postcode', 'country' ),
@@ -408,10 +399,7 @@ class TTA_ThreadDesk {
 					$key = "{$group}_{$field}";
 					if ( isset( $_POST[ $key ] ) ) {
 						$value  = sanitize_text_field( wp_unslash( $_POST[ $key ] ) );
-						$setter = "set_{$group}_{$field}";
-						if ( is_callable( array( $customer, $setter ) ) ) {
-							$customer->$setter( $value );
-						}
+						update_user_meta( get_current_user_id(), $key, $value );
 					}
 				}
 			}
@@ -420,15 +408,10 @@ class TTA_ThreadDesk {
 				$key = "{$type}_{$field}";
 				if ( isset( $_POST[ $key ] ) ) {
 					$value  = sanitize_text_field( wp_unslash( $_POST[ $key ] ) );
-					$setter = "set_{$type}_{$field}";
-					if ( is_callable( array( $customer, $setter ) ) ) {
-						$customer->$setter( $value );
-					}
+					update_user_meta( get_current_user_id(), $key, $value );
 				}
 			}
 		}
-
-		$customer->save();
 
 		$redirect = wp_get_referer();
 		if ( ! $redirect ) {
