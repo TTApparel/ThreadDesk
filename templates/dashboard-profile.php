@@ -12,14 +12,16 @@ $avatar_url  = ! empty( $context['avatar_url'] ) ? $context['avatar_url'] : '';
 $stats   = isset( $context['order_stats'] ) ? $context['order_stats'] : array();
 $currency = isset( $context['currency'] ) ? $context['currency'] : 'USD';
 $shipping_address = ! empty( $context['shipping_address'] ) ? $context['shipping_address'] : array();
+$billing_address  = ! empty( $context['billing_address'] ) ? $context['billing_address'] : array();
+$address_source   = $shipping_address ? $shipping_address : $billing_address;
 $map_parts = array_filter(
 	array(
-		isset( $shipping_address['address_1'] ) ? $shipping_address['address_1'] : '',
-		isset( $shipping_address['address_2'] ) ? $shipping_address['address_2'] : '',
-		isset( $shipping_address['city'] ) ? $shipping_address['city'] : '',
-		isset( $shipping_address['state'] ) ? $shipping_address['state'] : '',
-		isset( $shipping_address['postcode'] ) ? $shipping_address['postcode'] : '',
-		isset( $shipping_address['country'] ) ? $shipping_address['country'] : '',
+		isset( $address_source['address_1'] ) ? $address_source['address_1'] : '',
+		isset( $address_source['address_2'] ) ? $address_source['address_2'] : '',
+		isset( $address_source['city'] ) ? $address_source['city'] : '',
+		isset( $address_source['state'] ) ? $address_source['state'] : '',
+		isset( $address_source['postcode'] ) ? $address_source['postcode'] : '',
+		isset( $address_source['country'] ) ? $address_source['country'] : '',
 	)
 );
 $map_query = trim( implode( ', ', $map_parts ) );
