@@ -161,6 +161,27 @@ class TTA_ThreadDesk {
 				<?php submit_button(); ?>
 			</form>
 
+			<h2><?php echo esc_html__( 'Shortcodes', 'threaddesk' ); ?></h2>
+			<p><?php echo esc_html__( 'Place these shortcodes on the appropriate pages to surface ThreadDesk features for your customers.', 'threaddesk' ); ?></p>
+			<table class="widefat striped">
+				<thead>
+					<tr>
+						<th scope="col"><?php echo esc_html__( 'Shortcode', 'threaddesk' ); ?></th>
+						<th scope="col"><?php echo esc_html__( 'Placement', 'threaddesk' ); ?></th>
+					</tr>
+				</thead>
+				<tbody>
+					<tr>
+						<td><code>[threaddesk]</code></td>
+						<td><?php echo esc_html__( 'Use on the main ThreadDesk dashboard page within the WooCommerce My Account area.', 'threaddesk' ); ?></td>
+					</tr>
+					<tr>
+						<td><code>[threaddesk_auth]</code></td>
+						<td><?php echo esc_html__( 'Use in your header or account menu to display the login/register modal and account links.', 'threaddesk' ); ?></td>
+					</tr>
+				</tbody>
+			</table>
+
 			<h2><?php echo esc_html__( 'Demo Data', 'threaddesk' ); ?></h2>
 			<p><?php echo esc_html__( 'Generate demo quotes, designs, and layouts for the current admin user.', 'threaddesk' ); ?></p>
 			<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
@@ -371,7 +392,21 @@ class TTA_ThreadDesk {
 			$full_name    = trim( $current_user->first_name . ' ' . $current_user->last_name );
 			$display_name = $full_name ? $full_name : $current_user->display_name;
 			$company_name = $current_user->user_login;
-			$avatar       = get_avatar( $current_user->ID, 40, '', $display_name, array( 'class' => 'threaddesk-auth__avatar' ) );
+			$avatar       = '';
+			$avatar_id    = (int) get_user_meta( $current_user->ID, 'tta_threaddesk_avatar_id', true );
+			if ( $avatar_id ) {
+				$avatar_url = wp_get_attachment_image_url( $avatar_id, 'thumbnail' );
+				if ( $avatar_url ) {
+					$avatar = sprintf(
+						'<img src="%s" alt="%s" class="threaddesk-auth__avatar" />',
+						esc_url( $avatar_url ),
+						esc_attr( $display_name )
+					);
+				}
+			}
+			if ( '' === $avatar ) {
+				$avatar = get_avatar( $current_user->ID, 40, '', $display_name, array( 'class' => 'threaddesk-auth__avatar' ) );
+			}
 			$logout_url   = wp_logout_url( home_url() );
 			$base_url     = function_exists( 'wc_get_account_endpoint_url' )
 				? wc_get_account_endpoint_url( 'thread-desk' )
@@ -471,12 +506,12 @@ class TTA_ThreadDesk {
 									<?php if ( ( $this->auth_notice || ! empty( $this->auth_errors ) ) && 'login' === $this->auth_active_panel ) : ?>
 										<div class="threaddesk-auth-modal__notice" role="status">
 											<?php if ( $this->auth_notice ) : ?>
-												<p><?php echo esc_html( $this->auth_notice ); ?></p>
+												<p><?php echo wp_kses_post( $this->auth_notice ); ?></p>
 											<?php endif; ?>
 											<?php if ( ! empty( $this->auth_errors ) ) : ?>
 												<ul>
 													<?php foreach ( $this->auth_errors as $error ) : ?>
-														<li><?php echo esc_html( $error ); ?></li>
+														<li><?php echo wp_kses_post( $error ); ?></li>
 													<?php endforeach; ?>
 												</ul>
 											<?php endif; ?>
@@ -513,12 +548,12 @@ class TTA_ThreadDesk {
 											<?php if ( $this->auth_notice || ! empty( $this->auth_errors ) ) : ?>
 												<div class="threaddesk-auth-modal__notice" role="status">
 													<?php if ( $this->auth_notice ) : ?>
-														<p><?php echo esc_html( $this->auth_notice ); ?></p>
+														<p><?php echo wp_kses_post( $this->auth_notice ); ?></p>
 													<?php endif; ?>
 													<?php if ( ! empty( $this->auth_errors ) ) : ?>
 														<ul>
 															<?php foreach ( $this->auth_errors as $error ) : ?>
-																<li><?php echo esc_html( $error ); ?></li>
+																<li><?php echo wp_kses_post( $error ); ?></li>
 															<?php endforeach; ?>
 														</ul>
 													<?php endif; ?>
