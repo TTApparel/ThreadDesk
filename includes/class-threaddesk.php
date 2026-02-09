@@ -161,6 +161,27 @@ class TTA_ThreadDesk {
 				<?php submit_button(); ?>
 			</form>
 
+			<h2><?php echo esc_html__( 'Shortcodes', 'threaddesk' ); ?></h2>
+			<p><?php echo esc_html__( 'Place these shortcodes on the appropriate pages to surface ThreadDesk features for your customers.', 'threaddesk' ); ?></p>
+			<table class="widefat striped">
+				<thead>
+					<tr>
+						<th scope="col"><?php echo esc_html__( 'Shortcode', 'threaddesk' ); ?></th>
+						<th scope="col"><?php echo esc_html__( 'Placement', 'threaddesk' ); ?></th>
+					</tr>
+				</thead>
+				<tbody>
+					<tr>
+						<td><code>[threaddesk]</code></td>
+						<td><?php echo esc_html__( 'Use on the main ThreadDesk dashboard page within the WooCommerce My Account area.', 'threaddesk' ); ?></td>
+					</tr>
+					<tr>
+						<td><code>[threaddesk_auth]</code></td>
+						<td><?php echo esc_html__( 'Use in your header or account menu to display the login/register modal and account links.', 'threaddesk' ); ?></td>
+					</tr>
+				</tbody>
+			</table>
+
 			<h2><?php echo esc_html__( 'Demo Data', 'threaddesk' ); ?></h2>
 			<p><?php echo esc_html__( 'Generate demo quotes, designs, and layouts for the current admin user.', 'threaddesk' ); ?></p>
 			<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
