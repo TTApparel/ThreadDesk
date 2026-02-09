@@ -38,6 +38,7 @@ class TTA_ThreadDesk {
 		add_action( 'admin_post_tta_threaddesk_request_order', array( $this, 'handle_request_order' ) );
 		add_action( 'admin_post_tta_threaddesk_reorder', array( $this, 'handle_reorder' ) );
 		add_action( 'admin_post_tta_threaddesk_avatar_upload', array( $this, 'handle_avatar_upload' ) );
+		add_action( 'admin_post_tta_threaddesk_update_address', array( $this, 'handle_update_address' ) );
 		add_action( 'user_register', array( $this, 'handle_user_register' ) );
 		add_action( 'init', array( $this, 'handle_auth_login' ) );
 		add_action( 'init', array( $this, 'handle_auth_register' ) );
@@ -160,6 +161,27 @@ class TTA_ThreadDesk {
 				</table>
 				<?php submit_button(); ?>
 			</form>
+
+			<h2><?php echo esc_html__( 'Shortcodes', 'threaddesk' ); ?></h2>
+			<p><?php echo esc_html__( 'Place these shortcodes on the appropriate pages to surface ThreadDesk features for your customers.', 'threaddesk' ); ?></p>
+			<table class="widefat striped">
+				<thead>
+					<tr>
+						<th scope="col"><?php echo esc_html__( 'Shortcode', 'threaddesk' ); ?></th>
+						<th scope="col"><?php echo esc_html__( 'Placement', 'threaddesk' ); ?></th>
+					</tr>
+				</thead>
+				<tbody>
+					<tr>
+						<td><code>[threaddesk]</code></td>
+						<td><?php echo esc_html__( 'Use on the main ThreadDesk dashboard page within the WooCommerce My Account area.', 'threaddesk' ); ?></td>
+					</tr>
+					<tr>
+						<td><code>[threaddesk_auth]</code></td>
+						<td><?php echo esc_html__( 'Use in your header or account menu to display the login/register modal and account links.', 'threaddesk' ); ?></td>
+					</tr>
+				</tbody>
+			</table>
 
 			<h2><?php echo esc_html__( 'Demo Data', 'threaddesk' ); ?></h2>
 			<p><?php echo esc_html__( 'Generate demo quotes, designs, and layouts for the current admin user.', 'threaddesk' ); ?></p>
@@ -350,6 +372,63 @@ class TTA_ThreadDesk {
 		exit;
 	}
 
+	public function handle_update_address() {
+		if ( ! is_user_logged_in() ) {
+			wp_die( esc_html__( 'Unauthorized.', 'threaddesk' ) );
+		}
+
+		check_admin_referer( 'tta_threaddesk_update_address' );
+
+		$type = isset( $_POST['address_type'] ) ? sanitize_key( wp_unslash( $_POST['address_type'] ) ) : 'billing';
+		if ( ! in_array( $type, array( 'billing', 'shipping' ), true ) ) {
+			wp_die( esc_html__( 'Invalid address type.', 'threaddesk' ) );
+		}
+
+		if ( ! function_exists( 'wc_get_customer' ) ) {
+			wp_die( esc_html__( 'WooCommerce is required.', 'threaddesk' ) );
+		}
+
+		$customer = wc_get_customer( get_current_user_id() );
+		if ( ! $customer ) {
+			wp_die( esc_html__( 'Unable to load customer.', 'threaddesk' ) );
+		}
+
+		$fields = array(
+			'first_name',
+			'last_name',
+			'company',
+			'address_1',
+			'address_2',
+			'city',
+			'state',
+			'postcode',
+			'country',
+			'phone',
+			'email',
+		);
+
+		foreach ( $fields as $field ) {
+			$key = "{$type}_{$field}";
+			if ( isset( $_POST[ $key ] ) ) {
+				$value = sanitize_text_field( wp_unslash( $_POST[ $key ] ) );
+				$setter = "set_{$type}_{$field}";
+				if ( is_callable( array( $customer, $setter ) ) ) {
+					$customer->$setter( $value );
+				}
+			}
+		}
+
+		$customer->save();
+
+		$redirect = wp_get_referer();
+		if ( ! $redirect ) {
+			$redirect = home_url();
+		}
+
+		wp_safe_redirect( $redirect );
+		exit;
+	}
+
 	public function render_shortcode() {
 		if ( ! is_user_logged_in() ) {
 			return esc_html__( 'Please log in to view ThreadDesk.', 'threaddesk' );
@@ -371,7 +450,21 @@ class TTA_ThreadDesk {
 			$full_name    = trim( $current_user->first_name . ' ' . $current_user->last_name );
 			$display_name = $full_name ? $full_name : $current_user->display_name;
 			$company_name = $current_user->user_login;
-			$avatar       = get_avatar( $current_user->ID, 40, '', $display_name, array( 'class' => 'threaddesk-auth__avatar' ) );
+			$avatar       = '';
+			$avatar_id    = (int) get_user_meta( $current_user->ID, 'tta_threaddesk_avatar_id', true );
+			if ( $avatar_id ) {
+				$avatar_url = wp_get_attachment_image_url( $avatar_id, 'thumbnail' );
+				if ( $avatar_url ) {
+					$avatar = sprintf(
+						'<img src="%s" alt="%s" class="threaddesk-auth__avatar" />',
+						esc_url( $avatar_url ),
+						esc_attr( $display_name )
+					);
+				}
+			}
+			if ( '' === $avatar ) {
+				$avatar = get_avatar( $current_user->ID, 40, '', $display_name, array( 'class' => 'threaddesk-auth__avatar' ) );
+			}
 			$logout_url   = wp_logout_url( home_url() );
 			$base_url     = function_exists( 'wc_get_account_endpoint_url' )
 				? wc_get_account_endpoint_url( 'thread-desk' )
@@ -471,12 +564,12 @@ class TTA_ThreadDesk {
 									<?php if ( ( $this->auth_notice || ! empty( $this->auth_errors ) ) && 'login' === $this->auth_active_panel ) : ?>
 										<div class="threaddesk-auth-modal__notice" role="status">
 											<?php if ( $this->auth_notice ) : ?>
-												<p><?php echo esc_html( $this->auth_notice ); ?></p>
+												<p><?php echo wp_kses_post( $this->auth_notice ); ?></p>
 											<?php endif; ?>
 											<?php if ( ! empty( $this->auth_errors ) ) : ?>
 												<ul>
 													<?php foreach ( $this->auth_errors as $error ) : ?>
-														<li><?php echo esc_html( $error ); ?></li>
+														<li><?php echo wp_kses_post( $error ); ?></li>
 													<?php endforeach; ?>
 												</ul>
 											<?php endif; ?>
@@ -513,12 +606,12 @@ class TTA_ThreadDesk {
 											<?php if ( $this->auth_notice || ! empty( $this->auth_errors ) ) : ?>
 												<div class="threaddesk-auth-modal__notice" role="status">
 													<?php if ( $this->auth_notice ) : ?>
-														<p><?php echo esc_html( $this->auth_notice ); ?></p>
+														<p><?php echo wp_kses_post( $this->auth_notice ); ?></p>
 													<?php endif; ?>
 													<?php if ( ! empty( $this->auth_errors ) ) : ?>
 														<ul>
 															<?php foreach ( $this->auth_errors as $error ) : ?>
-																<li><?php echo esc_html( $error ); ?></li>
+																<li><?php echo wp_kses_post( $error ); ?></li>
 															<?php endforeach; ?>
 														</ul>
 													<?php endif; ?>
