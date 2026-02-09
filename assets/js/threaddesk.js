@@ -9,11 +9,13 @@ jQuery(function ($) {
 	if (modal.length) {
 		const openModal = function (target) {
 			modal.addClass('is-active').attr('aria-hidden', 'false');
+			$('body').addClass('threaddesk-modal-open');
 			switchAuthPanel(target);
 		};
 
 		const closeModal = function () {
 			modal.removeClass('is-active').attr('aria-hidden', 'true');
+			$('body').removeClass('threaddesk-modal-open');
 		};
 
 		const switchAuthPanel = function (target) {
@@ -59,11 +61,13 @@ jQuery(function ($) {
 	if (addressModal.length) {
 		const openAddressModal = function (target) {
 			addressModal.addClass('is-active').attr('aria-hidden', 'false');
+			$('body').addClass('threaddesk-modal-open');
 			switchAddressPanel(target);
 		};
 
 		const closeAddressModal = function () {
 			addressModal.removeClass('is-active').attr('aria-hidden', 'true');
+			$('body').removeClass('threaddesk-modal-open');
 		};
 
 		const switchAddressPanel = function (target) {
