@@ -14,6 +14,7 @@ class TTA_ThreadDesk {
 	private $auth_notice = '';
 	private $auth_errors = array();
 	private $auth_active_panel = '';
+	private $auth_login_success = false;
 
 	public static function instance() {
 		if ( null === self::$instance ) {
@@ -38,6 +39,7 @@ class TTA_ThreadDesk {
 		add_action( 'admin_post_tta_threaddesk_reorder', array( $this, 'handle_reorder' ) );
 		add_action( 'admin_post_tta_threaddesk_avatar_upload', array( $this, 'handle_avatar_upload' ) );
 		add_action( 'user_register', array( $this, 'handle_user_register' ) );
+		add_action( 'init', array( $this, 'handle_auth_login' ) );
 		add_action( 'init', array( $this, 'handle_auth_register' ) );
 		add_shortcode( 'threaddesk', array( $this, 'render_shortcode' ) );
 		add_shortcode( 'threaddesk_auth', array( $this, 'render_auth_shortcode' ) );
@@ -362,7 +364,7 @@ class TTA_ThreadDesk {
 	}
 
 	public function render_auth_shortcode() {
-		if ( is_user_logged_in() ) {
+		if ( is_user_logged_in() && empty( $this->auth_notice ) && empty( $this->auth_errors ) ) {
 			return '';
 		}
 
@@ -413,7 +415,23 @@ class TTA_ThreadDesk {
 						</div>
 							<div class="threaddesk-auth-modal__forms">
 								<div class="threaddesk-auth-modal__form is-active" data-threaddesk-auth-panel="login">
-								<form class="threaddesk-auth-modal__form-inner" action="<?php echo esc_url( $login_url ); ?>" method="post">
+								<form class="threaddesk-auth-modal__form-inner" action="<?php echo esc_url( wp_unslash( $_SERVER['REQUEST_URI'] ) ); ?>" method="post">
+									<input type="hidden" name="threaddesk_login" value="1" />
+									<?php wp_nonce_field( 'threaddesk_login', 'threaddesk_login_nonce' ); ?>
+									<?php if ( ( $this->auth_notice || ! empty( $this->auth_errors ) ) && 'login' === $this->auth_active_panel ) : ?>
+										<div class="threaddesk-auth-modal__notice" role="status">
+											<?php if ( $this->auth_notice ) : ?>
+												<p><?php echo esc_html( $this->auth_notice ); ?></p>
+											<?php endif; ?>
+											<?php if ( ! empty( $this->auth_errors ) ) : ?>
+												<ul>
+													<?php foreach ( $this->auth_errors as $error ) : ?>
+														<li><?php echo esc_html( $error ); ?></li>
+													<?php endforeach; ?>
+												</ul>
+											<?php endif; ?>
+										</div>
+									<?php endif; ?>
 									<p>
 										<label for="threaddesk_user_login"><?php echo esc_html__( 'Username or Email Address', 'threaddesk' ); ?></label>
 										<input type="text" name="log" id="threaddesk_user_login" autocomplete="username" autocapitalize="off" />
@@ -636,5 +654,51 @@ class TTA_ThreadDesk {
 		}
 
 		$this->auth_notice = __( 'Registration successful. Please check your email for confirmation.', 'threaddesk' );
+	}
+
+	public function handle_auth_login() {
+		if ( empty( $_POST['threaddesk_login'] ) ) {
+			return;
+		}
+
+		$this->auth_active_panel = 'login';
+
+		if ( ! isset( $_POST['threaddesk_login_nonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['threaddesk_login_nonce'] ) ), 'threaddesk_login' ) ) {
+			$this->auth_errors[] = __( 'Login failed security validation. Please try again.', 'threaddesk' );
+			return;
+		}
+
+		$username = isset( $_POST['log'] ) ? sanitize_text_field( wp_unslash( $_POST['log'] ) ) : '';
+		$password = isset( $_POST['pwd'] ) ? (string) wp_unslash( $_POST['pwd'] ) : '';
+		$remember = ! empty( $_POST['rememberme'] );
+
+		if ( '' === $username ) {
+			$this->auth_errors[] = __( 'Missing Username or Email.', 'threaddesk' );
+		}
+
+		if ( '' === $password ) {
+			$this->auth_errors[] = __( 'Missing Password.', 'threaddesk' );
+		}
+
+		if ( ! empty( $this->auth_errors ) ) {
+			return;
+		}
+
+		$user = wp_signon(
+			array(
+				'user_login'    => $username,
+				'user_password' => $password,
+				'remember'      => $remember,
+			),
+			is_ssl()
+		);
+
+		if ( is_wp_error( $user ) ) {
+			$this->auth_errors[] = $user->get_error_message();
+			return;
+		}
+
+		$this->auth_notice = __( 'Login successful. Welcome back!', 'threaddesk' );
+		$this->auth_login_success = true;
 	}
 }
