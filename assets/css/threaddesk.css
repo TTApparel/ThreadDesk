@@ -582,6 +582,17 @@ body.threaddesk-modal-open {
 	font-size: 12px;
 }
 
+.woocommerce-Price-amount.amount {
+	display: inline-flex;
+	align-items: baseline;
+	gap: 0;
+	white-space: nowrap;
+}
+
+.woocommerce-Price-amount.amount .woocommerce-Price-currencySymbol {
+	margin-right: 2px;
+}
+
 .threaddesk__grid {
 	display: grid;
 	grid-template-columns: minmax(0, 1fr) 280px;
