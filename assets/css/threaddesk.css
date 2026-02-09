@@ -87,6 +87,12 @@
 	z-index: 1;
 }
 
+.threaddesk__profile-details {
+	display: flex;
+	align-items: center;
+	gap: 16px;
+}
+
 .threaddesk__avatar {
 	position: relative;
 	width: 100px;

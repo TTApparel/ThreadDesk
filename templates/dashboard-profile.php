@@ -27,6 +27,10 @@ $map_parts = array_filter(
 	)
 );
 $map_query = trim( implode( ', ', $map_parts ) );
+$formatted_address = ! empty( $address_source['formatted'] ) ? wp_strip_all_tags( $address_source['formatted'] ) : '';
+if ( '' === $map_query && $formatted_address ) {
+	$map_query = trim( preg_replace( '/\s+/', ' ', str_replace( array( "\r\n", "\r", "\n" ), ', ', $formatted_address ) ) );
+}
 $map_url   = $map_query ? sprintf( 'https://www.google.com/maps?q=%s&output=embed', rawurlencode( $map_query ) ) : '';
 $profile_name = '';
 if ( $user ) {
@@ -73,15 +77,17 @@ $format_price = function ( $amount ) use ( $currency ) {
 					<form class="threaddesk__profile" method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" enctype="multipart/form-data">
 						<input type="hidden" name="action" value="tta_threaddesk_avatar_upload" />
 						<?php wp_nonce_field( 'tta_threaddesk_avatar_upload' ); ?>
-						<label class="threaddesk__avatar<?php echo $avatar_url ? ' has-image' : ''; ?>" for="threaddesk_avatar">
-							<img src="<?php echo esc_url( $avatar_url ); ?>" alt="<?php echo esc_attr__( 'Company avatar', 'threaddesk' ); ?>" />
-							<span class="threaddesk__avatar-overlay"><?php echo esc_html__( 'Upload', 'threaddesk' ); ?></span>
-						</label>
-						<input class="threaddesk__avatar-input" id="threaddesk_avatar" name="threaddesk_avatar" type="file" accept="image/*" onchange="this.form.submit();" />
-						<div class="threaddesk__profile-text">
-							<h2><?php echo esc_html( $profile_name ); ?></h2>
-							<p><?php echo esc_html( $profile_username ); ?></p>
+						<div class="threaddesk__profile-details">
+							<label class="threaddesk__avatar<?php echo $avatar_url ? ' has-image' : ''; ?>" for="threaddesk_avatar">
+								<img src="<?php echo esc_url( $avatar_url ); ?>" alt="<?php echo esc_attr__( 'Company avatar', 'threaddesk' ); ?>" />
+								<span class="threaddesk__avatar-overlay"><?php echo esc_html__( 'Upload', 'threaddesk' ); ?></span>
+							</label>
+							<div class="threaddesk__profile-text">
+								<h2><?php echo esc_html( $profile_name ); ?></h2>
+								<p><?php echo esc_html( $profile_username ); ?></p>
+							</div>
 						</div>
+						<input class="threaddesk__avatar-input" id="threaddesk_avatar" name="threaddesk_avatar" type="file" accept="image/*" onchange="this.form.submit();" />
 					</form>
 				</div>
 
