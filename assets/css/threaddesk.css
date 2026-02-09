@@ -78,7 +78,7 @@
 	position: relative;
 	display: flex;
 	gap: 16px;
-	align-items: center;
+	align-items: flex-end;
 	background: rgba(255, 255, 255, 0.9);
 	padding: 12px 16px;
 	border-radius: 12px;
@@ -521,22 +521,30 @@
 	border-radius: 12px;
 	background: #fff;
 	box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: flex-start;
 }
 
 .threaddesk__stat span,
 .threaddesk__secondary-stats span {
-	display: block;
+	display: flex;
+	align-items: center;
+	justify-content: center;
 	font-size: 12px;
 	color: #666;
 	text-transform: uppercase;
 	letter-spacing: 0.08em;
 	margin-bottom: 8px;
+	min-height: 2.6em;
 }
 
 .threaddesk__stat strong,
 .threaddesk__secondary-stats strong {
 	display: block;
 	font-size: 18px;
+	margin-top: 0;
 }
 
 .threaddesk__stat-note {

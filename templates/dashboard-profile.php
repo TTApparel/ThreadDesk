@@ -11,9 +11,11 @@ $client_name = ! empty( $context['client_name'] ) ? $context['client_name'] : __
 $avatar_url  = ! empty( $context['avatar_url'] ) ? $context['avatar_url'] : '';
 $stats   = isset( $context['order_stats'] ) ? $context['order_stats'] : array();
 $currency = isset( $context['currency'] ) ? $context['currency'] : 'USD';
-$shipping_address = ! empty( $context['shipping_address'] ) ? $context['shipping_address'] : array();
-$billing_address  = ! empty( $context['billing_address'] ) ? $context['billing_address'] : array();
+$shipping_address = ! empty( $context['shipping_address'] ) && is_array( $context['shipping_address'] ) ? $context['shipping_address'] : array();
+$billing_address  = ! empty( $context['billing_address'] ) && is_array( $context['billing_address'] ) ? $context['billing_address'] : array();
 $address_source   = $shipping_address ? $shipping_address : $billing_address;
+$billing_display  = ! empty( $billing_address['formatted'] ) ? $billing_address['formatted'] : __( 'Not provided yet.', 'threaddesk' );
+$shipping_display = ! empty( $shipping_address['formatted'] ) ? $shipping_address['formatted'] : __( 'Not provided yet.', 'threaddesk' );
 $map_parts = array_filter(
 	array(
 		isset( $address_source['address_1'] ) ? $address_source['address_1'] : '',
@@ -154,14 +156,14 @@ $format_price = function ( $amount ) use ( $currency ) {
 						<h4><?php echo esc_html__( 'Billing Details', 'threaddesk' ); ?></h4>
 						<a href="<?php echo esc_url( $context['account_links']['edit_billing'] ); ?>"><?php echo esc_html__( 'Edit', 'threaddesk' ); ?></a>
 					</div>
-					<p><?php echo wp_kses_post( nl2br( $context['billing_address'] ) ); ?></p>
+					<p><?php echo wp_kses_post( nl2br( $billing_display ) ); ?></p>
 				</div>
 				<div class="threaddesk__card">
 					<div class="threaddesk__card-header">
 						<h4><?php echo esc_html__( 'Shipping Details', 'threaddesk' ); ?></h4>
 						<a href="<?php echo esc_url( $context['account_links']['edit_shipping'] ); ?>"><?php echo esc_html__( 'Edit', 'threaddesk' ); ?></a>
 					</div>
-					<p><?php echo wp_kses_post( nl2br( $context['shipping_address'] ) ); ?></p>
+					<p><?php echo wp_kses_post( nl2br( $shipping_display ) ); ?></p>
 				</div>
 				<div class="threaddesk__card">
 					<div class="threaddesk__card-header">
