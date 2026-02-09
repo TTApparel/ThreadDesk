@@ -72,7 +72,6 @@
 	width: 100%;
 	height: 100%;
 	border: 0;
-	opacity: 0.85;
 }
 
 .threaddesk__profile {
@@ -106,6 +105,12 @@
 	justify-content: center;
 	cursor: pointer;
 	flex-shrink: 0;
+	z-index: 1;
+}
+
+.threaddesk__profile-text {
+	position: relative;
+	z-index: 1;
 }
 
 .threaddesk__avatar.has-image {
@@ -262,7 +267,6 @@
 	padding: 8px 16px;
 	text-align: left;
 	cursor: pointer;
-	font: inherit;
 }
 
 .threaddesk-auth__menu a:hover,
@@ -487,7 +491,6 @@ body.threaddesk-modal-open {
 }
 
 .threaddesk-auth-modal__form-inner input {
-	width: 100%;
 	padding: 10px 12px;
 	border-radius: 6px;
 	border: 1px solid #e4e4e4;
@@ -504,7 +507,7 @@ body.threaddesk-modal-open {
 }
 
 .threaddesk-auth-modal__checkbox {
-	display: flex;
+	display: flex !important;
 	align-items: center;
 	gap: 8px;
 }
