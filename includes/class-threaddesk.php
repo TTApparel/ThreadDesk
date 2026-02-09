@@ -38,6 +38,7 @@ class TTA_ThreadDesk {
 		add_action( 'admin_post_tta_threaddesk_request_order', array( $this, 'handle_request_order' ) );
 		add_action( 'admin_post_tta_threaddesk_reorder', array( $this, 'handle_reorder' ) );
 		add_action( 'admin_post_tta_threaddesk_avatar_upload', array( $this, 'handle_avatar_upload' ) );
+		add_action( 'admin_post_tta_threaddesk_update_address', array( $this, 'handle_update_address' ) );
 		add_action( 'user_register', array( $this, 'handle_user_register' ) );
 		add_action( 'init', array( $this, 'handle_auth_login' ) );
 		add_action( 'init', array( $this, 'handle_auth_register' ) );
@@ -368,6 +369,63 @@ class TTA_ThreadDesk {
 		}
 
 		wp_safe_redirect( wc_get_account_endpoint_url( 'thread-desk' ) );
+		exit;
+	}
+
+	public function handle_update_address() {
+		if ( ! is_user_logged_in() ) {
+			wp_die( esc_html__( 'Unauthorized.', 'threaddesk' ) );
+		}
+
+		check_admin_referer( 'tta_threaddesk_update_address' );
+
+		$type = isset( $_POST['address_type'] ) ? sanitize_key( wp_unslash( $_POST['address_type'] ) ) : 'billing';
+		if ( ! in_array( $type, array( 'billing', 'shipping' ), true ) ) {
+			wp_die( esc_html__( 'Invalid address type.', 'threaddesk' ) );
+		}
+
+		if ( ! function_exists( 'wc_get_customer' ) ) {
+			wp_die( esc_html__( 'WooCommerce is required.', 'threaddesk' ) );
+		}
+
+		$customer = wc_get_customer( get_current_user_id() );
+		if ( ! $customer ) {
+			wp_die( esc_html__( 'Unable to load customer.', 'threaddesk' ) );
+		}
+
+		$fields = array(
+			'first_name',
+			'last_name',
+			'company',
+			'address_1',
+			'address_2',
+			'city',
+			'state',
+			'postcode',
+			'country',
+			'phone',
+			'email',
+		);
+
+		foreach ( $fields as $field ) {
+			$key = "{$type}_{$field}";
+			if ( isset( $_POST[ $key ] ) ) {
+				$value = sanitize_text_field( wp_unslash( $_POST[ $key ] ) );
+				$setter = "set_{$type}_{$field}";
+				if ( is_callable( array( $customer, $setter ) ) ) {
+					$customer->$setter( $value );
+				}
+			}
+		}
+
+		$customer->save();
+
+		$redirect = wp_get_referer();
+		if ( ! $redirect ) {
+			$redirect = home_url();
+		}
+
+		wp_safe_redirect( $redirect );
 		exit;
 	}
 

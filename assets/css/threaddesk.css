@@ -150,6 +150,27 @@
 	left: -9999px;
 }
 
+.threaddesk__link-button {
+	border: none;
+	background: transparent;
+	padding: 0;
+	color: var(--theme-link-initial-color);
+	cursor: pointer;
+	text-decoration: underline;
+	font: inherit;
+}
+
+.threaddesk-address-modal {
+	display: none;
+	position: fixed;
+	inset: 0;
+	z-index: 9999;
+}
+
+.threaddesk-address-modal.is-active {
+	display: block;
+}
+
 .threaddesk__profile-text h2 {
 	font-size: 24px;
 	margin: 0 0 6px;
