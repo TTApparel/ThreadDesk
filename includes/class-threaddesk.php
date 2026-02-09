@@ -371,7 +371,21 @@ class TTA_ThreadDesk {
 			$full_name    = trim( $current_user->first_name . ' ' . $current_user->last_name );
 			$display_name = $full_name ? $full_name : $current_user->display_name;
 			$company_name = $current_user->user_login;
-			$avatar       = get_avatar( $current_user->ID, 40, '', $display_name, array( 'class' => 'threaddesk-auth__avatar' ) );
+			$avatar       = '';
+			$avatar_id    = (int) get_user_meta( $current_user->ID, 'tta_threaddesk_avatar_id', true );
+			if ( $avatar_id ) {
+				$avatar_url = wp_get_attachment_image_url( $avatar_id, 'thumbnail' );
+				if ( $avatar_url ) {
+					$avatar = sprintf(
+						'<img src="%s" alt="%s" class="threaddesk-auth__avatar" />',
+						esc_url( $avatar_url ),
+						esc_attr( $display_name )
+					);
+				}
+			}
+			if ( '' === $avatar ) {
+				$avatar = get_avatar( $current_user->ID, 40, '', $display_name, array( 'class' => 'threaddesk-auth__avatar' ) );
+			}
 			$logout_url   = wp_logout_url( home_url() );
 			$base_url     = function_exists( 'wc_get_account_endpoint_url' )
 				? wc_get_account_endpoint_url( 'thread-desk' )
