@@ -471,12 +471,12 @@ class TTA_ThreadDesk {
 									<?php if ( ( $this->auth_notice || ! empty( $this->auth_errors ) ) && 'login' === $this->auth_active_panel ) : ?>
 										<div class="threaddesk-auth-modal__notice" role="status">
 											<?php if ( $this->auth_notice ) : ?>
-												<p><?php echo esc_html( $this->auth_notice ); ?></p>
+												<p><?php echo wp_kses_post( $this->auth_notice ); ?></p>
 											<?php endif; ?>
 											<?php if ( ! empty( $this->auth_errors ) ) : ?>
 												<ul>
 													<?php foreach ( $this->auth_errors as $error ) : ?>
-														<li><?php echo esc_html( $error ); ?></li>
+														<li><?php echo wp_kses_post( $error ); ?></li>
 													<?php endforeach; ?>
 												</ul>
 											<?php endif; ?>
@@ -513,12 +513,12 @@ class TTA_ThreadDesk {
 											<?php if ( $this->auth_notice || ! empty( $this->auth_errors ) ) : ?>
 												<div class="threaddesk-auth-modal__notice" role="status">
 													<?php if ( $this->auth_notice ) : ?>
-														<p><?php echo esc_html( $this->auth_notice ); ?></p>
+														<p><?php echo wp_kses_post( $this->auth_notice ); ?></p>
 													<?php endif; ?>
 													<?php if ( ! empty( $this->auth_errors ) ) : ?>
 														<ul>
 															<?php foreach ( $this->auth_errors as $error ) : ?>
-																<li><?php echo esc_html( $error ); ?></li>
+																<li><?php echo wp_kses_post( $error ); ?></li>
 															<?php endforeach; ?>
 														</ul>
 													<?php endif; ?>
