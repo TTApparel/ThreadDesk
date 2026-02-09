@@ -239,6 +239,52 @@
 	text-decoration: none;
 }
 
+.threaddesk-auth__user {
+	display: flex;
+	gap: 12px;
+	align-items: center;
+	padding: 12px 16px;
+}
+
+.threaddesk-auth__avatar {
+	border-radius: 50%;
+	flex-shrink: 0;
+}
+
+.threaddesk-auth__user-text {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+}
+
+.threaddesk-auth__user-name {
+	font-weight: 600;
+	color: var(--theme-text-color);
+	font-size: 14px;
+}
+
+.threaddesk-auth__user-company {
+	font-size: 12px;
+	color: #666;
+}
+
+.threaddesk-auth__divider {
+	height: 1px;
+	background: rgba(0, 0, 0, 0.08);
+	margin: 4px 0;
+}
+
+.threaddesk-auth__links {
+	display: flex;
+	flex-direction: column;
+}
+
+.threaddesk-auth__logout {
+	color: var(--theme-link-initial-color);
+	padding: 8px 16px;
+	display: block;
+}
+
 .threaddesk-auth:hover .threaddesk-auth__menu,
 .threaddesk-auth:focus-within .threaddesk-auth__menu {
 	opacity: 1;

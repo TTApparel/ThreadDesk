@@ -364,12 +364,62 @@ class TTA_ThreadDesk {
 	}
 
 	public function render_auth_shortcode() {
+		wp_enqueue_style( 'threaddesk', THREDDESK_URL . 'assets/css/threaddesk.css', array(), THREDDESK_VERSION );
+
 		if ( is_user_logged_in() && empty( $this->auth_notice ) && empty( $this->auth_errors ) ) {
-			return '';
+			$current_user = wp_get_current_user();
+			$full_name    = trim( $current_user->first_name . ' ' . $current_user->last_name );
+			$display_name = $full_name ? $full_name : $current_user->display_name;
+			$company_name = $current_user->user_login;
+			$avatar       = get_avatar( $current_user->ID, 40, '', $display_name, array( 'class' => 'threaddesk-auth__avatar' ) );
+			$logout_url   = wp_logout_url( home_url() );
+			$base_url     = function_exists( 'wc_get_account_endpoint_url' )
+				? wc_get_account_endpoint_url( 'thread-desk' )
+				: home_url();
+			$sections     = array(
+				'profile'  => __( 'Profile', 'threaddesk' ),
+				'designs'  => __( 'Designs', 'threaddesk' ),
+				'layouts'  => __( 'Layouts', 'threaddesk' ),
+				'quotes'   => __( 'Quotes', 'threaddesk' ),
+				'invoices' => __( 'Invoices', 'threaddesk' ),
+			);
+
+			ob_start();
+			?>
+			<div class="threaddesk-auth" role="navigation" aria-label="<?php echo esc_attr__( 'Account links', 'threaddesk' ); ?>">
+				<button type="button" class="threaddesk-auth__trigger" aria-label="<?php echo esc_attr__( 'ThreadDesk menu', 'threaddesk' ); ?>">
+					<svg class="threaddesk-auth__icon" aria-hidden="true" viewBox="0 0 15 15" focusable="false">
+						<path d="M7.5 0C3.4 0 0 3.4 0 7.5S3.4 15 7.5 15 15 11.6 15 7.5 11.6 0 7.5 0zm0 2.1c1.4 0 2.5 1.1 2.5 2.4S8.9 7 7.5 7 5 5.9 5 4.5s1.1-2.4 2.5-2.4zm0 11.4c-2.1 0-3.9-1-5-2.6C3.4 9.6 6 9 7.5 9s4.1.6 5 1.9c-1.1 1.6-2.9 2.6-5 2.6z"></path>
+					</svg>
+				</button>
+				<div class="threaddesk-auth__menu" aria-hidden="true">
+					<div class="threaddesk-auth__user">
+						<?php echo $avatar; ?>
+						<div class="threaddesk-auth__user-text">
+							<span class="threaddesk-auth__user-name"><?php echo esc_html( $display_name ); ?></span>
+							<span class="threaddesk-auth__user-company"><?php echo esc_html( $company_name ); ?></span>
+						</div>
+					</div>
+					<div class="threaddesk-auth__divider" role="presentation"></div>
+					<div class="threaddesk-auth__links">
+						<?php foreach ( $sections as $section_key => $label ) : ?>
+							<a href="<?php echo esc_url( add_query_arg( 'td_section', $section_key, $base_url ) ); ?>">
+								<?php echo esc_html( $label ); ?>
+							</a>
+						<?php endforeach; ?>
+					</div>
+					<div class="threaddesk-auth__divider" role="presentation"></div>
+					<a class="threaddesk-auth__logout" href="<?php echo esc_url( $logout_url ); ?>">
+						<?php echo esc_html__( 'Log Out', 'threaddesk' ); ?>
+					</a>
+				</div>
+			</div>
+			<?php
+
+			return ob_get_clean();
 		}
 
-		wp_enqueue_style( 'threaddesk', THREDDESK_URL . 'assets/css/threaddesk.css', array(), THREDDESK_VERSION );
-		wp_enqueue_script( 'threaddesk', THREDDESK_URL . 'assets/js/threaddesk.js', array( 'jquery' ), THREDDESK_VERSION, true );
+			wp_enqueue_script( 'threaddesk', THREDDESK_URL . 'assets/js/threaddesk.js', array( 'jquery' ), THREDDESK_VERSION, true );
 
 		$login_url = wp_login_url();
 		$lost_url  = wp_lostpassword_url();
