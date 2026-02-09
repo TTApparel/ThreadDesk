@@ -452,7 +452,7 @@
 }
 
 .threaddesk-auth-modal__checkbox {
-	display: flex;
+	display: flex !important;
 	align-items: center;
 	gap: 8px;
 }
