@@ -11,6 +11,9 @@ class TTA_ThreadDesk {
 	public $endpoints;
 	public $render;
 	public $data;
+	private $auth_notice = '';
+	private $auth_errors = array();
+	private $auth_active_panel = '';
 
 	public static function instance() {
 		if ( null === self::$instance ) {
@@ -34,7 +37,10 @@ class TTA_ThreadDesk {
 		add_action( 'admin_post_tta_threaddesk_request_order', array( $this, 'handle_request_order' ) );
 		add_action( 'admin_post_tta_threaddesk_reorder', array( $this, 'handle_reorder' ) );
 		add_action( 'admin_post_tta_threaddesk_avatar_upload', array( $this, 'handle_avatar_upload' ) );
+		add_action( 'user_register', array( $this, 'handle_user_register' ) );
+		add_action( 'init', array( $this, 'handle_auth_register' ) );
 		add_shortcode( 'threaddesk', array( $this, 'render_shortcode' ) );
+		add_shortcode( 'threaddesk_auth', array( $this, 'render_auth_shortcode' ) );
 	}
 
 	public static function activate() {
@@ -353,5 +359,282 @@ class TTA_ThreadDesk {
 		$this->render->render_section( $section );
 
 		return ob_get_clean();
+	}
+
+	public function render_auth_shortcode() {
+		if ( is_user_logged_in() ) {
+			return '';
+		}
+
+		wp_enqueue_style( 'threaddesk', THREDDESK_URL . 'assets/css/threaddesk.css', array(), THREDDESK_VERSION );
+		wp_enqueue_script( 'threaddesk', THREDDESK_URL . 'assets/js/threaddesk.js', array( 'jquery' ), THREDDESK_VERSION, true );
+
+		$login_url = wp_login_url();
+		$lost_url  = wp_lostpassword_url();
+
+		ob_start();
+		?>
+		<div class="threaddesk-auth" role="navigation" aria-label="<?php echo esc_attr__( 'Account links', 'threaddesk' ); ?>">
+			<button type="button" class="threaddesk-auth__trigger" aria-label="<?php echo esc_attr__( 'Log in or register', 'threaddesk' ); ?>">
+				<svg class="threaddesk-auth__icon" aria-hidden="true" viewBox="0 0 15 15" focusable="false">
+					<path d="M7.5 0C3.4 0 0 3.4 0 7.5S3.4 15 7.5 15 15 11.6 15 7.5 11.6 0 7.5 0zm0 2.1c1.4 0 2.5 1.1 2.5 2.4S8.9 7 7.5 7 5 5.9 5 4.5s1.1-2.4 2.5-2.4zm0 11.4c-2.1 0-3.9-1-5-2.6C3.4 9.6 6 9 7.5 9s4.1.6 5 1.9c-1.1 1.6-2.9 2.6-5 2.6z"></path>
+				</svg>
+				</button>
+				<div class="threaddesk-auth__menu" aria-hidden="true">
+					<button type="button" class="threaddesk-auth__menu-button" data-threaddesk-auth="login">
+						<?php echo esc_html__( 'Sign in', 'threaddesk' ); ?>
+					</button>
+					<button type="button" class="threaddesk-auth__menu-button" data-threaddesk-auth="register">
+						<?php echo esc_html__( 'Register', 'threaddesk' ); ?>
+					</button>
+					<button type="button" class="threaddesk-auth__menu-button" data-threaddesk-auth="forgot">
+						<?php echo esc_html__( 'Forgot password', 'threaddesk' ); ?>
+					</button>
+				</div>
+			</div>
+			<div class="threaddesk-auth-modal" aria-hidden="true" data-threaddesk-auth-default="<?php echo esc_attr( $this->auth_active_panel ); ?>">
+				<div class="threaddesk-auth-modal__overlay" data-threaddesk-auth-close></div>
+				<div class="threaddesk-auth-modal__panel" role="dialog" aria-label="<?php echo esc_attr__( 'Account modal', 'threaddesk' ); ?>" aria-modal="true">
+					<div class="threaddesk-auth-modal__actions">
+						<button type="button" class="threaddesk-auth-modal__close" data-threaddesk-auth-close aria-label="<?php echo esc_attr__( 'Close account modal', 'threaddesk' ); ?>">
+							<svg class="threaddesk-auth-modal__close-icon" width="12" height="12" viewBox="0 0 15 15" aria-hidden="true" focusable="false">
+								<path d="M1 15a1 1 0 01-.71-.29 1 1 0 010-1.41l5.8-5.8-5.8-5.8A1 1 0 011.7.29l5.8 5.8 5.8-5.8a1 1 0 011.41 1.41l-5.8 5.8 5.8 5.8a1 1 0 01-1.41 1.41l-5.8-5.8-5.8 5.8A1 1 0 011 15z"></path>
+							</svg>
+						</button>
+					</div>
+					<div class="threaddesk-auth-modal__content">
+						<div class="threaddesk-auth-modal__tabs" role="tablist">
+							<button type="button" class="threaddesk-auth-modal__tab is-active" role="tab" aria-selected="true" data-threaddesk-auth-tab="login">
+								<?php echo esc_html__( 'Login', 'threaddesk' ); ?>
+							</button>
+							<button type="button" class="threaddesk-auth-modal__tab" role="tab" aria-selected="false" data-threaddesk-auth-tab="register">
+								<?php echo esc_html__( 'Sign Up', 'threaddesk' ); ?>
+							</button>
+						</div>
+							<div class="threaddesk-auth-modal__forms">
+								<div class="threaddesk-auth-modal__form is-active" data-threaddesk-auth-panel="login">
+								<form class="threaddesk-auth-modal__form-inner" action="<?php echo esc_url( $login_url ); ?>" method="post">
+									<p>
+										<label for="threaddesk_user_login"><?php echo esc_html__( 'Username or Email Address', 'threaddesk' ); ?></label>
+										<input type="text" name="log" id="threaddesk_user_login" autocomplete="username" autocapitalize="off" />
+									</p>
+									<p>
+										<label for="threaddesk_user_pass"><?php echo esc_html__( 'Password', 'threaddesk' ); ?></label>
+										<input type="password" name="pwd" id="threaddesk_user_pass" autocomplete="current-password" />
+									</p>
+									<p class="threaddesk-auth-modal__form-row">
+										<label class="threaddesk-auth-modal__checkbox">
+											<input type="checkbox" name="rememberme" value="forever" />
+											<?php echo esc_html__( 'Remember Me', 'threaddesk' ); ?>
+										</label>
+										<button type="button" class="threaddesk-auth-modal__link" data-threaddesk-auth="forgot">
+											<?php echo esc_html__( 'Forgot Password?', 'threaddesk' ); ?>
+										</button>
+									</p>
+									<p class="threaddesk-auth-modal__submit">
+										<button type="submit" class="threaddesk-auth-modal__button">
+											<?php echo esc_html__( 'Log In', 'threaddesk' ); ?>
+										</button>
+									</p>
+								</form>
+								</div>
+									<div class="threaddesk-auth-modal__form" data-threaddesk-auth-panel="register">
+										<form class="threaddesk-auth-modal__form-inner" action="<?php echo esc_url( wp_unslash( $_SERVER['REQUEST_URI'] ) ); ?>" method="post">
+											<input type="hidden" name="threaddesk_register" value="1" />
+											<?php wp_nonce_field( 'threaddesk_register', 'threaddesk_register_nonce' ); ?>
+											<?php if ( $this->auth_notice || ! empty( $this->auth_errors ) ) : ?>
+												<div class="threaddesk-auth-modal__notice" role="status">
+													<?php if ( $this->auth_notice ) : ?>
+														<p><?php echo esc_html( $this->auth_notice ); ?></p>
+													<?php endif; ?>
+													<?php if ( ! empty( $this->auth_errors ) ) : ?>
+														<ul>
+															<?php foreach ( $this->auth_errors as $error ) : ?>
+																<li><?php echo esc_html( $error ); ?></li>
+															<?php endforeach; ?>
+														</ul>
+													<?php endif; ?>
+												</div>
+											<?php endif; ?>
+											<div class="threaddesk-auth-modal__form-row">
+											<p>
+												<label for="threaddesk_register_first_name"><?php echo esc_html__( 'First Name', 'threaddesk' ); ?></label>
+												<input type="text" name="first_name" id="threaddesk_register_first_name" autocomplete="given-name" />
+											</p>
+											<p>
+												<label for="threaddesk_register_last_name"><?php echo esc_html__( 'Last Name', 'threaddesk' ); ?></label>
+												<input type="text" name="last_name" id="threaddesk_register_last_name" autocomplete="family-name" />
+											</p>
+										</div>
+										<p>
+											<label for="threaddesk_register_company"><?php echo esc_html__( 'Company Name', 'threaddesk' ); ?></label>
+											<input type="text" name="user_login" id="threaddesk_register_company" autocomplete="organization" />
+										</p>
+											<p>
+												<label for="threaddesk_register_website"><?php echo esc_html__( 'Website (optional)', 'threaddesk' ); ?></label>
+												<input type="text" name="user_url" id="threaddesk_register_website" autocomplete="url" />
+											</p>
+										<p>
+											<label for="threaddesk_register_email"><?php echo esc_html__( 'Email', 'threaddesk' ); ?></label>
+											<input type="email" name="user_email" id="threaddesk_register_email" autocomplete="email" />
+										</p>
+										<p>
+											<label for="threaddesk_register_pass"><?php echo esc_html__( 'Password', 'threaddesk' ); ?></label>
+											<input type="password" name="user_pass" id="threaddesk_register_pass" autocomplete="new-password" />
+										</p>
+										<p class="threaddesk-auth-modal__privacy">
+											<?php
+											printf(
+												wp_kses(
+													__( 'Your personal data will be used to support your experience throughout this website, to manage access to your account, and for other purposes described in our <a href="%s">privacy policy.</a>', 'threaddesk' ),
+													array(
+														'a' => array(
+															'href' => array(),
+														),
+													)
+												),
+												esc_url( get_privacy_policy_url() )
+											);
+											?>
+										</p>
+										<p class="threaddesk-auth-modal__submit">
+											<button type="submit" class="threaddesk-auth-modal__button">
+												<?php echo esc_html__( 'Register', 'threaddesk' ); ?>
+											</button>
+										</p>
+								</form>
+							</div>
+							<div class="threaddesk-auth-modal__form" data-threaddesk-auth-panel="forgot">
+								<form class="threaddesk-auth-modal__form-inner" action="<?php echo esc_url( $lost_url ); ?>" method="post">
+									<p>
+										<label for="threaddesk_forgot_login"><?php echo esc_html__( 'Username or Email Address', 'threaddesk' ); ?></label>
+										<input type="text" name="user_login" id="threaddesk_forgot_login" autocomplete="username" autocapitalize="off" />
+									</p>
+									<p class="threaddesk-auth-modal__submit">
+										<button type="submit" class="threaddesk-auth-modal__button">
+											<?php echo esc_html__( 'Get New Password', 'threaddesk' ); ?>
+										</button>
+									</p>
+									<button type="button" class="threaddesk-auth-modal__link" data-threaddesk-auth="login">
+										<?php echo esc_html__( '← Back to login', 'threaddesk' ); ?>
+									</button>
+								</form>
+							</div>
+						</div>
+					</div>
+				</div>
+			</div>
+			<?php
+
+		return ob_get_clean();
+	}
+
+	public function handle_user_register( $user_id ) {
+		if ( empty( $_POST['threaddesk_register'] ) ) {
+			return;
+		}
+
+		$first_name = isset( $_POST['first_name'] ) ? sanitize_text_field( wp_unslash( $_POST['first_name'] ) ) : '';
+		$last_name  = isset( $_POST['last_name'] ) ? sanitize_text_field( wp_unslash( $_POST['last_name'] ) ) : '';
+
+		if ( $first_name || $last_name ) {
+			wp_update_user(
+				array(
+					'ID'         => $user_id,
+					'first_name' => $first_name,
+					'last_name'  => $last_name,
+				)
+			);
+		}
+
+		if ( get_role( 'customer' ) ) {
+			$user = new WP_User( $user_id );
+			$user->set_role( 'customer' );
+		}
+	}
+
+	public function handle_auth_register() {
+		if ( empty( $_POST['threaddesk_register'] ) ) {
+			return;
+		}
+
+		$this->auth_active_panel = 'register';
+
+		if ( ! isset( $_POST['threaddesk_register_nonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['threaddesk_register_nonce'] ) ), 'threaddesk_register' ) ) {
+			$this->auth_errors[] = __( 'Registration failed security validation. Please try again.', 'threaddesk' );
+			return;
+		}
+
+		$first_name = isset( $_POST['first_name'] ) ? sanitize_text_field( wp_unslash( $_POST['first_name'] ) ) : '';
+		$last_name  = isset( $_POST['last_name'] ) ? sanitize_text_field( wp_unslash( $_POST['last_name'] ) ) : '';
+		$company    = isset( $_POST['user_login'] ) ? sanitize_user( wp_unslash( $_POST['user_login'] ), true ) : '';
+		$email      = isset( $_POST['user_email'] ) ? sanitize_email( wp_unslash( $_POST['user_email'] ) ) : '';
+		$password   = isset( $_POST['user_pass'] ) ? (string) wp_unslash( $_POST['user_pass'] ) : '';
+		$website    = isset( $_POST['user_url'] ) ? sanitize_text_field( wp_unslash( $_POST['user_url'] ) ) : '';
+
+		if ( '' === $first_name ) {
+			$this->auth_errors[] = __( 'Missing First Name.', 'threaddesk' );
+		}
+
+		if ( '' === $last_name ) {
+			$this->auth_errors[] = __( 'Missing Last Name.', 'threaddesk' );
+		}
+
+		if ( '' === $company ) {
+			$this->auth_errors[] = __( 'Missing Company Name.', 'threaddesk' );
+		}
+
+		if ( '' === $email ) {
+			$this->auth_errors[] = __( 'Missing Email.', 'threaddesk' );
+		} elseif ( ! is_email( $email ) ) {
+			$this->auth_errors[] = __( 'Please provide a valid email address.', 'threaddesk' );
+		}
+
+		if ( '' === $password ) {
+			$this->auth_errors[] = __( 'Missing Password.', 'threaddesk' );
+		}
+
+		if ( ! empty( $this->auth_errors ) ) {
+			return;
+		}
+
+		$user_id = wp_create_user( $company, $password, $email );
+
+		if ( is_wp_error( $user_id ) ) {
+			$this->auth_errors[] = $user_id->get_error_message();
+			return;
+		}
+
+		if ( $website ) {
+			$normalized = esc_url_raw( $website, array( 'http', 'https' ) );
+			if ( ! $normalized && ! empty( $website ) ) {
+				$normalized = esc_url_raw( 'https://' . ltrim( $website, '/' ), array( 'http', 'https' ) );
+			}
+			if ( $normalized ) {
+				wp_update_user(
+					array(
+						'ID'       => $user_id,
+						'user_url' => $normalized,
+					)
+				);
+			}
+		}
+
+		if ( $first_name || $last_name ) {
+			wp_update_user(
+				array(
+					'ID'         => $user_id,
+					'first_name' => $first_name,
+					'last_name'  => $last_name,
+				)
+			);
+		}
+
+		if ( get_role( 'customer' ) ) {
+			$user = new WP_User( $user_id );
+			$user->set_role( 'customer' );
+		}
+
+		$this->auth_notice = __( 'Registration successful. Please check your email for confirmation.', 'threaddesk' );
 	}
 }
