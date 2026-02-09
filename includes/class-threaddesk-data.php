@@ -204,8 +204,12 @@ class TTA_ThreadDesk_Data {
 			'state'     => $customer->{"get_{$type}_state"}(),
 			'postcode'  => $customer->{"get_{$type}_postcode"}(),
 			'country'   => $customer->{"get_{$type}_country"}(),
-			'formatted' => function_exists( 'wc_get_account_formatted_address' ) ? wc_get_account_formatted_address( $type ) : '',
+			'formatted' => '',
 		);
+
+		if ( function_exists( 'wc_format_address' ) ) {
+			$address['formatted'] = wc_format_address( $address );
+		}
 
 		return $address;
 	}

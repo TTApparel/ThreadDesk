@@ -434,6 +434,8 @@ class TTA_ThreadDesk {
 			return esc_html__( 'Please log in to view ThreadDesk.', 'threaddesk' );
 		}
 
+		wp_enqueue_script( 'threaddesk', THREDDESK_URL . 'assets/js/threaddesk.js', array( 'jquery' ), THREDDESK_VERSION, true );
+
 		ob_start();
 
 		$section = get_query_var( 'td_section', 'profile' );
