@@ -369,4 +369,146 @@ $format_price = function ( $amount ) use ( $currency ) {
 			</div>
 		</div>
 	</div>
+	<div class="threaddesk-address-modal" aria-hidden="true">
+		<div class="threaddesk-auth-modal__overlay" data-threaddesk-address-close></div>
+		<div class="threaddesk-auth-modal__panel" role="dialog" aria-label="<?php echo esc_attr__( 'Update address', 'threaddesk' ); ?>" aria-modal="true">
+			<div class="threaddesk-auth-modal__actions">
+				<button type="button" class="threaddesk-auth-modal__close" data-threaddesk-address-close aria-label="<?php echo esc_attr__( 'Close address modal', 'threaddesk' ); ?>">
+					<svg class="threaddesk-auth-modal__close-icon" width="12" height="12" viewBox="0 0 15 15" aria-hidden="true" focusable="false">
+						<path d="M1 15a1 1 0 01-.71-.29 1 1 0 010-1.41l5.8-5.8-5.8-5.8A1 1 0 011.7.29l5.8 5.8 5.8-5.8a1 1 0 011.41 1.41l-5.8 5.8 5.8 5.8a1 1 0 01-1.41 1.41l-5.8-5.8-5.8 5.8A1 1 0 011 15z"></path>
+					</svg>
+				</button>
+			</div>
+			<div class="threaddesk-auth-modal__content">
+				<div class="threaddesk-auth-modal__tabs" role="tablist">
+					<button type="button" class="threaddesk-auth-modal__tab is-active" role="tab" aria-selected="true" data-threaddesk-address-tab="billing">
+						<?php echo esc_html__( 'Billing', 'threaddesk' ); ?>
+					</button>
+					<button type="button" class="threaddesk-auth-modal__tab" role="tab" aria-selected="false" data-threaddesk-address-tab="shipping">
+						<?php echo esc_html__( 'Shipping', 'threaddesk' ); ?>
+					</button>
+				</div>
+				<div class="threaddesk-auth-modal__forms">
+					<div class="threaddesk-auth-modal__form is-active" data-threaddesk-address-panel="billing" aria-hidden="false">
+						<form class="threaddesk-auth-modal__form-inner" method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
+							<input type="hidden" name="action" value="tta_threaddesk_update_address" />
+							<input type="hidden" name="address_type" value="billing" />
+							<?php wp_nonce_field( 'tta_threaddesk_update_address' ); ?>
+							<div class="threaddesk-auth-modal__form-row">
+								<p>
+									<label for="threaddesk_billing_first_name"><?php echo esc_html__( 'First Name', 'threaddesk' ); ?></label>
+									<input type="text" name="billing_first_name" id="threaddesk_billing_first_name" value="<?php echo esc_attr( $billing_form['first_name'] ); ?>" />
+								</p>
+								<p>
+									<label for="threaddesk_billing_last_name"><?php echo esc_html__( 'Last Name', 'threaddesk' ); ?></label>
+									<input type="text" name="billing_last_name" id="threaddesk_billing_last_name" value="<?php echo esc_attr( $billing_form['last_name'] ); ?>" />
+								</p>
+							</div>
+							<p>
+								<label for="threaddesk_billing_company"><?php echo esc_html__( 'Company', 'threaddesk' ); ?></label>
+								<input type="text" name="billing_company" id="threaddesk_billing_company" value="<?php echo esc_attr( $billing_form['company'] ); ?>" />
+							</p>
+							<p>
+								<label for="threaddesk_billing_address_1"><?php echo esc_html__( 'Address Line 1', 'threaddesk' ); ?></label>
+								<input type="text" name="billing_address_1" id="threaddesk_billing_address_1" value="<?php echo esc_attr( $billing_form['address_1'] ); ?>" />
+							</p>
+							<p>
+								<label for="threaddesk_billing_address_2"><?php echo esc_html__( 'Address Line 2', 'threaddesk' ); ?></label>
+								<input type="text" name="billing_address_2" id="threaddesk_billing_address_2" value="<?php echo esc_attr( $billing_form['address_2'] ); ?>" />
+							</p>
+							<div class="threaddesk-auth-modal__form-row">
+								<p>
+									<label for="threaddesk_billing_city"><?php echo esc_html__( 'City', 'threaddesk' ); ?></label>
+									<input type="text" name="billing_city" id="threaddesk_billing_city" value="<?php echo esc_attr( $billing_form['city'] ); ?>" />
+								</p>
+								<p>
+									<label for="threaddesk_billing_state"><?php echo esc_html__( 'State/Province', 'threaddesk' ); ?></label>
+									<input type="text" name="billing_state" id="threaddesk_billing_state" value="<?php echo esc_attr( $billing_form['state'] ); ?>" />
+								</p>
+							</div>
+							<div class="threaddesk-auth-modal__form-row">
+								<p>
+									<label for="threaddesk_billing_postcode"><?php echo esc_html__( 'Postal Code', 'threaddesk' ); ?></label>
+									<input type="text" name="billing_postcode" id="threaddesk_billing_postcode" value="<?php echo esc_attr( $billing_form['postcode'] ); ?>" />
+								</p>
+								<p>
+									<label for="threaddesk_billing_country"><?php echo esc_html__( 'Country', 'threaddesk' ); ?></label>
+									<input type="text" name="billing_country" id="threaddesk_billing_country" value="<?php echo esc_attr( $billing_form['country'] ); ?>" />
+								</p>
+							</div>
+							<div class="threaddesk-auth-modal__form-row">
+								<p>
+									<label for="threaddesk_billing_phone"><?php echo esc_html__( 'Phone', 'threaddesk' ); ?></label>
+									<input type="text" name="billing_phone" id="threaddesk_billing_phone" value="<?php echo esc_attr( $billing_form['phone'] ); ?>" />
+								</p>
+								<p>
+									<label for="threaddesk_billing_email"><?php echo esc_html__( 'Email', 'threaddesk' ); ?></label>
+									<input type="email" name="billing_email" id="threaddesk_billing_email" value="<?php echo esc_attr( $billing_form['email'] ); ?>" />
+								</p>
+							</div>
+							<p class="threaddesk-auth-modal__submit">
+								<button type="submit" class="threaddesk-auth-modal__button">
+									<?php echo esc_html__( 'Save Billing', 'threaddesk' ); ?>
+								</button>
+							</p>
+						</form>
+					</div>
+					<div class="threaddesk-auth-modal__form" data-threaddesk-address-panel="shipping" aria-hidden="true">
+						<form class="threaddesk-auth-modal__form-inner" method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
+							<input type="hidden" name="action" value="tta_threaddesk_update_address" />
+							<input type="hidden" name="address_type" value="shipping" />
+							<?php wp_nonce_field( 'tta_threaddesk_update_address' ); ?>
+							<div class="threaddesk-auth-modal__form-row">
+								<p>
+									<label for="threaddesk_shipping_first_name"><?php echo esc_html__( 'First Name', 'threaddesk' ); ?></label>
+									<input type="text" name="shipping_first_name" id="threaddesk_shipping_first_name" value="<?php echo esc_attr( $shipping_form['first_name'] ); ?>" />
+								</p>
+								<p>
+									<label for="threaddesk_shipping_last_name"><?php echo esc_html__( 'Last Name', 'threaddesk' ); ?></label>
+									<input type="text" name="shipping_last_name" id="threaddesk_shipping_last_name" value="<?php echo esc_attr( $shipping_form['last_name'] ); ?>" />
+								</p>
+							</div>
+							<p>
+								<label for="threaddesk_shipping_company"><?php echo esc_html__( 'Company', 'threaddesk' ); ?></label>
+								<input type="text" name="shipping_company" id="threaddesk_shipping_company" value="<?php echo esc_attr( $shipping_form['company'] ); ?>" />
+							</p>
+							<p>
+								<label for="threaddesk_shipping_address_1"><?php echo esc_html__( 'Address Line 1', 'threaddesk' ); ?></label>
+								<input type="text" name="shipping_address_1" id="threaddesk_shipping_address_1" value="<?php echo esc_attr( $shipping_form['address_1'] ); ?>" />
+							</p>
+							<p>
+								<label for="threaddesk_shipping_address_2"><?php echo esc_html__( 'Address Line 2', 'threaddesk' ); ?></label>
+								<input type="text" name="shipping_address_2" id="threaddesk_shipping_address_2" value="<?php echo esc_attr( $shipping_form['address_2'] ); ?>" />
+							</p>
+							<div class="threaddesk-auth-modal__form-row">
+								<p>
+									<label for="threaddesk_shipping_city"><?php echo esc_html__( 'City', 'threaddesk' ); ?></label>
+									<input type="text" name="shipping_city" id="threaddesk_shipping_city" value="<?php echo esc_attr( $shipping_form['city'] ); ?>" />
+								</p>
+								<p>
+									<label for="threaddesk_shipping_state"><?php echo esc_html__( 'State/Province', 'threaddesk' ); ?></label>
+									<input type="text" name="shipping_state" id="threaddesk_shipping_state" value="<?php echo esc_attr( $shipping_form['state'] ); ?>" />
+								</p>
+							</div>
+							<div class="threaddesk-auth-modal__form-row">
+								<p>
+									<label for="threaddesk_shipping_postcode"><?php echo esc_html__( 'Postal Code', 'threaddesk' ); ?></label>
+									<input type="text" name="shipping_postcode" id="threaddesk_shipping_postcode" value="<?php echo esc_attr( $shipping_form['postcode'] ); ?>" />
+								</p>
+								<p>
+									<label for="threaddesk_shipping_country"><?php echo esc_html__( 'Country', 'threaddesk' ); ?></label>
+									<input type="text" name="shipping_country" id="threaddesk_shipping_country" value="<?php echo esc_attr( $shipping_form['country'] ); ?>" />
+								</p>
+							</div>
+							<p class="threaddesk-auth-modal__submit">
+								<button type="submit" class="threaddesk-auth-modal__button">
+									<?php echo esc_html__( 'Save Shipping', 'threaddesk' ); ?>
+								</button>
+							</p>
+						</form>
+					</div>
+				</div>
+			</div>
+		</div>
+	</div>
 </div>
