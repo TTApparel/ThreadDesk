@@ -160,17 +160,6 @@
 	font: inherit;
 }
 
-.threaddesk-address-modal {
-	display: none;
-	position: fixed;
-	inset: 0;
-	z-index: 9999;
-}
-
-.threaddesk-address-modal.is-active {
-	display: block;
-}
-
 .threaddesk__profile-text h2 {
 	font-size: 24px;
 	margin: 0 0 6px;
@@ -345,7 +334,8 @@
 	transform: translateY(0);
 }
 
-.threaddesk-auth-modal {
+.threaddesk-auth-modal,
+.threaddesk-address-modal {
 	position: fixed;
 	inset: 0;
 	display: none;
@@ -354,7 +344,8 @@
 	z-index: 1000;
 }
 
-.threaddesk-auth-modal.is-active {
+.threaddesk-auth-modal.is-active,
+.threaddesk-address-modal.is-active {
 	display: flex;
 }
 
@@ -382,11 +373,13 @@
 	transition: opacity 0.2s ease, transform 0.2s ease;
 }
 
-.threaddesk-auth-modal.is-active .threaddesk-auth-modal__overlay {
+.threaddesk-auth-modal.is-active .threaddesk-auth-modal__overlay,
+.threaddesk-address-modal.is-active .threaddesk-auth-modal__overlay {
 	opacity: 1;
 }
 
-.threaddesk-auth-modal.is-active .threaddesk-auth-modal__panel {
+.threaddesk-auth-modal.is-active .threaddesk-auth-modal__panel,
+.threaddesk-address-modal.is-active .threaddesk-auth-modal__panel {
 	opacity: 1;
 	transform: translate3d(0, 0, 0);
 }
