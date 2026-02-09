@@ -47,5 +47,10 @@ jQuery(function ($) {
 				closeModal();
 			}
 		});
+
+		const defaultPanel = modal.data('threaddesk-auth-default');
+		if (defaultPanel) {
+			openModal(defaultPanel);
+		}
 	}
 });
