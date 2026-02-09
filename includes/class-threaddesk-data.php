@@ -188,24 +188,14 @@ class TTA_ThreadDesk_Data {
 	}
 
 	public function get_user_address( $user_id, $type ) {
-		if ( ! function_exists( 'wc_get_customer' ) ) {
-			return array();
+		$fields = array( 'address_1', 'address_2', 'city', 'state', 'postcode', 'country', 'first_name', 'last_name', 'company', 'phone', 'email' );
+		$address = array();
+
+		foreach ( $fields as $field ) {
+			$address[ $field ] = get_user_meta( $user_id, "{$type}_{$field}", true );
 		}
 
-		$customer = wc_get_customer( $user_id );
-		if ( ! $customer ) {
-			return array();
-		}
-
-		$address = array(
-			'address_1' => $customer->{"get_{$type}_address_1"}(),
-			'address_2' => $customer->{"get_{$type}_address_2"}(),
-			'city'      => $customer->{"get_{$type}_city"}(),
-			'state'     => $customer->{"get_{$type}_state"}(),
-			'postcode'  => $customer->{"get_{$type}_postcode"}(),
-			'country'   => $customer->{"get_{$type}_country"}(),
-			'formatted' => '',
-		);
+		$address['formatted'] = '';
 
 		if ( function_exists( 'wc_format_address' ) ) {
 			$address['formatted'] = wc_format_address( $address );
