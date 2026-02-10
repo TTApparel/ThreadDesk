@@ -388,19 +388,22 @@ class TTA_ThreadDesk {
 			'billing'  => array( 'address_1', 'address_2', 'city', 'state', 'postcode', 'country' ),
 			'shipping' => array( 'address_1', 'address_2', 'city', 'state', 'postcode', 'country' ),
 			'account'  => array(
-				'billing'  => array( 'first_name', 'last_name', 'company', 'phone', 'email' ),
-				'shipping' => array( 'first_name', 'last_name', 'company' ),
+				'user' => array( 'email' ),
 			),
 		);
 
 		if ( 'account' === $type ) {
-			foreach ( $fields_by_type['account'] as $group => $fields ) {
-				foreach ( $fields as $field ) {
-					$key = "{$group}_{$field}";
-					if ( isset( $_POST[ $key ] ) ) {
-						$value  = sanitize_text_field( wp_unslash( $_POST[ $key ] ) );
-						update_user_meta( get_current_user_id(), $key, $value );
-					}
+			if ( isset( $_POST['account_email'] ) ) {
+				$email = sanitize_email( wp_unslash( $_POST['account_email'] ) );
+				if ( is_email( $email ) ) {
+					wp_update_user(
+						array(
+							'ID'         => get_current_user_id(),
+							'user_email' => $email,
+						)
+					);
+				} elseif ( function_exists( 'wc_add_notice' ) ) {
+					wc_add_notice( __( 'Please enter a valid email address.', 'threaddesk' ), 'error' );
 				}
 			}
 		} else {
