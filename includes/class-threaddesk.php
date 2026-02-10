@@ -470,7 +470,7 @@ class TTA_ThreadDesk {
 			$sections     = array(
 				'profile'  => __( 'Profile', 'threaddesk' ),
 				'designs'  => __( 'Designs', 'threaddesk' ),
-				'layouts'  => __( 'Layouts', 'threaddesk' ),
+				'layouts'  => __( 'Placements', 'threaddesk' ),
 				'quotes'   => __( 'Quotes', 'threaddesk' ),
 				'invoices' => __( 'Invoices', 'threaddesk' ),
 			);
