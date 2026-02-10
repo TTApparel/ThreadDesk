@@ -735,6 +735,40 @@ body.threaddesk-modal-open {
 	height: auto;
 }
 
+
+.mockmaster-designer__design-image {
+	--threaddesk-preview-accent: #111111;
+	position: relative;
+	overflow: hidden;
+}
+
+.mockmaster-designer__design-image-upload {
+	display: none;
+	width: 100%;
+	height: auto;
+	border-radius: 8px;
+}
+
+.mockmaster-designer__design-image-overlay {
+	display: none;
+	position: absolute;
+	inset: 10px;
+	background: var(--threaddesk-preview-accent);
+	mix-blend-mode: multiply;
+	opacity: 0.35;
+	pointer-events: none;
+	border-radius: 8px;
+}
+
+.mockmaster-designer__design-image.has-upload .mockmaster-designer__design-image-upload,
+.mockmaster-designer__design-image.has-upload .mockmaster-designer__design-image-overlay {
+	display: block;
+}
+
+.mockmaster-designer__design-image.has-upload svg {
+	display: none;
+}
+
 .threaddesk-designer__file-name {
 	display: block;
 	margin-top: 8px;

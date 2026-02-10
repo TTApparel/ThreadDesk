@@ -117,6 +117,7 @@ jQuery(function ($) {
 		};
 
 		const defaultPalette = ['#111111', '#ffffff', '#1f1f1f', '#3a3a3a', '#f24c3d', '#3366ff', '#21b573', '#f6b200'];
+		let uploadedPreviewUrl = null;
 
 		const applyDesignPreviewColors = function () {
 			const colors = [];
@@ -128,6 +129,9 @@ jQuery(function ($) {
 				const color = colors[index] || colors[0] || defaultPalette[0];
 				$(this).attr('fill', color);
 			});
+
+			const accent = colors[0] || defaultPalette[0];
+			designModal.find('[data-threaddesk-design-preview]').css('--threaddesk-preview-accent', accent);
 		};
 
 		const renderColorSwatches = function (count) {
@@ -171,8 +175,28 @@ jQuery(function ($) {
 		});
 
 		$(document).on('change', '[data-threaddesk-design-file]', function () {
-			const fileName = this.files && this.files.length ? this.files[0].name : 'No file selected';
+			const previewContainer = designModal.find('[data-threaddesk-design-preview]');
+			const previewImage = designModal.find('[data-threaddesk-design-upload-preview]');
+			const previewShape = previewContainer.find('svg');
+			const file = this.files && this.files.length ? this.files[0] : null;
+			const fileName = file ? file.name : 'No file selected';
 			designModal.find('[data-threaddesk-design-file-name]').text(fileName);
+
+			if (uploadedPreviewUrl) {
+				URL.revokeObjectURL(uploadedPreviewUrl);
+				uploadedPreviewUrl = null;
+			}
+
+			if (file && file.type && file.type.indexOf('image/') === 0) {
+				uploadedPreviewUrl = URL.createObjectURL(file);
+				previewImage.attr('src', uploadedPreviewUrl);
+				previewContainer.addClass('has-upload');
+				previewShape.attr('aria-hidden', 'true');
+			} else {
+				previewImage.attr('src', '');
+				previewContainer.removeClass('has-upload');
+				previewShape.removeAttr('aria-hidden');
+			}
 		});
 
 		$(document).on('input change', '[data-threaddesk-color-swatches] input[type="color"]', function () {
