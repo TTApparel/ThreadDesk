@@ -113,6 +113,16 @@ $nav_base = trailingslashit( wc_get_account_endpoint_url( 'thread-desk' ) );
 		</div>
 		<div class="threaddesk-auth-modal__content threaddesk-designer">
 			<form class="threaddesk-auth-modal__form-inner" method="post" action="#">
+				<div class="mockmaster-designer__design-image" data-threaddesk-design-preview>
+					<svg viewBox="0 0 320 210" role="img" aria-label="<?php echo esc_attr__( 'Design preview', 'threaddesk' ); ?>">
+						<rect x="0" y="0" width="320" height="210" rx="14" fill="#f4f4f4"></rect>
+						<path d="M58 168L99 56h35l41 112h-27l-8-24H93l-8 24H58z" fill="#111111" data-threaddesk-preview-layer="0"></path>
+						<path d="M110 124h28l-14-42-14 42z" fill="#ffffff" data-threaddesk-preview-layer="1"></path>
+						<circle cx="217" cy="98" r="44" fill="#1f1f1f" data-threaddesk-preview-layer="2"></circle>
+						<rect x="187" y="142" width="60" height="18" rx="9" fill="#3a3a3a" data-threaddesk-preview-layer="3"></rect>
+					</svg>
+				</div>
+
 				<p>
 					<label for="threaddesk_design_file"><?php echo esc_html__( 'Design File', 'threaddesk' ); ?></label>
 					<input type="file" id="threaddesk_design_file" accept=".png,.jpg,.jpeg,.pdf,.svg,.ai" data-threaddesk-design-file />
