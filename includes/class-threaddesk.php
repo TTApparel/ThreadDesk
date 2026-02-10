@@ -695,6 +695,8 @@ class TTA_ThreadDesk {
 
 		$first_name = isset( $_POST['first_name'] ) ? sanitize_text_field( wp_unslash( $_POST['first_name'] ) ) : '';
 		$last_name  = isset( $_POST['last_name'] ) ? sanitize_text_field( wp_unslash( $_POST['last_name'] ) ) : '';
+		$company    = isset( $_POST['user_login'] ) ? sanitize_user( wp_unslash( $_POST['user_login'] ), true ) : '';
+		$email      = isset( $_POST['user_email'] ) ? sanitize_email( wp_unslash( $_POST['user_email'] ) ) : '';
 
 		if ( $first_name || $last_name ) {
 			wp_update_user(
@@ -704,6 +706,23 @@ class TTA_ThreadDesk {
 					'last_name'  => $last_name,
 				)
 			);
+		}
+
+		$profile_defaults = array(
+			'billing_first_name'  => $first_name,
+			'billing_last_name'   => $last_name,
+			'billing_company'     => $company,
+			'billing_email'       => $email,
+			'shipping_first_name' => $first_name,
+			'shipping_last_name'  => $last_name,
+			'shipping_company'    => $company,
+			'shipping_email'      => $email,
+		);
+
+		foreach ( $profile_defaults as $meta_key => $meta_value ) {
+			if ( '' !== $meta_value ) {
+				update_user_meta( $user_id, $meta_key, $meta_value );
+			}
 		}
 
 		if ( get_role( 'customer' ) ) {

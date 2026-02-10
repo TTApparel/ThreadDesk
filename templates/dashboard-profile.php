@@ -230,7 +230,7 @@ $format_price = function ( $amount ) use ( $currency ) {
 							<button type="button" class="threaddesk__link-button" data-threaddesk-address="account"><?php echo esc_html__( 'Edit', 'threaddesk' ); ?></button>
 						</div>
 						<p><?php echo esc_html( sprintf( __( 'Username: %s', 'threaddesk' ), $account_details['username'] ) ); ?></p>
-						<p><?php echo esc_html( sprintf( __( 'Email: %s', 'threaddesk' ), $account_details['email'] ) ); ?></p>
+						<p><?php echo esc_html( $account_details['email'] ); ?></p>
 					</div>
 			</div>
 		</div>
