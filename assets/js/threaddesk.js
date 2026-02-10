@@ -102,4 +102,89 @@ jQuery(function ($) {
 			}
 		});
 	}
+
+	const designModal = $('.threaddesk-design-modal');
+
+	if (designModal.length) {
+		const openDesignModal = function () {
+			designModal.addClass('is-active').attr('aria-hidden', 'false');
+			$('body').addClass('threaddesk-modal-open');
+		};
+
+		const closeDesignModal = function () {
+			designModal.removeClass('is-active').attr('aria-hidden', 'true');
+			$('body').removeClass('threaddesk-modal-open');
+		};
+
+		const defaultPalette = ['#111111', '#ffffff', '#1f1f1f', '#3a3a3a', '#f24c3d', '#3366ff', '#21b573', '#f6b200'];
+
+		const applyDesignPreviewColors = function () {
+			const colors = [];
+			designModal.find('[data-threaddesk-color-swatches] input[type="color"]').each(function () {
+				colors.push($(this).val());
+			});
+
+			designModal.find('[data-threaddesk-preview-layer]').each(function (index) {
+				const color = colors[index] || colors[0] || defaultPalette[0];
+				$(this).attr('fill', color);
+			});
+		};
+
+		const renderColorSwatches = function (count) {
+			const swatches = designModal.find('[data-threaddesk-color-swatches]');
+			const total = Math.max(1, Math.min(12, count));
+			const existing = [];
+			swatches.find('input[type="color"]').each(function () {
+				existing.push($(this).val());
+			});
+			swatches.empty();
+
+			for (let i = 1; i <= total; i += 1) {
+				const row = $('<label></label>');
+				const value = existing[i - 1] || defaultPalette[i - 1] || '#000000';
+				row.append($('<span></span>').text('Color ' + i));
+				row.append($('<input type="color" />').val(value));
+				swatches.append(row);
+			}
+
+			designModal.find('[data-threaddesk-color-count]').text(total);
+			applyDesignPreviewColors();
+		};
+
+		$(document).on('click', '[data-threaddesk-design-open]', function (event) {
+			event.preventDefault();
+			openDesignModal();
+		});
+
+		$(document).on('click', '[data-threaddesk-design-close]', function () {
+			closeDesignModal();
+		});
+
+		$(document).on('click', '[data-threaddesk-color-increase]', function () {
+			const count = parseInt(designModal.find('[data-threaddesk-color-count]').text(), 10) || 1;
+			renderColorSwatches(count + 1);
+		});
+
+		$(document).on('click', '[data-threaddesk-color-decrease]', function () {
+			const count = parseInt(designModal.find('[data-threaddesk-color-count]').text(), 10) || 1;
+			renderColorSwatches(count - 1);
+		});
+
+		$(document).on('change', '[data-threaddesk-design-file]', function () {
+			const fileName = this.files && this.files.length ? this.files[0].name : 'No file selected';
+			designModal.find('[data-threaddesk-design-file-name]').text(fileName);
+		});
+
+		$(document).on('input change', '[data-threaddesk-color-swatches] input[type="color"]', function () {
+			applyDesignPreviewColors();
+		});
+
+		$(document).on('keyup', function (event) {
+			if (event.key === 'Escape') {
+				closeDesignModal();
+			}
+		});
+
+		renderColorSwatches(1);
+	}
 });
