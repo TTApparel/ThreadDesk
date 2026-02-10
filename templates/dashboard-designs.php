@@ -78,7 +78,10 @@ $nav_base = trailingslashit( wc_get_account_endpoint_url( 'thread-desk' ) );
 		</div>
 
 		<div class="threaddesk__section">
-			<h3><?php echo esc_html__( 'Saved Designs', 'threaddesk' ); ?></h3>
+			<div class="threaddesk__card-header threaddesk-designer__heading">
+				<h3><?php echo esc_html__( 'Saved Designs', 'threaddesk' ); ?></h3>
+				<button type="button" class="threaddesk__button" data-threaddesk-design-open><?php echo esc_html__( 'Choose Design', 'threaddesk' ); ?></button>
+			</div>
 			<p><?php echo esc_html__( 'Designs are placeholders for now. This area will list saved assets and approvals.', 'threaddesk' ); ?></p>
 			<div class="threaddesk__cards">
 				<?php if ( ! empty( $context['designs'] ) ) : ?>
@@ -94,6 +97,51 @@ $nav_base = trailingslashit( wc_get_account_endpoint_url( 'thread-desk' ) );
 					</div>
 				<?php endif; ?>
 			</div>
+		</div>
+	</div>
+</div>
+
+<div class="threaddesk-design-modal" aria-hidden="true">
+	<div class="threaddesk-auth-modal__overlay" data-threaddesk-design-close></div>
+	<div class="threaddesk-auth-modal__panel" role="dialog" aria-label="<?php echo esc_attr__( 'Choose design', 'threaddesk' ); ?>" aria-modal="true">
+		<div class="threaddesk-auth-modal__actions">
+			<button type="button" class="threaddesk-auth-modal__close" data-threaddesk-design-close aria-label="<?php echo esc_attr__( 'Close design modal', 'threaddesk' ); ?>">
+				<svg class="threaddesk-auth-modal__close-icon" width="12" height="12" viewBox="0 0 15 15" aria-hidden="true" focusable="false">
+					<path d="M1 15a1 1 0 01-.71-.29 1 1 0 010-1.41l5.8-5.8-5.8-5.8A1 1 0 011.7.29l5.8 5.8 5.8-5.8a1 1 0 011.41 1.41l-5.8 5.8 5.8 5.8a1 1 0 01-1.41 1.41l-5.8-5.8-5.8 5.8A1 1 0 011 15z"></path>
+				</svg>
+			</button>
+		</div>
+		<div class="threaddesk-auth-modal__content threaddesk-designer">
+			<form class="threaddesk-auth-modal__form-inner" method="post" action="#">
+				<p>
+					<label for="threaddesk_design_file"><?php echo esc_html__( 'Design File', 'threaddesk' ); ?></label>
+					<input type="file" id="threaddesk_design_file" accept=".png,.jpg,.jpeg,.pdf,.svg,.ai" data-threaddesk-design-file />
+					<small class="threaddesk-designer__file-name" data-threaddesk-design-file-name><?php echo esc_html__( 'No file selected', 'threaddesk' ); ?></small>
+				</p>
+
+				<div class="threaddesk-designer__controls">
+					<div class="threaddesk-designer__control-head">
+						<span><?php echo esc_html__( 'Color Count', 'threaddesk' ); ?></span>
+						<div class="mockmaster-designer__color-counter" data-threaddesk-color-counter>
+							<button type="button" class="threaddesk-designer__counter-btn" data-threaddesk-color-decrease>-</button>
+							<strong data-threaddesk-color-count>1</strong>
+							<button type="button" class="threaddesk-designer__counter-btn" data-threaddesk-color-increase>+</button>
+						</div>
+					</div>
+					<div class="threaddesk-designer__swatches" data-threaddesk-color-swatches>
+						<label>
+							<span><?php echo esc_html__( 'Color 1', 'threaddesk' ); ?></span>
+							<input type="color" value="#000000" />
+						</label>
+					</div>
+				</div>
+
+				<p class="threaddesk-auth-modal__submit">
+					<button type="button" class="threaddesk-auth-modal__button" data-threaddesk-design-close>
+						<?php echo esc_html__( 'Apply Settings', 'threaddesk' ); ?>
+					</button>
+				</p>
+			</form>
 		</div>
 	</div>
 </div>

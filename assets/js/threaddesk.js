@@ -102,4 +102,65 @@ jQuery(function ($) {
 			}
 		});
 	}
+
+	const designModal = $('.threaddesk-design-modal');
+
+	if (designModal.length) {
+		const openDesignModal = function () {
+			designModal.addClass('is-active').attr('aria-hidden', 'false');
+			$('body').addClass('threaddesk-modal-open');
+		};
+
+		const closeDesignModal = function () {
+			designModal.removeClass('is-active').attr('aria-hidden', 'true');
+			$('body').removeClass('threaddesk-modal-open');
+		};
+
+		const renderColorSwatches = function (count) {
+			const swatches = designModal.find('[data-threaddesk-color-swatches]');
+			const total = Math.max(1, Math.min(12, count));
+			swatches.empty();
+
+			for (let i = 1; i <= total; i += 1) {
+				const row = $('<label></label>');
+				row.append($('<span></span>').text('Color ' + i));
+				row.append($('<input type="color" value="#000000" />'));
+				swatches.append(row);
+			}
+
+			designModal.find('[data-threaddesk-color-count]').text(total);
+		};
+
+		$(document).on('click', '[data-threaddesk-design-open]', function (event) {
+			event.preventDefault();
+			openDesignModal();
+		});
+
+		$(document).on('click', '[data-threaddesk-design-close]', function () {
+			closeDesignModal();
+		});
+
+		$(document).on('click', '[data-threaddesk-color-increase]', function () {
+			const count = parseInt(designModal.find('[data-threaddesk-color-count]').text(), 10) || 1;
+			renderColorSwatches(count + 1);
+		});
+
+		$(document).on('click', '[data-threaddesk-color-decrease]', function () {
+			const count = parseInt(designModal.find('[data-threaddesk-color-count]').text(), 10) || 1;
+			renderColorSwatches(count - 1);
+		});
+
+		$(document).on('change', '[data-threaddesk-design-file]', function () {
+			const fileName = this.files && this.files.length ? this.files[0].name : 'No file selected';
+			designModal.find('[data-threaddesk-design-file-name]').text(fileName);
+		});
+
+		$(document).on('keyup', function (event) {
+			if (event.key === 'Escape') {
+				closeDesignModal();
+			}
+		});
+
+		renderColorSwatches(1);
+	}
 });
