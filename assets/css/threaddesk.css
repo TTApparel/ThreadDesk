@@ -760,8 +760,7 @@ body.threaddesk-modal-open {
 	border-radius: 8px;
 }
 
-.mockmaster-designer__design-image.has-upload .mockmaster-designer__design-image-upload,
-.mockmaster-designer__design-image.has-upload .mockmaster-designer__design-image-overlay {
+.mockmaster-designer__design-image.has-upload .mockmaster-designer__design-image-upload {
 	display: block;
 }
 
