@@ -87,6 +87,13 @@ $shipping_form = array_merge(
 	),
 	$shipping_address
 );
+$account_details = array_merge(
+	array(
+		'username' => '',
+		'email'    => '',
+	),
+	isset( $context['account_details'] ) && is_array( $context['account_details'] ) ? $context['account_details'] : array()
+);
 
 $nav_base = trailingslashit( wc_get_account_endpoint_url( 'thread-desk' ) );
 
@@ -222,8 +229,8 @@ $format_price = function ( $amount ) use ( $currency ) {
 							<h4><?php echo esc_html__( 'Account Details', 'threaddesk' ); ?></h4>
 							<button type="button" class="threaddesk__link-button" data-threaddesk-address="account"><?php echo esc_html__( 'Edit', 'threaddesk' ); ?></button>
 						</div>
-						<p><?php echo esc_html( sprintf( __( 'Username: %s', 'threaddesk' ), $context['account_details']['username'] ) ); ?></p>
-						<p><?php echo esc_html( sprintf( __( 'Email: %s', 'threaddesk' ), $context['account_details']['email'] ) ); ?></p>
+						<p><?php echo esc_html( sprintf( __( 'Username: %s', 'threaddesk' ), $account_details['username'] ) ); ?></p>
+						<p><?php echo esc_html( sprintf( __( 'Email: %s', 'threaddesk' ), $account_details['email'] ) ); ?></p>
 					</div>
 			</div>
 		</div>
@@ -336,43 +343,13 @@ $format_price = function ( $amount ) use ( $currency ) {
 							<input type="hidden" name="action" value="tta_threaddesk_update_address" />
 							<input type="hidden" name="address_type" value="account" />
 							<?php wp_nonce_field( 'tta_threaddesk_update_address' ); ?>
-							<div class="threaddesk-auth-modal__form-row">
-								<p>
-									<label for="threaddesk_account_billing_first_name"><?php echo esc_html__( 'Billing First Name', 'threaddesk' ); ?></label>
-									<input type="text" name="billing_first_name" id="threaddesk_account_billing_first_name" value="<?php echo esc_attr( $billing_form['first_name'] ); ?>" />
-								</p>
-								<p>
-									<label for="threaddesk_account_billing_last_name"><?php echo esc_html__( 'Billing Last Name', 'threaddesk' ); ?></label>
-									<input type="text" name="billing_last_name" id="threaddesk_account_billing_last_name" value="<?php echo esc_attr( $billing_form['last_name'] ); ?>" />
-								</p>
-							</div>
 							<p>
-								<label for="threaddesk_account_billing_company"><?php echo esc_html__( 'Billing Company', 'threaddesk' ); ?></label>
-								<input type="text" name="billing_company" id="threaddesk_account_billing_company" value="<?php echo esc_attr( $billing_form['company'] ); ?>" />
+								<label for="threaddesk_account_username"><?php echo esc_html__( 'Username', 'threaddesk' ); ?></label>
+								<input type="text" id="threaddesk_account_username" value="<?php echo esc_attr( $account_details['username'] ); ?>" readonly />
 							</p>
-							<div class="threaddesk-auth-modal__form-row">
-								<p>
-									<label for="threaddesk_account_billing_phone"><?php echo esc_html__( 'Billing Phone', 'threaddesk' ); ?></label>
-									<input type="text" name="billing_phone" id="threaddesk_account_billing_phone" value="<?php echo esc_attr( $billing_form['phone'] ); ?>" />
-								</p>
-								<p>
-									<label for="threaddesk_account_billing_email"><?php echo esc_html__( 'Billing Email', 'threaddesk' ); ?></label>
-									<input type="email" name="billing_email" id="threaddesk_account_billing_email" value="<?php echo esc_attr( $billing_form['email'] ); ?>" />
-								</p>
-							</div>
-							<div class="threaddesk-auth-modal__form-row">
-								<p>
-									<label for="threaddesk_account_shipping_first_name"><?php echo esc_html__( 'Shipping First Name', 'threaddesk' ); ?></label>
-									<input type="text" name="shipping_first_name" id="threaddesk_account_shipping_first_name" value="<?php echo esc_attr( $shipping_form['first_name'] ); ?>" />
-								</p>
-								<p>
-									<label for="threaddesk_account_shipping_last_name"><?php echo esc_html__( 'Shipping Last Name', 'threaddesk' ); ?></label>
-									<input type="text" name="shipping_last_name" id="threaddesk_account_shipping_last_name" value="<?php echo esc_attr( $shipping_form['last_name'] ); ?>" />
-								</p>
-							</div>
 							<p>
-								<label for="threaddesk_account_shipping_company"><?php echo esc_html__( 'Shipping Company', 'threaddesk' ); ?></label>
-								<input type="text" name="shipping_company" id="threaddesk_account_shipping_company" value="<?php echo esc_attr( $shipping_form['company'] ); ?>" />
+								<label for="threaddesk_account_email"><?php echo esc_html__( 'Email', 'threaddesk' ); ?></label>
+								<input type="email" name="account_email" id="threaddesk_account_email" value="<?php echo esc_attr( $account_details['email'] ); ?>" />
 							</p>
 							<p class="threaddesk-auth-modal__submit">
 								<button type="submit" class="threaddesk-auth-modal__button">
