@@ -178,6 +178,8 @@ jQuery(function ($) {
 				maximumColorCount: 4,
 			},
 			hasUserAdjustedMax: false,
+			activeSwatchIndex: 0,
+			showPaletteOptions: false,
 		};
 
 		const previewContainer = designModal.find('[data-threaddesk-design-preview]');
@@ -326,32 +328,59 @@ jQuery(function ($) {
 				return;
 			}
 
+			if (state.activeSwatchIndex >= palette.length) {
+				state.activeSwatchIndex = 0;
+			}
+
+			const activeIndex = Math.max(0, state.activeSwatchIndex || 0);
+			const activeColor = findClosestAllowedColor(palette[activeIndex]);
+
+			const panel = $('<div class="threaddesk-designer__palette-panel"></div>');
+			const current = $('<div class="threaddesk-designer__palette-current"></div>');
+			current.append($('<p class="threaddesk-designer__palette-title"></p>').text('Current Color'));
+			current.append($('<div class="threaddesk-designer__palette-current-chip"></div>').attr('title', activeColor.name + ' ' + activeColor.hex).css('background', activeColor.hex));
+			current.append($('<small class="threaddesk-designer__palette-current-name"></small>').text(activeColor.name + ' (' + activeColor.hex + ')'));
+			panel.append(current);
+
+			const inUse = $('<div class="threaddesk-designer__palette-in-use"></div>');
+			inUse.append($('<p class="threaddesk-designer__palette-title"></p>').text('Colors In Use'));
+			const inUseRow = $('<div class="threaddesk-designer__palette-row"></div>');
 			palette.forEach(function (hex, index) {
-				const pct = state.percentages[index] || 0;
-				const current = findClosestAllowedColor(hex);
-				const row = $('<label></label>').attr('data-threaddesk-swatch-row', index);
-				const meta = $('<div class="threaddesk-designer__swatch-meta"></div>');
-				const name = $('<span></span>').html('<span class="threaddesk-designer__swatch-chip" style="background:' + current.hex + '"></span>Color ' + (index + 1));
-				const percent = $('<span></span>').text(pct > 0 ? pct.toFixed(1) + '%' : '');
-				meta.append(name).append(percent);
-				const trigger = $('<button type="button" class="threaddesk-designer__swatch-picker" data-threaddesk-swatch-trigger></button>').text(current.name + ' (' + current.hex + ')');
-				const options = $('<div class="threaddesk-designer__swatch-options" data-threaddesk-swatch-options hidden></div>');
-				allowedSwatchPalette.forEach(function (option) {
-					const item = $('<button type="button" class="threaddesk-designer__swatch-option" data-threaddesk-swatch-option></button>')
-						.attr('data-threaddesk-swatch-index', index)
-						.attr('data-color-hex', option.hex)
-						.attr('title', option.name + ' ' + option.hex)
-						.attr('aria-label', option.name + ' ' + option.hex)
-						.append('<span class="threaddesk-designer__swatch-chip" style="background:' + option.hex + '"></span>')
-						.append('<span>' + option.name + '</span>');
-					if (option.hex.toLowerCase() === current.hex.toLowerCase()) {
-						item.addClass('is-active');
-					}
-					options.append(item);
-				});
-				row.append(meta).append(trigger).append(options);
-				swatches.append(row);
+				const currentAllowed = findClosestAllowedColor(hex);
+				const btn = $('<button type="button" class="threaddesk-designer__palette-dot" data-threaddesk-inuse-color></button>')
+					.attr('data-threaddesk-swatch-index', index)
+					.attr('title', currentAllowed.name + ' ' + currentAllowed.hex)
+					.attr('aria-label', 'Color ' + (index + 1) + ' ' + currentAllowed.name)
+					.css('background', currentAllowed.hex);
+				if (index === activeIndex) {
+					btn.addClass('is-active');
+				}
+				inUseRow.append(btn);
 			});
+			inUse.append(inUseRow);
+			panel.append(inUse);
+
+			const optionsWrap = $('<div class="threaddesk-designer__palette-options" data-threaddesk-palette-options></div>');
+			if (!state.showPaletteOptions) {
+				optionsWrap.attr('hidden', true);
+			}
+			optionsWrap.append($('<p class="threaddesk-designer__palette-title"></p>').text('Colors'));
+			const optionsGrid = $('<div class="threaddesk-designer__palette-grid"></div>');
+			allowedSwatchPalette.forEach(function (option) {
+				const opt = $('<button type="button" class="threaddesk-designer__palette-dot" data-threaddesk-palette-option></button>')
+					.attr('data-color-hex', option.hex)
+					.attr('title', option.name)
+					.attr('aria-label', option.name + ' ' + option.hex)
+					.css('background', option.hex);
+				if (option.hex.toLowerCase() === activeColor.hex.toLowerCase()) {
+					opt.addClass('is-active');
+				}
+				optionsGrid.append(opt);
+			});
+			optionsWrap.append(optionsGrid);
+			panel.append(optionsWrap);
+
+			swatches.append(panel);
 			colorCountOutput.text(String(state.analysisSettings.maximumColorCount));
 			persistDesignMetadata();
 		};
@@ -643,6 +672,7 @@ jQuery(function ($) {
 				renderColorSwatches();
 				renderVectorFallback();
 				setStatus('');
+				state.showPaletteOptions = false;
 				return;
 			}
 
@@ -673,24 +703,26 @@ jQuery(function ($) {
 				setStatus('No colors detected');
 				renderColorSwatches();
 			}
+			state.palette[index] = hex;
+			persistDesignMetadata();
+			queueRecolor();
+			renderColorSwatches();
 		});
 
-		$(document).on('click', '[data-threaddesk-swatch-trigger]', function (event) {
+		$(document).on('click', '[data-threaddesk-inuse-color]', function (event) {
 			event.preventDefault();
-			event.stopPropagation();
-			const row = $(this).closest('[data-threaddesk-swatch-row]');
-			const menu = row.find('[data-threaddesk-swatch-options]');
-			const isHidden = menu.is('[hidden]');
-			designModal.find('[data-threaddesk-swatch-options]').attr('hidden', true);
-			if (isHidden) {
-				menu.removeAttr('hidden');
-			}
-		});
-
-		$(document).on('click', '[data-threaddesk-swatch-option]', function (event) {
-			event.preventDefault();
-			event.stopPropagation();
 			const index = parseInt($(this).attr('data-threaddesk-swatch-index'), 10);
+			if (Number.isNaN(index) || index < 0) {
+				return;
+			}
+			state.activeSwatchIndex = index;
+			state.showPaletteOptions = true;
+			renderColorSwatches();
+		});
+
+		$(document).on('click', '[data-threaddesk-palette-option]', function (event) {
+			event.preventDefault();
+			const index = Math.max(0, state.activeSwatchIndex || 0);
 			const hex = ($(this).attr('data-color-hex') || '').toUpperCase();
 			if (Number.isNaN(index) || index < 0 || !/^#[0-9A-F]{6}$/.test(hex)) {
 				return;
@@ -699,10 +731,6 @@ jQuery(function ($) {
 			persistDesignMetadata();
 			queueRecolor();
 			renderColorSwatches();
-		});
-
-		$(document).on('click', function () {
-			designModal.find('[data-threaddesk-swatch-options]').attr('hidden', true);
 		});
 
 		$(document).on('keyup', function (event) {
@@ -714,6 +742,7 @@ jQuery(function ($) {
 		maxColorInput.val('4');
 		colorCountOutput.text('4');
 		state.palette = normalizePaletteToAllowed(defaultPalette.slice(0, 4));
+		state.showPaletteOptions = false;
 		renderColorSwatches();
 		renderVectorFallback();
 		persistDesignMetadata();

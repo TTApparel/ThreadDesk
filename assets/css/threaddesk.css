@@ -826,76 +826,61 @@ body.threaddesk-modal-open {
 }
 
 .threaddesk-designer__swatches {
-	display: grid;
-	grid-template-columns: repeat(4, minmax(0, 1fr));
-	gap: 10px;
+	display: block;
 }
 
-.threaddesk-designer__swatches label {
+.threaddesk-designer__palette-panel {
 	display: grid;
-	gap: 4px;
+	gap: 14px;
+}
+
+.threaddesk-designer__palette-title {
+	margin: 0 0 6px;
 	font-size: 12px;
-	color: #4f4f4f;
-	border: 1px solid #e5e5e5;
-	border-radius: 8px;
-	padding: 8px;
-	background: #fff;
+	font-weight: 700;
+	text-transform: uppercase;
+	letter-spacing: 0.03em;
 }
 
-.threaddesk-designer__swatch-meta {
-	display: flex;
-	justify-content: space-between;
-	align-items: center;
-	font-size: 11px;
-}
-
-.threaddesk-designer__swatch-chip {
-	width: 12px;
-	height: 12px;
+.threaddesk-designer__palette-current-chip {
+	width: 34px;
+	height: 34px;
 	border-radius: 50%;
-	display: inline-block;
-	border: 1px solid rgba(0, 0, 0, 0.2);
-	margin-right: 6px;
-	vertical-align: middle;
+	border: 1px solid rgba(0, 0, 0, 0.15);
 }
 
-.threaddesk-designer__swatch-picker {
-	width: 100%;
-	border: 1px solid #ddd;
-	border-radius: 6px;
-	background: #fff;
-	padding: 6px 8px;
+.threaddesk-designer__palette-current-name {
+	display: block;
+	margin-top: 4px;
 	font-size: 11px;
-	text-align: left;
-	cursor: pointer;
+	color: #595959;
 }
 
-.threaddesk-designer__swatch-options {
-	display: grid;
-	gap: 4px;
-	max-height: 180px;
-	overflow: auto;
-	padding: 6px;
-	border: 1px solid #ddd;
-	border-radius: 6px;
-	background: #fff;
-}
-
-.threaddesk-designer__swatch-option {
+.threaddesk-designer__palette-row,
+.threaddesk-designer__palette-grid {
 	display: flex;
-	align-items: center;
-	gap: 6px;
-	border: 1px solid transparent;
-	padding: 4px 6px;
-	border-radius: 4px;
-	background: #fff;
-	cursor: pointer;
-	font-size: 11px;
-	text-align: left;
+	gap: 10px;
+	flex-wrap: wrap;
 }
 
-.threaddesk-designer__swatch-option:hover,
-.threaddesk-designer__swatch-option.is-active {
-	border-color: #1f3a56;
-	background: #f3f8fd;
+.threaddesk-designer__palette-grid {
+	max-height: 270px;
+	overflow: auto;
+	padding-right: 4px;
 }
+
+.threaddesk-designer__palette-dot {
+	width: 34px;
+	height: 34px;
+	border-radius: 50%;
+	border: 2px solid transparent;
+	cursor: pointer;
+	padding: 0;
+	box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.12);
+}
+
+.threaddesk-designer__palette-dot:hover,
+.threaddesk-designer__palette-dot.is-active {
+	border-color: #2f2f2f;
+}
+
