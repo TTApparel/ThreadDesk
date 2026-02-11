@@ -618,6 +618,33 @@ body.threaddesk-modal-open {
 	margin-bottom: 12px;
 }
 
+
+.threaddesk__card-design-preview {
+	border-radius: 10px;
+	overflow: hidden;
+	background: #f3f3f3;
+	margin-bottom: 10px;
+	aspect-ratio: 4 / 3;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+}
+
+.threaddesk__card-design-preview img {
+	max-width: 100%;
+	max-height: 100%;
+	display: block;
+	object-fit: contain;
+}
+
+.threaddesk__card-design-file {
+	margin-top: 6px;
+	font-size: 12px;
+	color: #666;
+	word-break: break-word;
+}
+
+
 .threaddesk__table {
 	width: 100%;
 	border-collapse: collapse;

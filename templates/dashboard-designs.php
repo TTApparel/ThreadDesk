@@ -82,14 +82,20 @@ $nav_base = trailingslashit( wc_get_account_endpoint_url( 'thread-desk' ) );
 				<h3><?php echo esc_html__( 'Saved Designs', 'threaddesk' ); ?></h3>
 				<button type="button" class="threaddesk__button" data-threaddesk-design-open><?php echo esc_html__( 'Choose Design', 'threaddesk' ); ?></button>
 			</div>
-			<p><?php echo esc_html__( 'Designs are placeholders for now. This area will list saved assets and approvals.', 'threaddesk' ); ?></p>
-			<div class="threaddesk__cards">
+						<div class="threaddesk__cards">
 				<?php if ( ! empty( $context['designs'] ) ) : ?>
 					<?php foreach ( $context['designs'] as $design ) : ?>
-						<div class="threaddesk__card">
-							<h4><?php echo esc_html( $design->post_title ); ?></h4>
-							<p><?php echo esc_html__( 'Status: In review', 'threaddesk' ); ?></p>
-						</div>
+					<?php $design_preview = get_post_meta( $design->ID, 'design_preview_url', true ); ?>
+					<?php $design_file_name = get_post_meta( $design->ID, 'design_file_name', true ); ?>
+					<div class="threaddesk__card">
+						<?php if ( $design_preview ) : ?>
+							<div class="threaddesk__card-design-preview">
+								<img src="<?php echo esc_url( $design_preview ); ?>" alt="<?php echo esc_attr( $design->post_title ); ?>" />
+							</div>
+						<?php endif; ?>
+						<h4><?php echo esc_html( $design->post_title ); ?></h4>
+						<p class="threaddesk__card-design-file"><?php echo esc_html( $design_file_name ? $design_file_name : __( 'Filename unavailable', 'threaddesk' ) ); ?></p>
+					</div>
 					<?php endforeach; ?>
 				<?php else : ?>
 					<div class="threaddesk__card">
@@ -112,7 +118,9 @@ $nav_base = trailingslashit( wc_get_account_endpoint_url( 'thread-desk' ) );
 			</button>
 		</div>
 		<div class="threaddesk-auth-modal__content threaddesk-designer">
-			<form class="threaddesk-auth-modal__form-inner" method="post" action="#">
+			<form class="threaddesk-auth-modal__form-inner" method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" enctype="multipart/form-data">
+				<input type="hidden" name="action" value="tta_threaddesk_save_design" />
+				<?php wp_nonce_field( 'tta_threaddesk_save_design' ); ?>
 				<div class="threaddesk-designer__design-image" data-threaddesk-design-preview>
 					<img class="threaddesk-designer__design-image-upload" data-threaddesk-design-upload-preview alt="<?php echo esc_attr__( 'Uploaded design preview', 'threaddesk' ); ?>" />
 					<canvas class="threaddesk-designer__design-canvas" data-threaddesk-design-canvas aria-hidden="true"></canvas>
@@ -126,7 +134,7 @@ $nav_base = trailingslashit( wc_get_account_endpoint_url( 'thread-desk' ) );
 					</svg>
 				</div>
 
-				<input type="file" id="threaddesk_design_file" accept=".png,.jpg,.jpeg,.svg,image/png,image/jpeg,image/svg+xml" data-threaddesk-design-file hidden />
+				<input type="file" id="threaddesk_design_file" accept=".png,.jpg,.jpeg,.svg,image/png,image/jpeg,image/svg+xml" name="threaddesk_design_file" data-threaddesk-design-file hidden />
 				<small class="threaddesk-designer__file-name" data-threaddesk-design-file-name><?php echo esc_html__( 'No file selected', 'threaddesk' ); ?></small>
 				<input type="hidden" name="threaddesk_design_palette" data-threaddesk-design-palette value="[]" />
 				<input type="hidden" name="threaddesk_design_color_count" data-threaddesk-design-color-count value="0" />
@@ -150,8 +158,8 @@ $nav_base = trailingslashit( wc_get_account_endpoint_url( 'thread-desk' ) );
 				</div>
 
 				<p class="threaddesk-auth-modal__submit">
-					<button type="button" class="threaddesk-auth-modal__button" data-threaddesk-design-close>
-						<?php echo esc_html__( 'Apply Settings', 'threaddesk' ); ?>
+					<button type="submit" class="threaddesk-auth-modal__button">
+						<?php echo esc_html__( 'Save Design', 'threaddesk' ); ?>
 					</button>
 				</p>
 			</form>
