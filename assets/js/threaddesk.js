@@ -161,7 +161,6 @@ jQuery(function ($) {
 		];
 		const minimumPercent = 0.5;
 		const mergeThreshold = 22;
-		const maxAnalysisDimension = 2000;
 		const maxSwatches = 8;
 		let uploadedPreviewUrl = null;
 		let recolorTimer = null;
@@ -567,16 +566,34 @@ jQuery(function ($) {
 		};
 
 		const createAnalysisBuffer = function (image) {
-			const scale = Math.min(1, maxAnalysisDimension / Math.max(image.naturalWidth || image.width, image.naturalHeight || image.height));
-			const width = Math.max(1, Math.round((image.naturalWidth || image.width) * scale));
-			const height = Math.max(1, Math.round((image.naturalHeight || image.height) * scale));
+			const baseWidth = Math.max(1, image.naturalWidth || image.width || 1);
+			const baseHeight = Math.max(1, image.naturalHeight || image.height || 1);
 			const canvas = document.createElement('canvas');
-			canvas.width = width;
-			canvas.height = height;
-			const ctx = canvas.getContext('2d', { willReadFrequently: true });
-			ctx.clearRect(0, 0, width, height);
-			ctx.drawImage(image, 0, 0, width, height);
-			return { width: width, height: height, imageData: ctx.getImageData(0, 0, width, height) };
+			let scale = 1;
+			let lastError = null;
+			for (let attempt = 0; attempt < 7; attempt += 1) {
+				const width = Math.max(1, Math.round(baseWidth * scale));
+				const height = Math.max(1, Math.round(baseHeight * scale));
+				try {
+					canvas.width = width;
+					canvas.height = height;
+					const ctx = canvas.getContext('2d', { willReadFrequently: true });
+					if (!ctx) {
+						throw new Error('Canvas 2D context unavailable');
+					}
+					ctx.clearRect(0, 0, width, height);
+					ctx.drawImage(image, 0, 0, width, height);
+					const imageData = ctx.getImageData(0, 0, width, height);
+					return { width: width, height: height, imageData: imageData };
+				} catch (error) {
+					lastError = error;
+					if (width <= 1 || height <= 1) {
+						break;
+					}
+					scale *= 0.75;
+				}
+			}
+			throw lastError || new Error('Unable to create analysis buffer');
 		};
 
 		const loadCanvasFromPreviewUrl = function (url) {
@@ -591,6 +608,8 @@ jQuery(function ($) {
 					const analysis = createAnalysisBuffer(img);
 					state.width = analysis.width;
 					state.height = analysis.height;
+					state.sourcePixels = analysis.imageData.data;
+					state.fileType = 'raster';
 					const canvas = previewCanvas.get(0);
 					canvas.width = analysis.width;
 					canvas.height = analysis.height;
@@ -605,6 +624,88 @@ jQuery(function ($) {
 				};
 				img.src = url;
 			});
+		};
+
+
+		const rasterDataUrlToSvgDataUrl = function (rasterDataUrl, width, height) {
+			if (!rasterDataUrl) {
+				return '';
+			}
+			const safeWidth = Math.max(1, parseInt(width, 10) || 1);
+			const safeHeight = Math.max(1, parseInt(height, 10) || 1);
+			const svgMarkup = '<svg xmlns="http://www.w3.org/2000/svg" width="' + safeWidth + '" height="' + safeHeight + '" viewBox="0 0 ' + safeWidth + ' ' + safeHeight + '" preserveAspectRatio="xMidYMid meet"><image href="' + rasterDataUrl + '" width="' + safeWidth + '" height="' + safeHeight + '"/></svg>';
+			return 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(svgMarkup);
+		};
+
+		const recolorCardPreview = async function (imgEl, previewUrl, paletteRaw, settingsRaw) {
+			if (!imgEl || !previewUrl) {
+				return;
+			}
+
+			let palette = [];
+			let settings = {};
+			try { palette = JSON.parse(paletteRaw || '[]'); } catch (e) {}
+			try { settings = JSON.parse(settingsRaw || '{}'); } catch (e) {}
+
+			const normalizedPalette = normalizePaletteToAllowed(Array.isArray(palette) && palette.length ? palette : defaultPalette.slice(0, 4));
+			const maxColors = clamp(parseInt(settings.maximumColorCount, 10) || normalizedPalette.length || 4, 1, maxSwatches);
+			const image = new Image();
+			image.crossOrigin = 'anonymous';
+			const loaded = await new Promise(function (resolve) {
+				image.onload = function () { resolve(true); };
+				image.onerror = function () { resolve(false); };
+				image.src = previewUrl;
+			});
+
+			if (!loaded) {
+				return;
+			}
+
+			const analysis = createAnalysisBuffer(image);
+			const pixels = [];
+			const opaqueIndices = [];
+			for (let i = 0; i < analysis.imageData.data.length; i += 4) {
+				const alpha = analysis.imageData.data[i + 3];
+				if (alpha < 8) {
+					continue;
+				}
+				pixels.push([analysis.imageData.data[i], analysis.imageData.data[i + 1], analysis.imageData.data[i + 2]]);
+				opaqueIndices.push(i / 4);
+			}
+
+			if (!pixels.length) {
+				return;
+			}
+
+			const quantized = quantizeColors(pixels, opaqueIndices, analysis.width * analysis.height, maxColors);
+			if (!quantized || !quantized.labels) {
+				return;
+			}
+
+			const canvas = document.createElement('canvas');
+			canvas.width = analysis.width;
+			canvas.height = analysis.height;
+			const ctx = canvas.getContext('2d');
+			const output = new Uint8ClampedArray(analysis.imageData.data.length);
+			const paletteRgb = normalizedPalette.map(hexToRgb);
+			for (let pixelIndex = 0; pixelIndex < quantized.labels.length; pixelIndex += 1) {
+				const offset = pixelIndex * 4;
+				const alpha = analysis.imageData.data[offset + 3];
+				if (alpha < 8) {
+					output[offset + 3] = 0;
+					continue;
+				}
+				const label = quantized.labels[pixelIndex] || 0;
+				const color = paletteRgb[label] || paletteRgb[0] || [0, 0, 0];
+				output[offset] = color[0];
+				output[offset + 1] = color[1];
+				output[offset + 2] = color[2];
+				output[offset + 3] = alpha;
+			}
+			ctx.putImageData(new ImageData(output, analysis.width, analysis.height), 0, 0);
+			const pngDataUrl = canvas.toDataURL('image/png');
+			const svgDataUrl = rasterDataUrlToSvgDataUrl(pngDataUrl, analysis.width, analysis.height);
+			imgEl.src = svgDataUrl || pngDataUrl;
 		};
 
 		const analyzeCurrentImage = async function () {
@@ -693,10 +794,14 @@ jQuery(function ($) {
 			state.palette = normalizePaletteToAllowed(Array.isArray(palette) && palette.length ? palette : defaultPalette.slice(0, 4));
 			state.analysisSettings.maximumColorCount = clamp(parseInt(settings.maximumColorCount, 10) || state.palette.length || 4, 1, maxSwatches);
 			maxColorInput.val(String(state.analysisSettings.maximumColorCount));
-			state.labels = null;
-			state.sourcePixels = null;
+			state.hasUserAdjustedMax = true;
 			state.percentages = [];
 			state.showPaletteOptions = false;
+			if (state.sourcePixels) {
+				await analyzeCurrentImage();
+				state.palette = normalizePaletteToAllowed(Array.isArray(palette) && palette.length ? palette : state.palette);
+				queueRecolor();
+			}
 			renderColorSwatches();
 			renderVectorFallback();
 			setStatus('Editing saved design');
@@ -775,10 +880,15 @@ jQuery(function ($) {
 				setStatus('No colors detected');
 				renderColorSwatches();
 			}
-			state.palette[index] = hex;
-			persistDesignMetadata();
-			queueRecolor();
-			renderColorSwatches();
+		});
+
+		$('[data-threaddesk-design-edit]').each(function () {
+			const trigger = $(this);
+			const previewUrl = trigger.attr('data-threaddesk-design-preview-url') || '';
+			const paletteRaw = trigger.attr('data-threaddesk-design-palette') || '[]';
+			const settingsRaw = trigger.attr('data-threaddesk-design-settings') || '{}';
+			const cardImage = trigger.closest('.threaddesk__card').find('.threaddesk__card-design-preview img').get(0);
+			recolorCardPreview(cardImage, previewUrl, paletteRaw, settingsRaw).catch(function () {});
 		});
 
 		$(document).on('click', '[data-threaddesk-inuse-color]', function (event) {
