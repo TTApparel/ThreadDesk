@@ -158,6 +158,11 @@ jQuery(function ($) {
 		$(document).on('click', '[data-threaddesk-design-open]', function (event) {
 			event.preventDefault();
 			openDesignModal();
+
+			const designFileInput = designModal.find('[data-threaddesk-design-file]').get(0);
+			if (designFileInput) {
+				designFileInput.click();
+			}
 		});
 
 		$(document).on('click', '[data-threaddesk-design-close]', function () {
