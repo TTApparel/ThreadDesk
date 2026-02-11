@@ -703,6 +703,10 @@ jQuery(function ($) {
 				setStatus('No colors detected');
 				renderColorSwatches();
 			}
+			state.palette[index] = hex;
+			persistDesignMetadata();
+			queueRecolor();
+			renderColorSwatches();
 		});
 
 		$(document).on('click', '[data-threaddesk-inuse-color]', function (event) {
