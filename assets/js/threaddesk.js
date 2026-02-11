@@ -161,7 +161,7 @@ jQuery(function ($) {
 		];
 		const minimumPercent = 0.5;
 		const mergeThreshold = 22;
-		const maxAnalysisDimension = 1200;
+		const maxAnalysisDimension = 2000;
 		const maxSwatches = 8;
 		let uploadedPreviewUrl = null;
 		let recolorTimer = null;
@@ -323,6 +323,7 @@ jQuery(function ($) {
 			swatches.empty();
 			const palette = state.palette.slice(0, maxSwatches);
 			if (!palette.length) {
+				designModal.find('.threaddesk-designer__controls').removeClass('is-palette-selecting');
 				swatches.append($('<p></p>').text('No colors detected'));
 				setStatus('No colors detected');
 				colorCountOutput.text(String(state.analysisSettings.maximumColorCount));
@@ -336,6 +337,7 @@ jQuery(function ($) {
 
 			const activeIndex = Math.max(0, state.activeSwatchIndex || 0);
 			const activeColor = findClosestAllowedColor(palette[activeIndex]);
+			designModal.find('.threaddesk-designer__controls').toggleClass('is-palette-selecting', !!state.showPaletteOptions);
 
 			const panel = $('<div class="threaddesk-designer__palette-panel"></div>');
 

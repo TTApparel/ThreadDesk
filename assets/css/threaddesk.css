@@ -748,6 +748,7 @@ body.threaddesk-modal-open {
 	width: 100%;
 	height: auto;
 	border-radius: 8px;
+	background: transparent;
 }
 
 .threaddesk-designer__design-canvas {
@@ -824,6 +825,13 @@ body.threaddesk-modal-open {
 	color: #6d6d6d;
 	min-height: 16px;
 }
+
+
+.threaddesk-designer__controls.is-palette-selecting .threaddesk-designer__control-head,
+.threaddesk-designer__controls.is-palette-selecting .threaddesk-designer__status {
+	display: none;
+}
+
 
 .threaddesk-designer__swatches {
 	display: block;
