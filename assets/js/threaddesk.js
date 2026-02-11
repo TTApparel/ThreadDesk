@@ -536,20 +536,97 @@ jQuery(function ($) {
 			};
 		};
 
+
+		const parseSvgLength = function (value) {
+			if (typeof value !== 'string') {
+				return 0;
+			}
+			const trimmed = value.trim();
+			if (!trimmed || trimmed.endsWith('%')) {
+				return 0;
+			}
+			const numeric = parseFloat(trimmed);
+			return Number.isFinite(numeric) && numeric > 0 ? numeric : 0;
+		};
+
+		const parseSvgDimensionsFromText = function (svgText) {
+			if (!svgText || typeof svgText !== 'string') {
+				return null;
+			}
+			try {
+				const parser = new DOMParser();
+				const doc = parser.parseFromString(svgText, 'image/svg+xml');
+				const svg = doc && doc.documentElement && doc.documentElement.nodeName.toLowerCase() === 'svg'
+					? doc.documentElement
+					: doc.querySelector('svg');
+				if (!svg) {
+					return null;
+				}
+				let width = parseSvgLength(svg.getAttribute('width') || '');
+				let height = parseSvgLength(svg.getAttribute('height') || '');
+				const viewBox = (svg.getAttribute('viewBox') || '').trim();
+				if ((!width || !height) && viewBox) {
+					const parts = viewBox.split(/[\s,]+/).map(function (part) { return parseFloat(part); });
+					if (parts.length === 4 && Number.isFinite(parts[2]) && Number.isFinite(parts[3])) {
+						width = width || Math.max(0, parts[2]);
+						height = height || Math.max(0, parts[3]);
+					}
+				}
+				if (!width || !height) {
+					return null;
+				}
+				return { width: Math.round(width), height: Math.round(height) };
+			} catch (error) {
+				return null;
+			}
+		};
+
+		const getSvgDimensionsFromUrl = async function (url) {
+			if (!url) {
+				return null;
+			}
+			const isSvgUrl = /\.svg(?:[?#].*)?$/i.test(url) || /^data:image\/svg\+xml/i.test(url);
+			if (!isSvgUrl) {
+				return null;
+			}
+			try {
+				let svgText = '';
+				if (/^data:image\/svg\+xml/i.test(url)) {
+					const comma = url.indexOf(',');
+					if (comma < 0) {
+						return null;
+					}
+					const header = url.slice(0, comma);
+					const body = url.slice(comma + 1);
+					svgText = /;base64/i.test(header) ? atob(body) : decodeURIComponent(body);
+				} else {
+					const response = await fetch(url, { credentials: 'same-origin' });
+					if (!response.ok) {
+						return null;
+					}
+					svgText = await response.text();
+				}
+				return parseSvgDimensionsFromText(svgText);
+			} catch (error) {
+				return null;
+			}
+		};
+
 		const loadImageFromFile = function (file) {
 			return new Promise(function (resolve, reject) {
 				const isSvg = file.type === 'image/svg+xml' || /\.svg$/i.test(file.name || '');
 				const img = new Image();
-				img.onload = function () { resolve({ image: img, isSvg: isSvg }); };
+				img.onload = function () { resolve({ image: img, isSvg: isSvg, svgDimensions: null }); };
 				img.onerror = function () { reject(new Error('Failed to load image')); };
 				if (isSvg) {
 					const reader = new FileReader();
 					reader.onload = function () {
+						const svgDimensions = parseSvgDimensionsFromText(String(reader.result || ''));
 						const svgBlob = new Blob([reader.result], { type: 'image/svg+xml' });
 						const objectUrl = URL.createObjectURL(svgBlob);
 						img.onload = function () {
 							URL.revokeObjectURL(objectUrl);
-							resolve({ image: img, isSvg: true });
+							resolve({ image: img, isSvg: true, svgDimensions: svgDimensions });
 						};
 						img.onerror = function () {
 							URL.revokeObjectURL(objectUrl);
@@ -565,9 +642,11 @@ jQuery(function ($) {
 			});
 		};
 
-		const createAnalysisBuffer = function (image) {
-			const baseWidth = Math.max(1, image.naturalWidth || image.width || 1);
-			const baseHeight = Math.max(1, image.naturalHeight || image.height || 1);
+		const createAnalysisBuffer = function (image, preferredDimensions) {
+			const preferredWidth = preferredDimensions && preferredDimensions.width ? preferredDimensions.width : 0;
+			const preferredHeight = preferredDimensions && preferredDimensions.height ? preferredDimensions.height : 0;
+			const baseWidth = Math.max(1, Math.round(preferredWidth || image.naturalWidth || image.width || 1));
+			const baseHeight = Math.max(1, Math.round(preferredHeight || image.naturalHeight || image.height || 1));
 			const canvas = document.createElement('canvas');
 			let scale = 1;
 			let lastError = null;
@@ -596,7 +675,8 @@ jQuery(function ($) {
 			throw lastError || new Error('Unable to create analysis buffer');
 		};
 
-		const loadCanvasFromPreviewUrl = function (url) {
+		const loadCanvasFromPreviewUrl = async function (url) {
+			const svgDimensions = await getSvgDimensionsFromUrl(url);
 			return new Promise(function (resolve) {
 				if (!url || !previewCanvas.length) {
 					resolve(false);
@@ -605,7 +685,7 @@ jQuery(function ($) {
 				const img = new Image();
 				img.crossOrigin = 'anonymous';
 				img.onload = function () {
-					const analysis = createAnalysisBuffer(img);
+					const analysis = createAnalysisBuffer(img, svgDimensions);
 					state.width = analysis.width;
 					state.height = analysis.height;
 					state.sourcePixels = analysis.imageData.data;
@@ -651,6 +731,7 @@ jQuery(function ($) {
 			const maxColors = clamp(parseInt(settings.maximumColorCount, 10) || normalizedPalette.length || 4, 1, maxSwatches);
 			const image = new Image();
 			image.crossOrigin = 'anonymous';
+			const svgDimensions = await getSvgDimensionsFromUrl(previewUrl);
 			const loaded = await new Promise(function (resolve) {
 				image.onload = function () { resolve(true); };
 				image.onerror = function () { resolve(false); };
@@ -661,7 +742,7 @@ jQuery(function ($) {
 				return;
 			}
 
-			const analysis = createAnalysisBuffer(image);
+			const analysis = createAnalysisBuffer(image, svgDimensions);
 			const pixels = [];
 			const opaqueIndices = [];
 			for (let i = 0; i < analysis.imageData.data.length; i += 4) {
@@ -867,7 +948,7 @@ jQuery(function ($) {
 				previewContainer.addClass('has-upload');
 				previewSvg.attr('aria-hidden', 'true');
 
-				const analysis = createAnalysisBuffer(loaded.image);
+				const analysis = createAnalysisBuffer(loaded.image, loaded.svgDimensions || null);
 				state.width = analysis.width;
 				state.height = analysis.height;
 				state.sourcePixels = analysis.imageData.data;
