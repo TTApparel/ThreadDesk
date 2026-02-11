@@ -117,6 +117,46 @@ jQuery(function ($) {
 		};
 
 		const defaultPalette = ['#111111', '#ffffff', '#1f1f1f', '#3a3a3a', '#f24c3d', '#3366ff', '#21b573', '#f6b200'];
+		const allowedSwatchPalette = [
+			{ name: 'Lemon Yellow', hex: '#FEDB00' },
+			{ name: 'Rich Yellow', hex: '#FED141' },
+			{ name: 'Gold Yellow', hex: '#FFB81C' },
+			{ name: 'Orange', hex: '#FF6A39' },
+			{ name: 'Athletic Orange', hex: '#E38331' },
+			{ name: 'Academy Orange', hex: '#BE531C' },
+			{ name: 'Vivid Red', hex: '#C8102E' },
+			{ name: 'Scarlet Red', hex: '#D22730' },
+			{ name: 'Bold Red', hex: '#BE3A34' },
+			{ name: 'Cardinal Red', hex: '#A6192E' },
+			{ name: 'Maroon', hex: '#A50034' },
+			{ name: 'Pure Pink', hex: '#FF85BD' },
+			{ name: 'Lilac', hex: '#BA9CC5' },
+			{ name: 'Violet', hex: '#512D6D' },
+			{ name: 'Magenta', hex: '#833177' },
+			{ name: 'Dark Purple', hex: '#351F65' },
+			{ name: 'Ultramarine', hex: '#10069F' },
+			{ name: 'Navy Blue', hex: '#131F29' },
+			{ name: 'Light Navy Blue', hex: '#28334A' },
+			{ name: 'Royal Blue', hex: '#002D72' },
+			{ name: 'Moon Blue', hex: '#004C97' },
+			{ name: 'Columbia Blue', hex: '#0076A8' },
+			{ name: 'Sky Blue', hex: '#8BBEE8' },
+			{ name: 'Ocean Blue', hex: '#0092CB' },
+			{ name: 'Caribbean Blue', hex: '#00AFD7' },
+			{ name: 'Aqua Blue', hex: '#007C80' },
+			{ name: 'Jungle Green', hex: '#007A53' },
+			{ name: 'Light Green', hex: '#00AD50' },
+			{ name: 'Forest Green', hex: '#249E6B' },
+			{ name: 'Pine Green', hex: '#00664F' },
+			{ name: 'Dark Green', hex: '#304F42' },
+			{ name: 'Dark Brown', hex: '#4E3629' },
+			{ name: 'Light Brown', hex: '#7B4D35' },
+			{ name: 'Khaki', hex: '#D3BC8D' },
+			{ name: 'Vegas Gold', hex: '#D5CB9F' },
+			{ name: 'Dolphin Grey', hex: '#A7A8AA' },
+			{ name: 'Shark Grey', hex: '#A7A8AA' },
+			{ name: 'Bora Bora Sand', hex: '#F2E9DB' },
+		];
 		const minimumPercent = 0.5;
 		const mergeThreshold = 22;
 		const maxAnalysisDimension = 640;
@@ -175,6 +215,25 @@ jQuery(function ($) {
 			const dg = a[1] - b[1];
 			const db = a[2] - b[2];
 			return (dr * dr) + (dg * dg) + (db * db);
+		};
+		const findClosestAllowedColor = function (hex) {
+			const rgb = hexToRgb(hex);
+			let best = allowedSwatchPalette[0] || { hex: '#111111', name: 'Black' };
+			let bestDist = Number.POSITIVE_INFINITY;
+			allowedSwatchPalette.forEach(function (option) {
+				const dist = colorDistanceSq(rgb, hexToRgb(option.hex));
+				if (dist < bestDist) {
+					bestDist = dist;
+					best = option;
+				}
+			});
+			return best;
+		};
+
+		const normalizePaletteToAllowed = function (palette) {
+			return (palette || []).map(function (hex) {
+				return findClosestAllowedColor(hex).hex;
+			});
 		};
 
 		const seedFromPixels = function (pixels) {
@@ -269,13 +328,28 @@ jQuery(function ($) {
 
 			palette.forEach(function (hex, index) {
 				const pct = state.percentages[index] || 0;
-				const row = $('<label></label>');
+				const current = findClosestAllowedColor(hex);
+				const row = $('<label></label>').attr('data-threaddesk-swatch-row', index);
 				const meta = $('<div class="threaddesk-designer__swatch-meta"></div>');
-				const name = $('<span></span>').html('<span class="threaddesk-designer__swatch-chip" style="background:' + hex + '"></span>Color ' + (index + 1));
+				const name = $('<span></span>').html('<span class="threaddesk-designer__swatch-chip" style="background:' + current.hex + '"></span>Color ' + (index + 1));
 				const percent = $('<span></span>').text(pct > 0 ? pct.toFixed(1) + '%' : '');
 				meta.append(name).append(percent);
-				row.append(meta);
-				row.append($('<input type="color" />').val(hex).attr('data-threaddesk-swatch-index', index));
+				const trigger = $('<button type="button" class="threaddesk-designer__swatch-picker" data-threaddesk-swatch-trigger></button>').text(current.name + ' (' + current.hex + ')');
+				const options = $('<div class="threaddesk-designer__swatch-options" data-threaddesk-swatch-options hidden></div>');
+				allowedSwatchPalette.forEach(function (option) {
+					const item = $('<button type="button" class="threaddesk-designer__swatch-option" data-threaddesk-swatch-option></button>')
+						.attr('data-threaddesk-swatch-index', index)
+						.attr('data-color-hex', option.hex)
+						.attr('title', option.name + ' ' + option.hex)
+						.attr('aria-label', option.name + ' ' + option.hex)
+						.append('<span class="threaddesk-designer__swatch-chip" style="background:' + option.hex + '"></span>')
+						.append('<span>' + option.name + '</span>');
+					if (option.hex.toLowerCase() === current.hex.toLowerCase()) {
+						item.addClass('is-active');
+					}
+					options.append(item);
+				});
+				row.append(meta).append(trigger).append(options);
 				swatches.append(row);
 			});
 			colorCountOutput.text(String(state.analysisSettings.maximumColorCount));
@@ -510,7 +584,7 @@ jQuery(function ($) {
 				state.analysisSettings.maximumColorCount = recommended;
 				maxColorInput.val(String(recommended));
 			}
-			state.palette = quantized.palette;
+			state.palette = normalizePaletteToAllowed(quantized.palette);
 			state.percentages = quantized.percentages;
 			state.labels = quantized.labels;
 			renderColorSwatches();
@@ -562,7 +636,7 @@ jQuery(function ($) {
 				previewImage.attr('src', '');
 				previewContainer.removeClass('has-upload');
 				previewSvg.removeAttr('aria-hidden');
-				state.palette = defaultPalette.slice(0, 4);
+				state.palette = normalizePaletteToAllowed(defaultPalette.slice(0, 4));
 				state.percentages = [];
 				state.labels = null;
 				state.sourcePixels = null;
@@ -601,15 +675,34 @@ jQuery(function ($) {
 			}
 		});
 
-		$(document).on('input change', '[data-threaddesk-color-swatches] input[type="color"]', function () {
+		$(document).on('click', '[data-threaddesk-swatch-trigger]', function (event) {
+			event.preventDefault();
+			event.stopPropagation();
+			const row = $(this).closest('[data-threaddesk-swatch-row]');
+			const menu = row.find('[data-threaddesk-swatch-options]');
+			const isHidden = menu.is('[hidden]');
+			designModal.find('[data-threaddesk-swatch-options]').attr('hidden', true);
+			if (isHidden) {
+				menu.removeAttr('hidden');
+			}
+		});
+
+		$(document).on('click', '[data-threaddesk-swatch-option]', function (event) {
+			event.preventDefault();
+			event.stopPropagation();
 			const index = parseInt($(this).attr('data-threaddesk-swatch-index'), 10);
-			if (Number.isNaN(index) || index < 0) {
+			const hex = ($(this).attr('data-color-hex') || '').toUpperCase();
+			if (Number.isNaN(index) || index < 0 || !/^#[0-9A-F]{6}$/.test(hex)) {
 				return;
 			}
-			state.palette[index] = $(this).val();
+			state.palette[index] = hex;
 			persistDesignMetadata();
 			queueRecolor();
 			renderColorSwatches();
+		});
+
+		$(document).on('click', function () {
+			designModal.find('[data-threaddesk-swatch-options]').attr('hidden', true);
 		});
 
 		$(document).on('keyup', function (event) {
@@ -620,7 +713,7 @@ jQuery(function ($) {
 
 		maxColorInput.val('4');
 		colorCountOutput.text('4');
-		state.palette = defaultPalette.slice(0, 4);
+		state.palette = normalizePaletteToAllowed(defaultPalette.slice(0, 4));
 		renderColorSwatches();
 		renderVectorFallback();
 		persistDesignMetadata();

@@ -859,11 +859,43 @@ body.threaddesk-modal-open {
 	vertical-align: middle;
 }
 
-.threaddesk-designer__swatches input[type='color'] {
+.threaddesk-designer__swatch-picker {
 	width: 100%;
-	height: 34px;
 	border: 1px solid #ddd;
 	border-radius: 6px;
 	background: #fff;
-	padding: 2px;
+	padding: 6px 8px;
+	font-size: 11px;
+	text-align: left;
+	cursor: pointer;
+}
+
+.threaddesk-designer__swatch-options {
+	display: grid;
+	gap: 4px;
+	max-height: 180px;
+	overflow: auto;
+	padding: 6px;
+	border: 1px solid #ddd;
+	border-radius: 6px;
+	background: #fff;
+}
+
+.threaddesk-designer__swatch-option {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	border: 1px solid transparent;
+	padding: 4px 6px;
+	border-radius: 4px;
+	background: #fff;
+	cursor: pointer;
+	font-size: 11px;
+	text-align: left;
+}
+
+.threaddesk-designer__swatch-option:hover,
+.threaddesk-designer__swatch-option.is-active {
+	border-color: #1f3a56;
+	background: #f3f8fd;
 }
