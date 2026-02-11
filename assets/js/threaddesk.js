@@ -579,6 +579,34 @@ jQuery(function ($) {
 			return { width: width, height: height, imageData: ctx.getImageData(0, 0, width, height) };
 		};
 
+		const loadCanvasFromPreviewUrl = function (url) {
+			return new Promise(function (resolve) {
+				if (!url || !previewCanvas.length) {
+					resolve(false);
+					return;
+				}
+				const img = new Image();
+				img.crossOrigin = 'anonymous';
+				img.onload = function () {
+					const analysis = createAnalysisBuffer(img);
+					state.width = analysis.width;
+					state.height = analysis.height;
+					const canvas = previewCanvas.get(0);
+					canvas.width = analysis.width;
+					canvas.height = analysis.height;
+					const ctx = canvas.getContext('2d', { willReadFrequently: true });
+					ctx.clearRect(0, 0, analysis.width, analysis.height);
+					ctx.drawImage(img, 0, 0, analysis.width, analysis.height);
+					previewContainer.attr('data-threaddesk-preview-mode', 'quantized');
+					resolve(true);
+				};
+				img.onerror = function () {
+					resolve(false);
+				};
+				img.src = url;
+			});
+		};
+
 		const analyzeCurrentImage = async function () {
 			if (!state.sourcePixels || !state.width || !state.height) {
 				return;
@@ -641,7 +669,7 @@ jQuery(function ($) {
 		});
 
 
-		$(document).on('click', '[data-threaddesk-design-edit]', function (event) {
+		$(document).on('click', '[data-threaddesk-design-edit]', async function (event) {
 			event.preventDefault();
 			openDesignModal();
 			const designId = parseInt($(this).attr('data-threaddesk-design-id'), 10) || 0;
@@ -656,6 +684,7 @@ jQuery(function ($) {
 				previewImage.attr('src', previewUrl);
 				previewContainer.addClass('has-upload');
 				previewSvg.attr('aria-hidden', 'true');
+				await loadCanvasFromPreviewUrl(previewUrl);
 			}
 			let palette = [];
 			let settings = {};
