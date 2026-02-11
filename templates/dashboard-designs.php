@@ -113,9 +113,9 @@ $nav_base = trailingslashit( wc_get_account_endpoint_url( 'thread-desk' ) );
 		</div>
 		<div class="threaddesk-auth-modal__content threaddesk-designer">
 			<form class="threaddesk-auth-modal__form-inner" method="post" action="#">
-				<div class="mockmaster-designer__design-image" data-threaddesk-design-preview>
-					<img class="mockmaster-designer__design-image-upload" data-threaddesk-design-upload-preview alt="<?php echo esc_attr__( 'Uploaded design preview', 'threaddesk' ); ?>" />
-					<div class="mockmaster-designer__design-image-overlay" aria-hidden="true"></div>
+				<div class="threaddesk-designer__design-image" data-threaddesk-design-preview>
+					<img class="threaddesk-designer__design-image-upload" data-threaddesk-design-upload-preview alt="<?php echo esc_attr__( 'Uploaded design preview', 'threaddesk' ); ?>" />
+					<div class="threaddesk-designer__design-image-overlay" aria-hidden="true"></div>
 					<svg viewBox="0 0 320 210" role="img" aria-label="<?php echo esc_attr__( 'Design preview', 'threaddesk' ); ?>">
 						<rect x="0" y="0" width="320" height="210" rx="14" fill="#f4f4f4"></rect>
 						<path d="M58 168L99 56h35l41 112h-27l-8-24H93l-8 24H58z" fill="#111111" data-threaddesk-preview-layer="0"></path>
@@ -134,7 +134,7 @@ $nav_base = trailingslashit( wc_get_account_endpoint_url( 'thread-desk' ) );
 				<div class="threaddesk-designer__controls">
 					<div class="threaddesk-designer__control-head">
 						<span><?php echo esc_html__( 'Color Count', 'threaddesk' ); ?></span>
-						<div class="mockmaster-designer__color-counter" data-threaddesk-color-counter>
+						<div class="threaddesk-designer__color-counter" data-threaddesk-color-counter>
 							<button type="button" class="threaddesk-designer__counter-btn" data-threaddesk-color-decrease>-</button>
 							<strong data-threaddesk-color-count>1</strong>
 							<button type="button" class="threaddesk-designer__counter-btn" data-threaddesk-color-increase>+</button>
