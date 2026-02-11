@@ -119,7 +119,7 @@ jQuery(function ($) {
 		const defaultPalette = ['#111111', '#ffffff', '#1f1f1f', '#3a3a3a', '#f24c3d', '#3366ff', '#21b573', '#f6b200'];
 		const minimumPercent = 0.5;
 		const mergeThreshold = 22;
-		const maxAnalysisDimension = 220;
+		const maxAnalysisDimension = 640;
 		const maxSwatches = 8;
 		let uploadedPreviewUrl = null;
 		let recolorTimer = null;
