@@ -191,6 +191,10 @@ jQuery(function ($) {
 		const maxColorInput = designModal.find('[data-threaddesk-max-colors]');
 		const colorCountOutput = designModal.find('[data-threaddesk-color-count]');
 		const statusEl = designModal.find('[data-threaddesk-design-status]');
+		const initialPreviewHeight = Math.round(previewContainer.outerHeight() || 0);
+		if (initialPreviewHeight > 0) {
+			previewContainer.css('--threaddesk-preview-max-height', initialPreviewHeight + 'px');
+		}
 
 		const clamp = function (value, min, max) {
 			return Math.max(min, Math.min(max, value));
@@ -324,6 +328,7 @@ jQuery(function ($) {
 			const palette = state.palette.slice(0, maxSwatches);
 			if (!palette.length) {
 				designModal.find('.threaddesk-designer__controls').removeClass('is-palette-selecting');
+				designModal.removeClass('is-palette-selecting');
 				swatches.append($('<p></p>').text('No colors detected'));
 				setStatus('No colors detected');
 				colorCountOutput.text(String(state.analysisSettings.maximumColorCount));
@@ -338,6 +343,7 @@ jQuery(function ($) {
 			const activeIndex = Math.max(0, state.activeSwatchIndex || 0);
 			const activeColor = findClosestAllowedColor(palette[activeIndex]);
 			designModal.find('.threaddesk-designer__controls').toggleClass('is-palette-selecting', !!state.showPaletteOptions);
+			designModal.toggleClass('is-palette-selecting', !!state.showPaletteOptions);
 
 			const panel = $('<div class="threaddesk-designer__palette-panel"></div>');
 
@@ -674,6 +680,7 @@ jQuery(function ($) {
 				renderVectorFallback();
 				setStatus('');
 				state.showPaletteOptions = false;
+				designModal.removeClass('is-palette-selecting');
 				return;
 			}
 
@@ -745,6 +752,7 @@ jQuery(function ($) {
 		colorCountOutput.text('4');
 		state.palette = normalizePaletteToAllowed(defaultPalette.slice(0, 4));
 		state.showPaletteOptions = false;
+		designModal.removeClass('is-palette-selecting');
 		renderColorSwatches();
 		renderVectorFallback();
 		persistDesignMetadata();

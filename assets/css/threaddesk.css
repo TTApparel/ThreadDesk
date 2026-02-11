@@ -741,20 +741,24 @@ body.threaddesk-modal-open {
 	position: relative;
 	overflow: hidden;
 	opacity: 1;
+	max-height: var(--threaddesk-preview-max-height);
 }
 
 .threaddesk-designer__design-image-upload {
 	display: none;
 	width: 100%;
 	height: auto;
+	max-height: calc(var(--threaddesk-preview-max-height) - 20px);
+	object-fit: contain;
 	border-radius: 8px;
-	background: transparent;
 }
 
 .threaddesk-designer__design-canvas {
 	display: none;
 	width: 100%;
 	height: auto;
+	max-height: calc(var(--threaddesk-preview-max-height) - 20px);
+	object-fit: contain;
 	border-radius: 8px;
 	background: transparent;
 }
@@ -829,6 +833,15 @@ body.threaddesk-modal-open {
 
 .threaddesk-designer__controls.is-palette-selecting .threaddesk-designer__control-head,
 .threaddesk-designer__controls.is-palette-selecting .threaddesk-designer__status {
+	display: none;
+}
+
+
+.threaddesk-designer__controls.is-palette-selecting .threaddesk-designer__palette-in-use {
+	display: none;
+}
+
+.threaddesk-design-modal.is-palette-selecting .threaddesk-designer__file-name {
 	display: none;
 }
 
