@@ -87,6 +87,8 @@ $nav_base = trailingslashit( wc_get_account_endpoint_url( 'thread-desk' ) );
 					<?php foreach ( $context['designs'] as $design ) : ?>
 					<?php $design_preview = get_post_meta( $design->ID, 'design_preview_url', true ); ?>
 					<?php $design_file_name = get_post_meta( $design->ID, 'design_file_name', true ); ?>
+					<?php $design_palette = get_post_meta( $design->ID, 'design_palette', true ); ?>
+					<?php $design_settings = get_post_meta( $design->ID, 'design_analysis_settings', true ); ?>
 					<div class="threaddesk__card">
 						<?php if ( $design_preview ) : ?>
 							<div class="threaddesk__card-design-preview">
@@ -95,6 +97,26 @@ $nav_base = trailingslashit( wc_get_account_endpoint_url( 'thread-desk' ) );
 						<?php endif; ?>
 						<h4><?php echo esc_html( $design->post_title ); ?></h4>
 						<p class="threaddesk__card-design-file"><?php echo esc_html( $design_file_name ? $design_file_name : __( 'Filename unavailable', 'threaddesk' ) ); ?></p>
+						<div class="threaddesk__card-design-actions">
+							<button
+								type="button"
+								class="threaddesk__button threaddesk__button--small"
+								data-threaddesk-design-edit
+								data-threaddesk-design-id="<?php echo esc_attr( $design->ID ); ?>"
+								data-threaddesk-design-title="<?php echo esc_attr( $design->post_title ); ?>"
+								data-threaddesk-design-preview-url="<?php echo esc_url( $design_preview ); ?>"
+								data-threaddesk-design-file-name="<?php echo esc_attr( $design_file_name ); ?>"
+								data-threaddesk-design-palette="<?php echo esc_attr( $design_palette ? $design_palette : '[]' ); ?>"
+								data-threaddesk-design-settings="<?php echo esc_attr( $design_settings ? $design_settings : '{}' ); ?>">
+								<?php echo esc_html__( 'Edit', 'threaddesk' ); ?>
+							</button>
+							<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
+								<input type="hidden" name="action" value="tta_threaddesk_delete_design" />
+								<input type="hidden" name="design_id" value="<?php echo esc_attr( $design->ID ); ?>" />
+								<?php wp_nonce_field( 'tta_threaddesk_delete_design' ); ?>
+								<button type="submit" class="threaddesk__button threaddesk__button--small threaddesk__button--danger"><?php echo esc_html__( 'Delete', 'threaddesk' ); ?></button>
+							</form>
+						</div>
 					</div>
 					<?php endforeach; ?>
 				<?php else : ?>
@@ -121,6 +143,7 @@ $nav_base = trailingslashit( wc_get_account_endpoint_url( 'thread-desk' ) );
 			<form class="threaddesk-auth-modal__form-inner" method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" enctype="multipart/form-data">
 				<input type="hidden" name="action" value="tta_threaddesk_save_design" />
 				<?php wp_nonce_field( 'tta_threaddesk_save_design' ); ?>
+				<input type="hidden" name="threaddesk_design_id" value="0" data-threaddesk-design-id-field />
 				<div class="threaddesk-designer__design-image" data-threaddesk-design-preview>
 					<img class="threaddesk-designer__design-image-upload" data-threaddesk-design-upload-preview alt="<?php echo esc_attr__( 'Uploaded design preview', 'threaddesk' ); ?>" />
 					<canvas class="threaddesk-designer__design-canvas" data-threaddesk-design-canvas aria-hidden="true"></canvas>

@@ -645,6 +645,26 @@ body.threaddesk-modal-open {
 }
 
 
+.threaddesk__card-design-actions {
+	display: flex;
+	gap: 8px;
+	margin-top: 10px;
+}
+
+.threaddesk__card-design-actions form {
+	margin: 0;
+}
+
+.threaddesk__button--small {
+	padding: 6px 12px;
+	font-size: 11px;
+}
+
+.threaddesk__button--danger {
+	background: #8b1f1f;
+}
+
+
 .threaddesk__table {
 	width: 100%;
 	border-collapse: collapse;

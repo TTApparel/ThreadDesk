@@ -40,6 +40,7 @@ class TTA_ThreadDesk {
 		add_action( 'admin_post_tta_threaddesk_avatar_upload', array( $this, 'handle_avatar_upload' ) );
 		add_action( 'admin_post_tta_threaddesk_update_address', array( $this, 'handle_update_address' ) );
 		add_action( 'admin_post_tta_threaddesk_save_design', array( $this, 'handle_save_design' ) );
+		add_action( 'admin_post_tta_threaddesk_delete_design', array( $this, 'handle_delete_design' ) );
 		add_action( 'user_register', array( $this, 'handle_user_register' ) );
 		add_action( 'init', array( $this, 'handle_auth_login' ) );
 		add_action( 'init', array( $this, 'handle_auth_register' ) );
@@ -374,6 +375,10 @@ class TTA_ThreadDesk {
 	}
 
 
+	private function get_designs_redirect_url() {
+		return add_query_arg( 'td_section', 'designs', trailingslashit( wc_get_account_endpoint_url( 'thread-desk' ) ) );
+	}
+
 	public function handle_save_design() {
 		if ( ! is_user_logged_in() ) {
 			wp_die( esc_html__( 'Unauthorized.', 'threaddesk' ) );
@@ -381,46 +386,62 @@ class TTA_ThreadDesk {
 
 		check_admin_referer( 'tta_threaddesk_save_design' );
 
-		if ( empty( $_FILES['threaddesk_design_file']['name'] ) ) {
-			if ( function_exists( 'wc_add_notice' ) ) {
-				wc_add_notice( __( 'Please choose a design file before saving.', 'threaddesk' ), 'error' );
+		$existing_design_id = isset( $_POST['threaddesk_design_id'] ) ? absint( $_POST['threaddesk_design_id'] ) : 0;
+		$design_id = 0;
+		$upload = null;
+		$file_name = '';
+
+		if ( $existing_design_id > 0 ) {
+			$existing = get_post( $existing_design_id );
+			if ( $existing && 'tta_design' === $existing->post_type && (int) $existing->post_author === get_current_user_id() ) {
+				$design_id = $existing_design_id;
+				$file_name = (string) get_post_meta( $design_id, 'design_file_name', true );
 			}
-			wp_safe_redirect( wc_get_account_endpoint_url( 'thread-desk' ) . 'designs/' );
-			exit;
 		}
 
-		require_once ABSPATH . 'wp-admin/includes/file.php';
-
-		$upload = wp_handle_upload( $_FILES['threaddesk_design_file'], array( 'test_form' => false ) );
-		if ( isset( $upload['error'] ) ) {
-			if ( function_exists( 'wc_add_notice' ) ) {
-				wc_add_notice( __( 'Design upload failed. Please try again.', 'threaddesk' ), 'error' );
+		if ( ! empty( $_FILES['threaddesk_design_file']['name'] ) ) {
+			require_once ABSPATH . 'wp-admin/includes/file.php';
+			$upload = wp_handle_upload( $_FILES['threaddesk_design_file'], array( 'test_form' => false ) );
+			if ( isset( $upload['error'] ) ) {
+				if ( function_exists( 'wc_add_notice' ) ) {
+					wc_add_notice( __( 'Design upload failed. Please try again.', 'threaddesk' ), 'error' );
+				}
+				wp_safe_redirect( $this->get_designs_redirect_url() );
+				exit;
 			}
-			wp_safe_redirect( wc_get_account_endpoint_url( 'thread-desk' ) . 'designs/' );
-			exit;
+			$file_name = sanitize_file_name( wp_basename( $upload['file'] ) );
 		}
 
-		$file_name = sanitize_file_name( wp_basename( $upload['file'] ) );
-		$title     = sanitize_text_field( preg_replace( '/\.[^.]+$/', '', $file_name ) );
-		if ( '' === $title ) {
-			$title = __( 'Design', 'threaddesk' );
-		}
-
-		$design_id = wp_insert_post(
-			array(
-				'post_type'   => 'tta_design',
-				'post_status' => 'private',
-				'post_title'  => $title,
-				'post_author' => get_current_user_id(),
-			)
-		);
-
-		if ( ! $design_id || is_wp_error( $design_id ) ) {
-			if ( function_exists( 'wc_add_notice' ) ) {
-				wc_add_notice( __( 'Unable to save design right now.', 'threaddesk' ), 'error' );
+		if ( 0 === $design_id ) {
+			if ( '' === $file_name ) {
+				if ( function_exists( 'wc_add_notice' ) ) {
+					wc_add_notice( __( 'Please choose a design file before saving.', 'threaddesk' ), 'error' );
+				}
+				wp_safe_redirect( $this->get_designs_redirect_url() );
+				exit;
 			}
-			wp_safe_redirect( wc_get_account_endpoint_url( 'thread-desk' ) . 'designs/' );
-			exit;
+
+			$title = sanitize_text_field( preg_replace( '/\.[^.]+$/', '', $file_name ) );
+			if ( '' === $title ) {
+				$title = __( 'Design', 'threaddesk' );
+			}
+
+			$design_id = wp_insert_post(
+				array(
+					'post_type'   => 'tta_design',
+					'post_status' => 'private',
+					'post_title'  => $title,
+					'post_author' => get_current_user_id(),
+				)
+			);
+
+			if ( ! $design_id || is_wp_error( $design_id ) ) {
+				if ( function_exists( 'wc_add_notice' ) ) {
+					wc_add_notice( __( 'Unable to save design right now.', 'threaddesk' ), 'error' );
+				}
+				wp_safe_redirect( $this->get_designs_redirect_url() );
+				exit;
+			}
 		}
 
 		$palette_raw = isset( $_POST['threaddesk_design_palette'] ) ? wp_unslash( $_POST['threaddesk_design_palette'] ) : '[]';
@@ -449,8 +470,16 @@ class TTA_ThreadDesk {
 
 		$color_count = isset( $_POST['threaddesk_design_color_count'] ) ? absint( $_POST['threaddesk_design_color_count'] ) : count( $palette );
 
-		update_post_meta( $design_id, 'design_preview_url', esc_url_raw( $upload['url'] ) );
-		update_post_meta( $design_id, 'design_file_name', $file_name );
+		if ( $upload && isset( $upload['url'] ) ) {
+			update_post_meta( $design_id, 'design_preview_url', esc_url_raw( $upload['url'] ) );
+			$updated_title = sanitize_text_field( preg_replace( '/\.[^.]+$/', '', $file_name ) );
+			if ( '' !== $updated_title ) {
+				wp_update_post( array( 'ID' => $design_id, 'post_title' => $updated_title ) );
+			}
+		}
+		if ( '' !== $file_name ) {
+			update_post_meta( $design_id, 'design_file_name', $file_name );
+		}
 		update_post_meta( $design_id, 'design_palette', wp_json_encode( $palette ) );
 		update_post_meta( $design_id, 'design_color_count', $color_count );
 		update_post_meta( $design_id, 'design_analysis_settings', wp_json_encode( $settings_clean ) );
@@ -460,7 +489,32 @@ class TTA_ThreadDesk {
 			wc_add_notice( __( 'Design saved successfully.', 'threaddesk' ), 'success' );
 		}
 
-		wp_safe_redirect( wc_get_account_endpoint_url( 'thread-desk' ) . 'designs/' );
+		wp_safe_redirect( $this->get_designs_redirect_url() );
+		exit;
+	}
+
+
+	public function handle_delete_design() {
+		if ( ! is_user_logged_in() ) {
+			wp_die( esc_html__( 'Unauthorized.', 'threaddesk' ) );
+		}
+
+		check_admin_referer( 'tta_threaddesk_delete_design' );
+		$design_id = isset( $_POST['design_id'] ) ? absint( $_POST['design_id'] ) : 0;
+		$design    = get_post( $design_id );
+		if ( ! $design || 'tta_design' !== $design->post_type || (int) $design->post_author !== get_current_user_id() ) {
+			if ( function_exists( 'wc_add_notice' ) ) {
+				wc_add_notice( __( 'Invalid design.', 'threaddesk' ), 'error' );
+			}
+			wp_safe_redirect( $this->get_designs_redirect_url() );
+			exit;
+		}
+
+		wp_delete_post( $design_id, true );
+		if ( function_exists( 'wc_add_notice' ) ) {
+			wc_add_notice( __( 'Design deleted.', 'threaddesk' ), 'success' );
+		}
+		wp_safe_redirect( $this->get_designs_redirect_url() );
 		exit;
 	}
 

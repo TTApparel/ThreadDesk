@@ -191,6 +191,7 @@ jQuery(function ($) {
 		const maxColorInput = designModal.find('[data-threaddesk-max-colors]');
 		const colorCountOutput = designModal.find('[data-threaddesk-color-count]');
 		const statusEl = designModal.find('[data-threaddesk-design-status]');
+		const designIdField = designModal.find('[data-threaddesk-design-id-field]');
 		const initialPreviewHeight = Math.round(previewContainer.outerHeight() || 0);
 		if (initialPreviewHeight > 0) {
 			previewContainer.css('--threaddesk-preview-max-height', initialPreviewHeight + 'px');
@@ -631,6 +632,7 @@ jQuery(function ($) {
 		$(document).on('click', '[data-threaddesk-design-open]', function (event) {
 			event.preventDefault();
 			openDesignModal();
+			designIdField.val('0');
 
 			const designFileInput = designModal.find('[data-threaddesk-design-file]').get(0);
 			if (designFileInput) {
@@ -638,6 +640,38 @@ jQuery(function ($) {
 			}
 		});
 
+
+		$(document).on('click', '[data-threaddesk-design-edit]', function (event) {
+			event.preventDefault();
+			openDesignModal();
+			const designId = parseInt($(this).attr('data-threaddesk-design-id'), 10) || 0;
+			const previewUrl = $(this).attr('data-threaddesk-design-preview-url') || '';
+			const fileName = $(this).attr('data-threaddesk-design-file-name') || 'No file selected';
+			const paletteRaw = $(this).attr('data-threaddesk-design-palette') || '[]';
+			const settingsRaw = $(this).attr('data-threaddesk-design-settings') || '{}';
+			designIdField.val(String(designId));
+			designModal.find('[data-threaddesk-design-file-name]').text(fileName);
+			previewContainer.removeAttr('data-threaddesk-preview-mode');
+			if (previewUrl) {
+				previewImage.attr('src', previewUrl);
+				previewContainer.addClass('has-upload');
+				previewSvg.attr('aria-hidden', 'true');
+			}
+			let palette = [];
+			let settings = {};
+			try { palette = JSON.parse(paletteRaw); } catch (e) {}
+			try { settings = JSON.parse(settingsRaw); } catch (e) {}
+			state.palette = normalizePaletteToAllowed(Array.isArray(palette) && palette.length ? palette : defaultPalette.slice(0, 4));
+			state.analysisSettings.maximumColorCount = clamp(parseInt(settings.maximumColorCount, 10) || state.palette.length || 4, 1, maxSwatches);
+			maxColorInput.val(String(state.analysisSettings.maximumColorCount));
+			state.labels = null;
+			state.sourcePixels = null;
+			state.percentages = [];
+			state.showPaletteOptions = false;
+			renderColorSwatches();
+			renderVectorFallback();
+			setStatus('Editing saved design');
+		});
 		$(document).on('click', '[data-threaddesk-design-close]', function () {
 			closeDesignModal();
 		});
@@ -680,6 +714,7 @@ jQuery(function ($) {
 				renderVectorFallback();
 				setStatus('');
 				state.showPaletteOptions = false;
+				designIdField.val('0');
 				designModal.removeClass('is-palette-selecting');
 				return;
 			}
@@ -753,6 +788,7 @@ jQuery(function ($) {
 		state.palette = normalizePaletteToAllowed(defaultPalette.slice(0, 4));
 		state.showPaletteOptions = false;
 		designModal.removeClass('is-palette-selecting');
+		designIdField.val('0');
 		renderColorSwatches();
 		renderVectorFallback();
 		persistDesignMetadata();
