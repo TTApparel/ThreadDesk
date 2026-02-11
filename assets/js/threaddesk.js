@@ -707,13 +707,54 @@ jQuery(function ($) {
 		};
 
 
-		const rasterDataUrlToSvgDataUrl = function (rasterDataUrl, width, height) {
-			if (!rasterDataUrl) {
-				return '';
-			}
+		const labelsToVectorSvgDataUrl = function (labels, sourcePixels, width, height, paletteHex) {
 			const safeWidth = Math.max(1, parseInt(width, 10) || 1);
 			const safeHeight = Math.max(1, parseInt(height, 10) || 1);
-			const svgMarkup = '<svg xmlns="http://www.w3.org/2000/svg" width="' + safeWidth + '" height="' + safeHeight + '" viewBox="0 0 ' + safeWidth + ' ' + safeHeight + '" preserveAspectRatio="xMidYMid meet"><image href="' + rasterDataUrl + '" width="' + safeWidth + '" height="' + safeHeight + '"/></svg>';
+			if (!labels || !sourcePixels || !paletteHex || !paletteHex.length) {
+				return '';
+			}
+			if ((safeWidth * safeHeight) > 160000) {
+				return '';
+			}
+
+			const rects = [];
+			for (let y = 0; y < safeHeight; y += 1) {
+				let runStart = 0;
+				let runLabel = -1;
+				let runAlpha = -1;
+				for (let x = 0; x <= safeWidth; x += 1) {
+					let label = -1;
+					let alpha = 0;
+					if (x < safeWidth) {
+						const pixelIndex = (y * safeWidth) + x;
+						const offset = pixelIndex * 4;
+						alpha = sourcePixels[offset + 3] || 0;
+						if (alpha >= 8) {
+							label = labels[pixelIndex] || 0;
+						}
+					}
+					const shouldFlush = x === safeWidth || label !== runLabel || alpha !== runAlpha;
+					if (!shouldFlush) {
+						continue;
+					}
+					if (runLabel >= 0 && runAlpha >= 8) {
+						const color = paletteHex[runLabel] || paletteHex[0] || '#111111';
+						const runWidth = x - runStart;
+						if (runAlpha >= 254) {
+							rects.push('<rect x="' + runStart + '" y="' + y + '" width="' + runWidth + '" height="1" fill="' + color + '"/>');
+						} else {
+							rects.push('<rect x="' + runStart + '" y="' + y + '" width="' + runWidth + '" height="1" fill="' + color + '" fill-opacity="' + (runAlpha / 255).toFixed(3) + '"/>');
+						}
+					}
+					runStart = x;
+					runLabel = label;
+					runAlpha = alpha;
+				}
+			}
+			if (!rects.length) {
+				return '';
+			}
+			const svgMarkup = '<svg xmlns="http://www.w3.org/2000/svg" width="' + safeWidth + '" height="' + safeHeight + '" viewBox="0 0 ' + safeWidth + ' ' + safeHeight + '" shape-rendering="crispEdges">' + rects.join('') + '</svg>';
 			return 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(svgMarkup);
 		};
 
@@ -763,6 +804,18 @@ jQuery(function ($) {
 				return;
 			}
 
+			const vectorDataUrl = labelsToVectorSvgDataUrl(
+				quantized.labels,
+				analysis.imageData.data,
+				analysis.width,
+				analysis.height,
+				normalizedPalette
+			);
+			if (vectorDataUrl) {
+				imgEl.src = vectorDataUrl;
+				return;
+			}
+
 			const canvas = document.createElement('canvas');
 			canvas.width = analysis.width;
 			canvas.height = analysis.height;
@@ -784,9 +837,7 @@ jQuery(function ($) {
 				output[offset + 3] = alpha;
 			}
 			ctx.putImageData(new ImageData(output, analysis.width, analysis.height), 0, 0);
-			const pngDataUrl = canvas.toDataURL('image/png');
-			const svgDataUrl = rasterDataUrlToSvgDataUrl(pngDataUrl, analysis.width, analysis.height);
-			imgEl.src = svgDataUrl || pngDataUrl;
+			imgEl.src = canvas.toDataURL('image/png');
 		};
 
 		const analyzeCurrentImage = async function () {
