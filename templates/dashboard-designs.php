@@ -113,9 +113,10 @@ $nav_base = trailingslashit( wc_get_account_endpoint_url( 'thread-desk' ) );
 		</div>
 		<div class="threaddesk-auth-modal__content threaddesk-designer">
 			<form class="threaddesk-auth-modal__form-inner" method="post" action="#">
-				<div class="mockmaster-designer__design-image" data-threaddesk-design-preview>
-					<img class="mockmaster-designer__design-image-upload" data-threaddesk-design-upload-preview alt="<?php echo esc_attr__( 'Uploaded design preview', 'threaddesk' ); ?>" />
-					<div class="mockmaster-designer__design-image-overlay" aria-hidden="true"></div>
+				<div class="threaddesk-designer__design-image" data-threaddesk-design-preview>
+					<img class="threaddesk-designer__design-image-upload" data-threaddesk-design-upload-preview alt="<?php echo esc_attr__( 'Uploaded design preview', 'threaddesk' ); ?>" />
+					<canvas class="threaddesk-designer__design-canvas" data-threaddesk-design-canvas aria-hidden="true"></canvas>
+					<div class="threaddesk-designer__design-image-overlay" aria-hidden="true"></div>
 					<svg viewBox="0 0 320 210" role="img" aria-label="<?php echo esc_attr__( 'Design preview', 'threaddesk' ); ?>">
 						<rect x="0" y="0" width="320" height="210" rx="14" fill="#f4f4f4"></rect>
 						<path d="M58 168L99 56h35l41 112h-27l-8-24H93l-8 24H58z" fill="#111111" data-threaddesk-preview-layer="0"></path>
@@ -125,21 +126,21 @@ $nav_base = trailingslashit( wc_get_account_endpoint_url( 'thread-desk' ) );
 					</svg>
 				</div>
 
-				<p>
-					<label for="threaddesk_design_file"><?php echo esc_html__( 'Design File', 'threaddesk' ); ?></label>
-					<input type="file" id="threaddesk_design_file" accept=".png,.jpg,.jpeg,.pdf,.svg,.ai" data-threaddesk-design-file />
-					<small class="threaddesk-designer__file-name" data-threaddesk-design-file-name><?php echo esc_html__( 'No file selected', 'threaddesk' ); ?></small>
-				</p>
+				<input type="file" id="threaddesk_design_file" accept=".png,.jpg,.jpeg,.svg,image/png,image/jpeg,image/svg+xml" data-threaddesk-design-file hidden />
+				<small class="threaddesk-designer__file-name" data-threaddesk-design-file-name><?php echo esc_html__( 'No file selected', 'threaddesk' ); ?></small>
+				<input type="hidden" name="threaddesk_design_palette" data-threaddesk-design-palette value="[]" />
+				<input type="hidden" name="threaddesk_design_color_count" data-threaddesk-design-color-count value="0" />
+				<input type="hidden" name="threaddesk_design_analysis_settings" data-threaddesk-design-settings value="{}" />
 
 				<div class="threaddesk-designer__controls">
 					<div class="threaddesk-designer__control-head">
-						<span><?php echo esc_html__( 'Color Count', 'threaddesk' ); ?></span>
-						<div class="mockmaster-designer__color-counter" data-threaddesk-color-counter>
-							<button type="button" class="threaddesk-designer__counter-btn" data-threaddesk-color-decrease>-</button>
-							<strong data-threaddesk-color-count>1</strong>
-							<button type="button" class="threaddesk-designer__counter-btn" data-threaddesk-color-increase>+</button>
+						<label for="threaddesk_design_max_colors"><?php echo esc_html__( 'Maximum color count', 'threaddesk' ); ?></label>
+						<div class="threaddesk-designer__color-counter">
+							<input type="range" id="threaddesk_design_max_colors" min="1" max="8" value="4" data-threaddesk-max-colors />
+							<strong data-threaddesk-color-count>4</strong>
 						</div>
 					</div>
+					<p class="threaddesk-designer__status" data-threaddesk-design-status aria-live="polite"></p>
 					<div class="threaddesk-designer__swatches" data-threaddesk-color-swatches>
 						<label>
 							<span><?php echo esc_html__( 'Color 1', 'threaddesk' ); ?></span>
