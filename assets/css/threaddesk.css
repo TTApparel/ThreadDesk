@@ -748,6 +748,7 @@ body.threaddesk-modal-open {
 	width: 100%;
 	height: auto;
 	border-radius: 8px;
+	background: transparent;
 }
 
 .threaddesk-designer__design-canvas {
