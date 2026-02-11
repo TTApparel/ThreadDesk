@@ -740,6 +740,7 @@ body.threaddesk-modal-open {
 	--threaddesk-preview-accent: #111111;
 	position: relative;
 	overflow: hidden;
+	opacity: 1;
 }
 
 .mockmaster-designer__design-image-upload {
@@ -762,6 +763,8 @@ body.threaddesk-modal-open {
 
 .mockmaster-designer__design-image.has-upload .mockmaster-designer__design-image-upload {
 	display: block;
+	opacity: 1;
+	visibility: visible;
 }
 
 .mockmaster-designer__design-image.has-upload svg {
