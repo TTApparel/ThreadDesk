@@ -609,6 +609,17 @@ jQuery(function ($) {
 			});
 		};
 
+
+		const rasterDataUrlToSvgDataUrl = function (rasterDataUrl, width, height) {
+			if (!rasterDataUrl) {
+				return '';
+			}
+			const safeWidth = Math.max(1, parseInt(width, 10) || 1);
+			const safeHeight = Math.max(1, parseInt(height, 10) || 1);
+			const svgMarkup = '<svg xmlns="http://www.w3.org/2000/svg" width="' + safeWidth + '" height="' + safeHeight + '" viewBox="0 0 ' + safeWidth + ' ' + safeHeight + '" preserveAspectRatio="xMidYMid meet"><image href="' + rasterDataUrl + '" width="' + safeWidth + '" height="' + safeHeight + '"/></svg>';
+			return 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(svgMarkup);
+		};
+
 		const recolorCardPreview = async function (imgEl, previewUrl, paletteRaw, settingsRaw) {
 			if (!imgEl || !previewUrl) {
 				return;
@@ -675,7 +686,9 @@ jQuery(function ($) {
 				output[offset + 3] = alpha;
 			}
 			ctx.putImageData(new ImageData(output, analysis.width, analysis.height), 0, 0);
-			imgEl.src = canvas.toDataURL('image/png');
+			const pngDataUrl = canvas.toDataURL('image/png');
+			const svgDataUrl = rasterDataUrlToSvgDataUrl(pngDataUrl, analysis.width, analysis.height);
+			imgEl.src = svgDataUrl || pngDataUrl;
 		};
 
 		const analyzeCurrentImage = async function () {
