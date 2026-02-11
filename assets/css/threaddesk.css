@@ -842,20 +842,6 @@ body.threaddesk-modal-open {
 	letter-spacing: 0.03em;
 }
 
-.threaddesk-designer__palette-current-chip {
-	width: 34px;
-	height: 34px;
-	border-radius: 50%;
-	border: 1px solid rgba(0, 0, 0, 0.15);
-}
-
-.threaddesk-designer__palette-current-name {
-	display: block;
-	margin-top: 4px;
-	font-size: 11px;
-	color: #595959;
-}
-
 .threaddesk-designer__palette-row,
 .threaddesk-designer__palette-grid {
 	display: flex;
@@ -883,4 +869,32 @@ body.threaddesk-modal-open {
 .threaddesk-designer__palette-dot.is-active {
 	border-color: #2f2f2f;
 }
+
+
+.threaddesk-designer__palette-dot {
+	position: relative;
+}
+
+.threaddesk-designer__palette-dot::after {
+	content: attr(data-color-name);
+	position: absolute;
+	left: 50%;
+	bottom: calc(100% + 8px);
+	transform: translateX(-50%);
+	background: rgba(31, 31, 31, 0.9);
+	color: #fff;
+	padding: 4px 8px;
+	border-radius: 4px;
+	font-size: 11px;
+	white-space: nowrap;
+	opacity: 0;
+	pointer-events: none;
+	transition: opacity 0.15s ease;
+	z-index: 5;
+}
+
+.threaddesk-designer__palette-dot:hover::after {
+	opacity: 1;
+}
+
 

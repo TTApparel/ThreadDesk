@@ -35,10 +35,10 @@ ThreadDesk is a WooCommerce customer portal that adds a dedicated "ThreadDesk" s
 
 ## Designer Color Extraction Notes
 
-- The DESIGN modal now analyzes uploaded PNG/JPG/SVG artwork in-browser using a canvas buffer scaled down to a maximum dimension of 640px for performance.
+- The DESIGN modal now analyzes uploaded PNG/JPG/SVG artwork in-browser using a canvas buffer scaled down to a maximum dimension of 1200px for performance.
 - Color extraction uses deterministic k-means clustering (max 8 colors), then filters very small clusters (<0.5% of opaque pixels) and merges nearby clusters by RGB distance.
 - The detected palette is rendered as editable swatches in `.threaddesk-designer__controls`; changing a swatch recolors the quantized preview in real time while preserving original alpha transparency.
-- Swatch editing is restricted to the approved ThreadDesk/Pantone table colors; clicking a swatch opens selectable preset color chips from that table.
+- Swatch editing is restricted to the approved ThreadDesk/Pantone table colors; clicking a swatch opens selectable preset color chips from that table, including White and Black options.
 - Expensive operations are throttled/debounced for responsiveness:
   - file analysis yields back to the UI thread before clustering,
   - maximum-color slider reanalysis is debounced.

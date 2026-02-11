@@ -118,6 +118,8 @@ jQuery(function ($) {
 
 		const defaultPalette = ['#111111', '#ffffff', '#1f1f1f', '#3a3a3a', '#f24c3d', '#3366ff', '#21b573', '#f6b200'];
 		const allowedSwatchPalette = [
+			{ name: 'White', hex: '#FFFFFF' },
+			{ name: 'Black', hex: '#000000' },
 			{ name: 'Lemon Yellow', hex: '#FEDB00' },
 			{ name: 'Rich Yellow', hex: '#FED141' },
 			{ name: 'Gold Yellow', hex: '#FFB81C' },
@@ -159,7 +161,7 @@ jQuery(function ($) {
 		];
 		const minimumPercent = 0.5;
 		const mergeThreshold = 22;
-		const maxAnalysisDimension = 640;
+		const maxAnalysisDimension = 1200;
 		const maxSwatches = 8;
 		let uploadedPreviewUrl = null;
 		let recolorTimer = null;
@@ -336,11 +338,6 @@ jQuery(function ($) {
 			const activeColor = findClosestAllowedColor(palette[activeIndex]);
 
 			const panel = $('<div class="threaddesk-designer__palette-panel"></div>');
-			const current = $('<div class="threaddesk-designer__palette-current"></div>');
-			current.append($('<p class="threaddesk-designer__palette-title"></p>').text('Current Color'));
-			current.append($('<div class="threaddesk-designer__palette-current-chip"></div>').attr('title', activeColor.name + ' ' + activeColor.hex).css('background', activeColor.hex));
-			current.append($('<small class="threaddesk-designer__palette-current-name"></small>').text(activeColor.name + ' (' + activeColor.hex + ')'));
-			panel.append(current);
 
 			const inUse = $('<div class="threaddesk-designer__palette-in-use"></div>');
 			inUse.append($('<p class="threaddesk-designer__palette-title"></p>').text('Colors In Use'));
@@ -351,6 +348,7 @@ jQuery(function ($) {
 					.attr('data-threaddesk-swatch-index', index)
 					.attr('title', currentAllowed.name + ' ' + currentAllowed.hex)
 					.attr('aria-label', 'Color ' + (index + 1) + ' ' + currentAllowed.name)
+					.attr('data-color-name', currentAllowed.name)
 					.css('background', currentAllowed.hex);
 				if (index === activeIndex) {
 					btn.addClass('is-active');
@@ -371,8 +369,9 @@ jQuery(function ($) {
 					.attr('data-color-hex', option.hex)
 					.attr('title', option.name)
 					.attr('aria-label', option.name + ' ' + option.hex)
+					.attr('data-color-name', option.name)
 					.css('background', option.hex);
-				if (option.hex.toLowerCase() === activeColor.hex.toLowerCase()) {
+				if (option.hex.toLowerCase() === findClosestAllowedColor(palette[activeIndex]).hex.toLowerCase()) {
 					opt.addClass('is-active');
 				}
 				optionsGrid.append(opt);
@@ -728,6 +727,7 @@ jQuery(function ($) {
 				return;
 			}
 			state.palette[index] = hex;
+			state.showPaletteOptions = false;
 			persistDesignMetadata();
 			queueRecolor();
 			renderColorSwatches();
