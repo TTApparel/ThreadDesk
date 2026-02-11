@@ -161,7 +161,6 @@ jQuery(function ($) {
 		];
 		const minimumPercent = 0.5;
 		const mergeThreshold = 22;
-		const maxAnalysisDimension = 2000;
 		const maxSwatches = 8;
 		let uploadedPreviewUrl = null;
 		let recolorTimer = null;
@@ -567,16 +566,34 @@ jQuery(function ($) {
 		};
 
 		const createAnalysisBuffer = function (image) {
-			const scale = Math.min(1, maxAnalysisDimension / Math.max(image.naturalWidth || image.width, image.naturalHeight || image.height));
-			const width = Math.max(1, Math.round((image.naturalWidth || image.width) * scale));
-			const height = Math.max(1, Math.round((image.naturalHeight || image.height) * scale));
+			const baseWidth = Math.max(1, image.naturalWidth || image.width || 1);
+			const baseHeight = Math.max(1, image.naturalHeight || image.height || 1);
 			const canvas = document.createElement('canvas');
-			canvas.width = width;
-			canvas.height = height;
-			const ctx = canvas.getContext('2d', { willReadFrequently: true });
-			ctx.clearRect(0, 0, width, height);
-			ctx.drawImage(image, 0, 0, width, height);
-			return { width: width, height: height, imageData: ctx.getImageData(0, 0, width, height) };
+			let scale = 1;
+			let lastError = null;
+			for (let attempt = 0; attempt < 7; attempt += 1) {
+				const width = Math.max(1, Math.round(baseWidth * scale));
+				const height = Math.max(1, Math.round(baseHeight * scale));
+				try {
+					canvas.width = width;
+					canvas.height = height;
+					const ctx = canvas.getContext('2d', { willReadFrequently: true });
+					if (!ctx) {
+						throw new Error('Canvas 2D context unavailable');
+					}
+					ctx.clearRect(0, 0, width, height);
+					ctx.drawImage(image, 0, 0, width, height);
+					const imageData = ctx.getImageData(0, 0, width, height);
+					return { width: width, height: height, imageData: imageData };
+				} catch (error) {
+					lastError = error;
+					if (width <= 1 || height <= 1) {
+						break;
+					}
+					scale *= 0.75;
+				}
+			}
+			throw lastError || new Error('Unable to create analysis buffer');
 		};
 
 		const loadCanvasFromPreviewUrl = function (url) {
