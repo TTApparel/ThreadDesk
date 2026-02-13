@@ -164,6 +164,9 @@ jQuery(function ($) {
 		const minimumPercent = 0.5;
 		const mergeThreshold = 22;
 		const maxSwatches = 8;
+		const designPreviewMaxDimension = 960;
+		const designCardMaxDimension = 420;
+		const exportVectorMaxDimension = 2400;
 		let uploadedPreviewUrl = null;
 		let recolorTimer = null;
 		let reanalyzeTimer = null;
@@ -303,6 +306,9 @@ jQuery(function ($) {
 
 		const buildVectorPathByColor = function (labels, sourcePixels, width, height, palette) {
 			if (!labels || !sourcePixels || !palette || !palette.length || !width || !height) {
+				return '';
+			}
+			if ((width * height) > 260000) {
 				return '';
 			}
 			const pathChunks = palette.map(function () { return []; });
@@ -719,16 +725,14 @@ jQuery(function ($) {
 			const preferredHeight = preferredDimensions && preferredDimensions.height ? preferredDimensions.height : 0;
 			const sourceWidth = Math.max(1, Math.round(image.naturalWidth || image.width || 1));
 			const sourceHeight = Math.max(1, Math.round(image.naturalHeight || image.height || 1));
-			const shouldBoostVectorFallback = !!(options && options.isVectorSource && !preferredWidth && !preferredHeight);
-			const vectorBoostScale = shouldBoostVectorFallback ? 6 : 1;
-			const vectorWidth = shouldBoostVectorFallback ? Math.min(4096, sourceWidth * vectorBoostScale) : sourceWidth;
-			const vectorHeight = shouldBoostVectorFallback ? Math.min(4096, sourceHeight * vectorBoostScale) : sourceHeight;
-			const baseWidth = Math.max(1, Math.round(preferredWidth || vectorWidth));
-			const baseHeight = Math.max(1, Math.round(preferredHeight || vectorHeight));
+			const baseWidth = Math.max(1, Math.round(preferredWidth || sourceWidth));
+			const baseHeight = Math.max(1, Math.round(preferredHeight || sourceHeight));
+			const maxDimension = Math.max(64, parseInt(options && options.maxDimension, 10) || designPreviewMaxDimension);
+			const initialScale = Math.min(1, maxDimension / Math.max(baseWidth, baseHeight));
 			const canvas = document.createElement('canvas');
-			let scale = 1;
+			let scale = initialScale;
 			let lastError = null;
-			for (let attempt = 0; attempt < 7; attempt += 1) {
+			for (let attempt = 0; attempt < 5; attempt += 1) {
 				const width = Math.max(1, Math.round(baseWidth * scale));
 				const height = Math.max(1, Math.round(baseHeight * scale));
 				try {
@@ -763,7 +767,7 @@ jQuery(function ($) {
 				const img = new Image();
 				img.crossOrigin = 'anonymous';
 				img.onload = function () {
-					const analysis = createAnalysisBuffer(img, svgDimensions, { isVectorSource: !!svgDimensions || /\.svg(?:[?#].*)?$/i.test(url) });
+					const analysis = createAnalysisBuffer(img, svgDimensions, { maxDimension: designPreviewMaxDimension });
 					state.width = analysis.width;
 					state.height = analysis.height;
 					state.sourcePixels = analysis.imageData.data;
@@ -870,7 +874,7 @@ jQuery(function ($) {
 			if (!loaded) {
 				return '';
 			}
-			const analysis = createAnalysisBuffer(image, svgDimensions, { isVectorSource: !!svgDimensions || /\.svg(?:[?#].*)?$/i.test(previewUrl) });
+			const analysis = createAnalysisBuffer(image, svgDimensions, { maxDimension: exportVectorMaxDimension });
 			const pixels = [];
 			const opaqueIndices = [];
 			for (let i = 0; i < analysis.imageData.data.length; i += 4) {
@@ -917,7 +921,7 @@ jQuery(function ($) {
 				return;
 			}
 
-			const analysis = createAnalysisBuffer(image, svgDimensions, { isVectorSource: !!svgDimensions || /\.svg(?:[?#].*)?$/i.test(previewUrl) });
+			const analysis = createAnalysisBuffer(image, svgDimensions, { maxDimension: designCardMaxDimension });
 			const pixels = [];
 			const opaqueIndices = [];
 			for (let i = 0; i < analysis.imageData.data.length; i += 4) {
@@ -1129,9 +1133,9 @@ jQuery(function ($) {
 				return;
 			}
 
-			const supported = /image\/(png|jpeg|svg\+xml)/i.test(file.type) || /\.(png|jpe?g|svg)$/i.test(file.name || '');
+			const supported = /image\/(png|jpeg)/i.test(file.type) || /\.(png|jpe?g)$/i.test(file.name || '');
 			if (!supported) {
-				setStatus('Unsupported file type. Please upload PNG, JPG, or SVG.');
+				setStatus('Unsupported file type. Please upload PNG or JPG.');
 				return;
 			}
 
@@ -1143,7 +1147,7 @@ jQuery(function ($) {
 				previewContainer.addClass('has-upload');
 				previewSvg.attr('aria-hidden', 'true');
 
-				const analysis = createAnalysisBuffer(loaded.image, loaded.svgDimensions || null, { isVectorSource: loaded.isSvg });
+				const analysis = createAnalysisBuffer(loaded.image, loaded.svgDimensions || null, { maxDimension: designPreviewMaxDimension });
 				state.width = analysis.width;
 				state.height = analysis.height;
 				state.sourcePixels = analysis.imageData.data;

@@ -167,7 +167,7 @@ $nav_base = trailingslashit( wc_get_account_endpoint_url( 'thread-desk' ) );
 					</svg>
 				</div>
 
-				<input type="file" id="threaddesk_design_file" accept=".png,.jpg,.jpeg,.svg,image/png,image/jpeg,image/svg+xml" name="threaddesk_design_file" data-threaddesk-design-file hidden />
+				<input type="file" id="threaddesk_design_file" accept=".png,.jpg,.jpeg,image/png,image/jpeg" name="threaddesk_design_file" data-threaddesk-design-file hidden />
 				<small class="threaddesk-designer__file-name" data-threaddesk-design-file-name><?php echo esc_html__( 'No file selected', 'threaddesk' ); ?></small>
 				<input type="hidden" name="threaddesk_design_palette" data-threaddesk-design-palette value="[]" />
 				<input type="hidden" name="threaddesk_design_color_count" data-threaddesk-design-color-count value="0" />
