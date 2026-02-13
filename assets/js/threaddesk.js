@@ -856,11 +856,6 @@ jQuery(function ($) {
 			let settings = {};
 			try { palette = JSON.parse(paletteRaw || '[]'); } catch (e) {}
 			try { settings = JSON.parse(settingsRaw || '{}'); } catch (e) {}
-			const originalSvg = await getSvgTextFromUrl(previewUrl);
-			const originalSvgDimensions = parseSvgDimensionsFromText(originalSvg || '');
-			if (originalSvg && originalSvgDimensions) {
-				return originalSvg;
-			}
 			const normalizedPalette = normalizePaletteToAllowed(Array.isArray(palette) && palette.length ? palette : defaultPalette.slice(0, 4));
 			const maxColors = clamp(parseInt(settings.maximumColorCount, 10) || normalizedPalette.length || 4, 1, maxSwatches);
 			const image = new Image();
@@ -892,8 +887,7 @@ jQuery(function ($) {
 			if (!quantized || !quantized.labels) {
 				return '';
 			}
-			const exportPalette = normalizePaletteToAllowed((quantized.palette && quantized.palette.length) ? quantized.palette : normalizedPalette);
-			return buildVectorSvgMarkup(quantized.labels, analysis.imageData.data, analysis.width, analysis.height, exportPalette);
+			return buildVectorSvgMarkup(quantized.labels, analysis.imageData.data, analysis.width, analysis.height, normalizedPalette);
 		};
 
 		const recolorCardPreview = async function (imgEl, previewUrl, paletteRaw, settingsRaw) {
