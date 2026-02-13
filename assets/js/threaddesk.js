@@ -642,11 +642,17 @@ jQuery(function ($) {
 			});
 		};
 
-		const createAnalysisBuffer = function (image, preferredDimensions) {
+		const createAnalysisBuffer = function (image, preferredDimensions, options) {
 			const preferredWidth = preferredDimensions && preferredDimensions.width ? preferredDimensions.width : 0;
 			const preferredHeight = preferredDimensions && preferredDimensions.height ? preferredDimensions.height : 0;
-			const baseWidth = Math.max(1, Math.round(preferredWidth || image.naturalWidth || image.width || 1));
-			const baseHeight = Math.max(1, Math.round(preferredHeight || image.naturalHeight || image.height || 1));
+			const sourceWidth = Math.max(1, Math.round(image.naturalWidth || image.width || 1));
+			const sourceHeight = Math.max(1, Math.round(image.naturalHeight || image.height || 1));
+			const shouldBoostVectorFallback = !!(options && options.isVectorSource && !preferredWidth && !preferredHeight);
+			const vectorBoostScale = shouldBoostVectorFallback ? 6 : 1;
+			const vectorWidth = shouldBoostVectorFallback ? Math.min(4096, sourceWidth * vectorBoostScale) : sourceWidth;
+			const vectorHeight = shouldBoostVectorFallback ? Math.min(4096, sourceHeight * vectorBoostScale) : sourceHeight;
+			const baseWidth = Math.max(1, Math.round(preferredWidth || vectorWidth));
+			const baseHeight = Math.max(1, Math.round(preferredHeight || vectorHeight));
 			const canvas = document.createElement('canvas');
 			let scale = 1;
 			let lastError = null;
@@ -685,7 +691,7 @@ jQuery(function ($) {
 				const img = new Image();
 				img.crossOrigin = 'anonymous';
 				img.onload = function () {
-					const analysis = createAnalysisBuffer(img, svgDimensions);
+					const analysis = createAnalysisBuffer(img, svgDimensions, { isVectorSource: !!svgDimensions || /\.svg(?:[?#].*)?$/i.test(url) });
 					state.width = analysis.width;
 					state.height = analysis.height;
 					state.sourcePixels = analysis.imageData.data;
@@ -783,7 +789,7 @@ jQuery(function ($) {
 				return;
 			}
 
-			const analysis = createAnalysisBuffer(image, svgDimensions);
+			const analysis = createAnalysisBuffer(image, svgDimensions, { isVectorSource: !!svgDimensions || /\.svg(?:[?#].*)?$/i.test(previewUrl) });
 			const pixels = [];
 			const opaqueIndices = [];
 			for (let i = 0; i < analysis.imageData.data.length; i += 4) {
@@ -999,7 +1005,7 @@ jQuery(function ($) {
 				previewContainer.addClass('has-upload');
 				previewSvg.attr('aria-hidden', 'true');
 
-				const analysis = createAnalysisBuffer(loaded.image, loaded.svgDimensions || null);
+				const analysis = createAnalysisBuffer(loaded.image, loaded.svgDimensions || null, { isVectorSource: loaded.isSvg });
 				state.width = analysis.width;
 				state.height = analysis.height;
 				state.sourcePixels = analysis.imageData.data;
