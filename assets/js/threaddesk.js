@@ -339,6 +339,45 @@ jQuery(function ($) {
 			return paths.join('');
 		};
 
+
+		const buildVectorPathByColor = function (labels, sourcePixels, width, height, palette) {
+			if (!labels || !sourcePixels || !palette || !palette.length || !width || !height) {
+				return '';
+			}
+			const pathChunks = palette.map(function () { return []; });
+			for (let y = 0; y < height; y += 1) {
+				let runStart = 0;
+				let runLabel = -1;
+				for (let x = 0; x <= width; x += 1) {
+					let label = -1;
+					if (x < width) {
+						const pixelIndex = (y * width) + x;
+						const alpha = sourcePixels[(pixelIndex * 4) + 3];
+						if (alpha >= 8) {
+							label = labels[pixelIndex] || 0;
+						}
+					}
+					if (x < width && label === runLabel) {
+						continue;
+					}
+					if (runLabel >= 0 && (x - runStart) > 0 && pathChunks[runLabel]) {
+						const runWidth = x - runStart;
+						pathChunks[runLabel].push('M' + runStart + ' ' + y + 'h' + runWidth + 'v1h-' + runWidth + 'Z');
+					}
+					runStart = x;
+					runLabel = label;
+				}
+			}
+			const paths = [];
+			for (let i = 0; i < palette.length; i += 1) {
+				if (!pathChunks[i].length) {
+					continue;
+				}
+				paths.push('<path fill="' + palette[i] + '" d="' + pathChunks[i].join('') + '"/>');
+			}
+			return paths.join('');
+		};
+
 		const renderQuantizedPreview = function () {
 			if (!state.labels || !state.sourcePixels || !state.palette.length || !previewCanvas.length) {
 				return;
