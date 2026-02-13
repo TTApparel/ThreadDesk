@@ -44,6 +44,7 @@ jQuery(function ($) {
 			closeModal();
 		});
 
+
 		$(document).on('keyup', function (event) {
 			if (event.key === 'Escape') {
 				closeModal();
@@ -177,7 +178,7 @@ jQuery(function ($) {
 			analysisSettings: {
 				minimumPercent: minimumPercent,
 				mergeThreshold: mergeThreshold,
-				maximumColorCount: 4,
+				maximumColorCount: 8,
 			},
 			hasUserAdjustedMax: false,
 			activeSwatchIndex: 0,
@@ -204,6 +205,7 @@ jQuery(function ($) {
 		};
 		updatePreviewMaxHeight();
 		$(window).on('resize', updatePreviewMaxHeight);
+		previewContainer.css('--threaddesk-preview-bg', '#FFFFFF');
 
 		const clamp = function (value, min, max) {
 			return Math.max(min, Math.min(max, value));
@@ -281,12 +283,60 @@ jQuery(function ($) {
 			designModal.find('[data-threaddesk-design-settings]').val(JSON.stringify(state.analysisSettings));
 		};
 
+
+		const syncPreviewBackgroundColor = function () {
+			const hasWhite = (state.palette || []).some(function (hex) {
+				return String(hex || '').toUpperCase() === '#FFFFFF';
+			});
+			previewContainer.css('--threaddesk-preview-bg', hasWhite ? '#F6F6F6' : '#FFFFFF');
+		};
+
 		const renderVectorFallback = function () {
 			const colors = state.palette.length ? state.palette : [defaultPalette[0]];
 			designModal.find('[data-threaddesk-preview-layer]').each(function (index) {
 				$(this).attr('fill', colors[index] || colors[0]);
 			});
 			previewContainer.css('--threaddesk-preview-accent', colors[0] || defaultPalette[0]);
+			syncPreviewBackgroundColor();
+		};
+
+
+		const buildVectorPathByColor = function (labels, sourcePixels, width, height, palette) {
+			if (!labels || !sourcePixels || !palette || !palette.length || !width || !height) {
+				return '';
+			}
+			const pathChunks = palette.map(function () { return []; });
+			for (let y = 0; y < height; y += 1) {
+				let runStart = 0;
+				let runLabel = -1;
+				for (let x = 0; x <= width; x += 1) {
+					let label = -1;
+					if (x < width) {
+						const pixelIndex = (y * width) + x;
+						const alpha = sourcePixels[(pixelIndex * 4) + 3];
+						if (alpha >= 8) {
+							label = labels[pixelIndex] || 0;
+						}
+					}
+					if (x < width && label === runLabel) {
+						continue;
+					}
+					if (runLabel >= 0 && (x - runStart) > 0 && pathChunks[runLabel]) {
+						const runWidth = x - runStart;
+						pathChunks[runLabel].push('M' + runStart + ' ' + y + 'h' + runWidth + 'v1h-' + runWidth + 'Z');
+					}
+					runStart = x;
+					runLabel = label;
+				}
+			}
+			const paths = [];
+			for (let i = 0; i < palette.length; i += 1) {
+				if (!pathChunks[i].length) {
+					continue;
+				}
+				paths.push('<path fill="' + palette[i] + '" d="' + pathChunks[i].join('') + '"/>');
+			}
+			return paths.join('');
 		};
 
 
@@ -363,6 +413,7 @@ jQuery(function ($) {
 				previewContainer.attr('data-threaddesk-preview-mode', 'quantized');
 			}
 			previewContainer.css('--threaddesk-preview-accent', state.palette[0] || defaultPalette[0]);
+			syncPreviewBackgroundColor();
 		};
 
 		const queueRecolor = function () {
@@ -820,6 +871,56 @@ jQuery(function ($) {
 			return 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(svgMarkup);
 		};
 
+		const buildVectorSvgMarkup = function (labels, sourcePixels, width, height, palette) {
+			const vectorPaths = buildVectorPathByColor(labels, sourcePixels, width, height, palette);
+			if (!vectorPaths) {
+				return '';
+			}
+			return '<svg xmlns="http://www.w3.org/2000/svg" width="' + width + '" height="' + height + '" viewBox="0 0 ' + width + ' ' + height + '" shape-rendering="crispEdges">' + vectorPaths + '</svg>';
+		};
+
+		const createSavedDesignVectorMarkup = async function (previewUrl, paletteRaw, settingsRaw) {
+			if (!previewUrl) {
+				return '';
+			}
+			let palette = [];
+			let settings = {};
+			try { palette = JSON.parse(paletteRaw || '[]'); } catch (e) {}
+			try { settings = JSON.parse(settingsRaw || '{}'); } catch (e) {}
+			const normalizedPalette = normalizePaletteToAllowed(Array.isArray(palette) && palette.length ? palette : defaultPalette.slice(0, 4));
+			const maxColors = clamp(parseInt(settings.maximumColorCount, 10) || normalizedPalette.length || 4, 1, maxSwatches);
+			const image = new Image();
+			image.crossOrigin = 'anonymous';
+			const svgDimensions = await getSvgDimensionsFromUrl(previewUrl);
+			const loaded = await new Promise(function (resolve) {
+				image.onload = function () { resolve(true); };
+				image.onerror = function () { resolve(false); };
+				image.src = previewUrl;
+			});
+			if (!loaded) {
+				return '';
+			}
+			const analysis = createAnalysisBuffer(image, svgDimensions, { isVectorSource: !!svgDimensions || /\.svg(?:[?#].*)?$/i.test(previewUrl) });
+			const pixels = [];
+			const opaqueIndices = [];
+			for (let i = 0; i < analysis.imageData.data.length; i += 4) {
+				const alpha = analysis.imageData.data[i + 3];
+				if (alpha < 8) {
+					continue;
+				}
+				pixels.push([analysis.imageData.data[i], analysis.imageData.data[i + 1], analysis.imageData.data[i + 2]]);
+				opaqueIndices.push(i / 4);
+			}
+			if (!pixels.length) {
+				return '';
+			}
+			const quantized = quantizeColors(pixels, opaqueIndices, analysis.width * analysis.height, maxColors);
+			if (!quantized || !quantized.labels) {
+				return '';
+			}
+			return buildVectorSvgMarkup(quantized.labels, analysis.imageData.data, analysis.width, analysis.height, normalizedPalette);
+		};
+
 		const recolorCardPreview = async function (imgEl, previewUrl, paletteRaw, settingsRaw) {
 			if (!imgEl || !previewUrl) {
 				return;
@@ -1113,15 +1214,44 @@ jQuery(function ($) {
 			renderColorSwatches();
 		});
 
+		$(document).on('click', '[data-threaddesk-design-download-svg]', async function (event) {
+			event.preventDefault();
+			const trigger = $(this);
+			const previewUrl = trigger.attr('data-threaddesk-design-preview-url') || '';
+			const paletteRaw = trigger.attr('data-threaddesk-design-palette') || '[]';
+			const settingsRaw = trigger.attr('data-threaddesk-design-settings') || '{}';
+			const fileNameRaw = trigger.attr('data-threaddesk-design-file-name') || 'design';
+			const baseName = fileNameRaw.replace(/\.[^.]+$/, '') || 'design';
+			trigger.prop('disabled', true);
+			try {
+				const svgMarkup = await createSavedDesignVectorMarkup(previewUrl, paletteRaw, settingsRaw);
+				if (!svgMarkup) {
+					setStatus('Unable to generate vector for this design');
+					return;
+				}
+				const blob = new Blob([svgMarkup], { type: 'image/svg+xml;charset=utf-8' });
+				const objectUrl = URL.createObjectURL(blob);
+				const link = document.createElement('a');
+				link.href = objectUrl;
+				link.download = baseName + '-vector.svg';
+				document.body.appendChild(link);
+				link.click();
+				document.body.removeChild(link);
+				URL.revokeObjectURL(objectUrl);
+			} finally {
+				trigger.prop('disabled', false);
+			}
+		});
+
 		$(document).on('keyup', function (event) {
 			if (event.key === 'Escape') {
 				closeDesignModal();
 			}
 		});
 
-		maxColorInput.val('4');
-		colorCountOutput.text('4');
-		state.palette = normalizePaletteToAllowed(defaultPalette.slice(0, 4));
+		maxColorInput.val('8');
+		colorCountOutput.text('8');
+		state.palette = normalizePaletteToAllowed(defaultPalette.slice(0, 8));
 		state.showPaletteOptions = false;
 		designModal.removeClass('is-palette-selecting');
 		designIdField.val('0');
