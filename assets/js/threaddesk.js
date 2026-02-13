@@ -851,6 +851,29 @@ jQuery(function ($) {
 			return '<svg xmlns="http://www.w3.org/2000/svg" width="' + width + '" height="' + height + '" viewBox="0 0 ' + width + ' ' + height + '" shape-rendering="crispEdges">' + vectorPaths + '</svg>';
 		};
 
+		const buildImageWrapperSvgMarkup = function (imageHref, width, height) {
+			const safeWidth = Math.max(1, parseInt(width, 10) || 1200);
+			const safeHeight = Math.max(1, parseInt(height, 10) || 1200);
+			return '<svg xmlns="http://www.w3.org/2000/svg" width="' + safeWidth + '" height="' + safeHeight + '" viewBox="0 0 ' + safeWidth + ' ' + safeHeight + '"><image href="' + imageHref + '" width="' + safeWidth + '" height="' + safeHeight + '" preserveAspectRatio="xMidYMid meet"/></svg>';
+		};
+
+		const buildFallbackSvgFromPreview = async function (previewUrl) {
+			if (!previewUrl) {
+				return '';
+			}
+			const img = new Image();
+			img.crossOrigin = 'anonymous';
+			const loaded = await new Promise(function (resolve) {
+				img.onload = function () { resolve(true); };
+				img.onerror = function () { resolve(false); };
+				img.src = previewUrl;
+			});
+			if (!loaded) {
+				return '';
+			}
+			return buildImageWrapperSvgMarkup(previewUrl, img.naturalWidth || img.width, img.naturalHeight || img.height);
+		};
+
 		const createSavedDesignVectorMarkup = async function (previewUrl, paletteRaw, settingsRaw) {
 			if (!previewUrl) {
 				return '';
@@ -860,6 +883,7 @@ jQuery(function ($) {
 			try { palette = JSON.parse(paletteRaw || '[]'); } catch (e) {}
 			try { settings = JSON.parse(settingsRaw || '{}'); } catch (e) {}
 			const normalizedPalette = normalizePaletteToAllowed(Array.isArray(palette) && palette.length ? palette : defaultPalette.slice(0, 4));
+			try {
 			const maxColors = clamp(parseInt(settings.maximumColorCount, 10) || normalizedPalette.length || 4, 1, maxSwatches);
 			const image = new Image();
 			image.crossOrigin = 'anonymous';
@@ -891,6 +915,9 @@ jQuery(function ($) {
 				return '';
 			}
 			return buildVectorSvgMarkup(quantized.labels, analysis.imageData.data, analysis.width, analysis.height, normalizedPalette, exportVectorMaxPixels);
+			} catch (error) {
+				return buildFallbackSvgFromPreview(previewUrl);
+			}
 		};
 
 		const recolorCardPreview = async function (imgEl, previewUrl, paletteRaw, settingsRaw) {
@@ -1206,7 +1233,20 @@ jQuery(function ($) {
 			try {
 				const svgMarkup = await createSavedDesignVectorMarkup(previewUrl, paletteRaw, settingsRaw);
 				if (!svgMarkup) {
-					setStatus('Unable to generate vector for this design');
+					const fallbackSvg = await buildFallbackSvgFromPreview(previewUrl);
+					if (!fallbackSvg) {
+						setStatus('Unable to generate vector for this design');
+						return;
+					}
+					const fallbackBlob = new Blob([fallbackSvg], { type: 'image/svg+xml;charset=utf-8' });
+					const fallbackUrl = URL.createObjectURL(fallbackBlob);
+					const fallbackLink = document.createElement('a');
+					fallbackLink.href = fallbackUrl;
+					fallbackLink.download = baseName + '-vector.svg';
+					document.body.appendChild(fallbackLink);
+					fallbackLink.click();
+					document.body.removeChild(fallbackLink);
+					URL.revokeObjectURL(fallbackUrl);
 					return;
 				}
 				const blob = new Blob([svgMarkup], { type: 'image/svg+xml;charset=utf-8' });
