@@ -110,6 +110,16 @@ $nav_base = trailingslashit( wc_get_account_endpoint_url( 'thread-desk' ) );
 								data-threaddesk-design-settings="<?php echo esc_attr( $design_settings ? $design_settings : '{}' ); ?>">
 								<?php echo esc_html__( 'Edit', 'threaddesk' ); ?>
 							</button>
+							<button
+								type="button"
+								class="threaddesk__button threaddesk__button--small"
+								data-threaddesk-design-download-svg
+								data-threaddesk-design-preview-url="<?php echo esc_url( $design_preview ); ?>"
+								data-threaddesk-design-file-name="<?php echo esc_attr( $design_file_name ); ?>"
+								data-threaddesk-design-palette="<?php echo esc_attr( $design_palette ? $design_palette : '[]' ); ?>"
+								data-threaddesk-design-settings="<?php echo esc_attr( $design_settings ? $design_settings : '{}' ); ?>">
+								<?php echo esc_html__( 'Save', 'threaddesk' ); ?>
+							</button>
 							<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
 								<input type="hidden" name="action" value="tta_threaddesk_delete_design" />
 								<input type="hidden" name="design_id" value="<?php echo esc_attr( $design->ID ); ?>" />
@@ -157,7 +167,7 @@ $nav_base = trailingslashit( wc_get_account_endpoint_url( 'thread-desk' ) );
 					</svg>
 				</div>
 
-				<input type="file" id="threaddesk_design_file" accept=".png,.jpg,.jpeg,.svg,image/png,image/jpeg,image/svg+xml" name="threaddesk_design_file" data-threaddesk-design-file hidden />
+				<input type="file" id="threaddesk_design_file" accept=".png,.jpg,.jpeg,image/png,image/jpeg" name="threaddesk_design_file" data-threaddesk-design-file hidden />
 				<small class="threaddesk-designer__file-name" data-threaddesk-design-file-name><?php echo esc_html__( 'No file selected', 'threaddesk' ); ?></small>
 				<input type="hidden" name="threaddesk_design_palette" data-threaddesk-design-palette value="[]" />
 				<input type="hidden" name="threaddesk_design_color_count" data-threaddesk-design-color-count value="0" />
@@ -167,8 +177,8 @@ $nav_base = trailingslashit( wc_get_account_endpoint_url( 'thread-desk' ) );
 					<div class="threaddesk-designer__control-head">
 						<label for="threaddesk_design_max_colors"><?php echo esc_html__( 'Maximum color count', 'threaddesk' ); ?></label>
 						<div class="threaddesk-designer__color-counter">
-							<input type="range" id="threaddesk_design_max_colors" min="1" max="8" value="4" data-threaddesk-max-colors />
-							<strong data-threaddesk-color-count>4</strong>
+							<input type="range" id="threaddesk_design_max_colors" min="1" max="8" value="8" data-threaddesk-max-colors />
+							<strong data-threaddesk-color-count>8</strong>
 						</div>
 					</div>
 					<p class="threaddesk-designer__status" data-threaddesk-design-status aria-live="polite"></p>
