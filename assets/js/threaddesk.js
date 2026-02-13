@@ -167,6 +167,8 @@ jQuery(function ($) {
 		const designPreviewMaxDimension = 960;
 		const designCardMaxDimension = 420;
 		const exportVectorMaxDimension = 2400;
+		const previewVectorMaxPixels = 260000;
+		const exportVectorMaxPixels = 4000000;
 		let uploadedPreviewUrl = null;
 		let recolorTimer = null;
 		let reanalyzeTimer = null;
@@ -304,11 +306,12 @@ jQuery(function ($) {
 		};
 
 
-		const buildVectorPathByColor = function (labels, sourcePixels, width, height, palette) {
+		const buildVectorPathByColor = function (labels, sourcePixels, width, height, palette, maxPixels) {
 			if (!labels || !sourcePixels || !palette || !palette.length || !width || !height) {
 				return '';
 			}
-			if ((width * height) > 260000) {
+			const pixelLimit = Math.max(1, parseInt(maxPixels, 10) || previewVectorMaxPixels);
+			if ((width * height) > pixelLimit) {
 				return '';
 			}
 			const pathChunks = palette.map(function () { return []; });
@@ -371,7 +374,7 @@ jQuery(function ($) {
 			}
 			ctx.putImageData(output, 0, 0);
 
-			const vectorPaths = buildVectorPathByColor(state.labels, state.sourcePixels, state.width, state.height, state.palette);
+			const vectorPaths = buildVectorPathByColor(state.labels, state.sourcePixels, state.width, state.height, state.palette, previewVectorMaxPixels);
 			if (vectorPaths && previewVector.length) {
 				previewVector.attr('viewBox', '0 0 ' + state.width + ' ' + state.height);
 				previewVector.html(vectorPaths);
@@ -840,8 +843,8 @@ jQuery(function ($) {
 			return 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(svgMarkup);
 		};
 
-		const buildVectorSvgMarkup = function (labels, sourcePixels, width, height, palette) {
-			const vectorPaths = buildVectorPathByColor(labels, sourcePixels, width, height, palette);
+		const buildVectorSvgMarkup = function (labels, sourcePixels, width, height, palette, maxPixels) {
+			const vectorPaths = buildVectorPathByColor(labels, sourcePixels, width, height, palette, maxPixels);
 			if (!vectorPaths) {
 				return '';
 			}
@@ -887,7 +890,7 @@ jQuery(function ($) {
 			if (!quantized || !quantized.labels) {
 				return '';
 			}
-			return buildVectorSvgMarkup(quantized.labels, analysis.imageData.data, analysis.width, analysis.height, normalizedPalette);
+			return buildVectorSvgMarkup(quantized.labels, analysis.imageData.data, analysis.width, analysis.height, normalizedPalette, exportVectorMaxPixels);
 		};
 
 		const recolorCardPreview = async function (imgEl, previewUrl, paletteRaw, settingsRaw) {
