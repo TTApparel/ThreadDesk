@@ -851,27 +851,51 @@ jQuery(function ($) {
 			return '<svg xmlns="http://www.w3.org/2000/svg" width="' + width + '" height="' + height + '" viewBox="0 0 ' + width + ' ' + height + '" shape-rendering="crispEdges">' + vectorPaths + '</svg>';
 		};
 
-		const buildImageWrapperSvgMarkup = function (imageHref, width, height) {
-			const safeWidth = Math.max(1, parseInt(width, 10) || 1200);
-			const safeHeight = Math.max(1, parseInt(height, 10) || 1200);
-			return '<svg xmlns="http://www.w3.org/2000/svg" width="' + safeWidth + '" height="' + safeHeight + '" viewBox="0 0 ' + safeWidth + ' ' + safeHeight + '"><image href="' + imageHref + '" width="' + safeWidth + '" height="' + safeHeight + '" preserveAspectRatio="xMidYMid meet"/></svg>';
-		};
-
-		const buildFallbackSvgFromPreview = async function (previewUrl) {
-			if (!previewUrl) {
+		const buildRectVectorSvgMarkup = function (labels, sourcePixels, width, height, palette, maxPixels) {
+			const safeWidth = Math.max(1, parseInt(width, 10) || 1);
+			const safeHeight = Math.max(1, parseInt(height, 10) || 1);
+			const pixelLimit = Math.max(1, parseInt(maxPixels, 10) || exportVectorMaxPixels);
+			if (!labels || !sourcePixels || !palette || !palette.length || (safeWidth * safeHeight) > pixelLimit) {
 				return '';
 			}
-			const img = new Image();
-			img.crossOrigin = 'anonymous';
-			const loaded = await new Promise(function (resolve) {
-				img.onload = function () { resolve(true); };
-				img.onerror = function () { resolve(false); };
-				img.src = previewUrl;
-			});
-			if (!loaded) {
+			const rects = [];
+			for (let y = 0; y < safeHeight; y += 1) {
+				let runStart = 0;
+				let runLabel = -1;
+				let runAlpha = -1;
+				for (let x = 0; x <= safeWidth; x += 1) {
+					let label = -1;
+					let alpha = 0;
+					if (x < safeWidth) {
+						const pixelIndex = (y * safeWidth) + x;
+						const offset = pixelIndex * 4;
+						alpha = sourcePixels[offset + 3] || 0;
+						if (alpha >= 8) {
+							label = labels[pixelIndex] || 0;
+						}
+					}
+					const flush = x === safeWidth || label !== runLabel || alpha !== runAlpha;
+					if (!flush) {
+						continue;
+					}
+					if (runLabel >= 0 && runAlpha >= 8) {
+						const color = palette[runLabel] || palette[0] || '#111111';
+						const runWidth = x - runStart;
+						if (runAlpha >= 254) {
+							rects.push('<rect x="' + runStart + '" y="' + y + '" width="' + runWidth + '" height="1" fill="' + color + '"/>');
+						} else {
+							rects.push('<rect x="' + runStart + '" y="' + y + '" width="' + runWidth + '" height="1" fill="' + color + '" fill-opacity="' + (runAlpha / 255).toFixed(3) + '"/>');
+						}
+					}
+					runStart = x;
+					runLabel = label;
+					runAlpha = alpha;
+				}
+			}
+			if (!rects.length) {
 				return '';
 			}
-			return buildImageWrapperSvgMarkup(previewUrl, img.naturalWidth || img.width, img.naturalHeight || img.height);
+			return '<svg xmlns="http://www.w3.org/2000/svg" width="' + safeWidth + '" height="' + safeHeight + '" viewBox="0 0 ' + safeWidth + ' ' + safeHeight + '" shape-rendering="crispEdges">' + rects.join('') + '</svg>';
 		};
 
 		const createSavedDesignVectorMarkup = async function (previewUrl, paletteRaw, settingsRaw) {
@@ -914,9 +938,13 @@ jQuery(function ($) {
 			if (!quantized || !quantized.labels) {
 				return '';
 			}
-			return buildVectorSvgMarkup(quantized.labels, analysis.imageData.data, analysis.width, analysis.height, normalizedPalette, exportVectorMaxPixels);
+			const pathSvg = buildVectorSvgMarkup(quantized.labels, analysis.imageData.data, analysis.width, analysis.height, normalizedPalette, exportVectorMaxPixels);
+			if (pathSvg) {
+				return pathSvg;
+			}
+			return buildRectVectorSvgMarkup(quantized.labels, analysis.imageData.data, analysis.width, analysis.height, normalizedPalette, exportVectorMaxPixels * 2);
 			} catch (error) {
-				return buildFallbackSvgFromPreview(previewUrl);
+				return '';
 			}
 		};
 
@@ -1233,20 +1261,7 @@ jQuery(function ($) {
 			try {
 				const svgMarkup = await createSavedDesignVectorMarkup(previewUrl, paletteRaw, settingsRaw);
 				if (!svgMarkup) {
-					const fallbackSvg = await buildFallbackSvgFromPreview(previewUrl);
-					if (!fallbackSvg) {
-						setStatus('Unable to generate vector for this design');
-						return;
-					}
-					const fallbackBlob = new Blob([fallbackSvg], { type: 'image/svg+xml;charset=utf-8' });
-					const fallbackUrl = URL.createObjectURL(fallbackBlob);
-					const fallbackLink = document.createElement('a');
-					fallbackLink.href = fallbackUrl;
-					fallbackLink.download = baseName + '-vector.svg';
-					document.body.appendChild(fallbackLink);
-					fallbackLink.click();
-					document.body.removeChild(fallbackLink);
-					URL.revokeObjectURL(fallbackUrl);
+					setStatus('Unable to generate vector for this design');
 					return;
 				}
 				const blob = new Blob([svgMarkup], { type: 'image/svg+xml;charset=utf-8' });
