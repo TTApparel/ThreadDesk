@@ -109,6 +109,7 @@ jQuery(function ($) {
 		const openDesignModal = function () {
 			designModal.addClass('is-active').attr('aria-hidden', 'false');
 			$('body').addClass('threaddesk-modal-open');
+			updatePreviewMaxHeight();
 		};
 
 		const closeDesignModal = function () {
@@ -191,10 +192,16 @@ jQuery(function ($) {
 		const colorCountOutput = designModal.find('[data-threaddesk-color-count]');
 		const statusEl = designModal.find('[data-threaddesk-design-status]');
 		const designIdField = designModal.find('[data-threaddesk-design-id-field]');
-		const initialPreviewHeight = Math.round(previewContainer.outerHeight() || 0);
-		if (initialPreviewHeight > 0) {
-			previewContainer.css('--threaddesk-preview-max-height', initialPreviewHeight + 'px');
-		}
+		const updatePreviewMaxHeight = function () {
+			const panelHeight = Math.round(designModal.find('.threaddesk-auth-modal__panel').innerHeight() || 0);
+			if (panelHeight <= 0) {
+				return;
+			}
+			const targetHeight = Math.max(120, Math.floor(panelHeight / 3));
+			previewContainer.css('--threaddesk-preview-max-height', targetHeight + 'px');
+		};
+		updatePreviewMaxHeight();
+		$(window).on('resize', updatePreviewMaxHeight);
 
 		const clamp = function (value, min, max) {
 			return Math.max(min, Math.min(max, value));
@@ -846,7 +853,7 @@ jQuery(function ($) {
 			imgEl.src = canvas.toDataURL('image/png');
 		};
 
-		const analyzeCurrentImage = async function () {
+		const analyzeCurrentImage = async function (forceDetectedMax) {
 			if (!state.sourcePixels || !state.width || !state.height) {
 				return;
 			}
@@ -883,7 +890,7 @@ jQuery(function ($) {
 				return;
 			}
 
-			if (!state.hasUserAdjustedMax) {
+			if (forceDetectedMax || !state.hasUserAdjustedMax) {
 				const recommended = clamp(quantized.palette.length || 4, 1, maxSwatches);
 				state.analysisSettings.maximumColorCount = recommended;
 				maxColorInput.val(String(recommended));
@@ -900,6 +907,7 @@ jQuery(function ($) {
 			event.preventDefault();
 			openDesignModal();
 			designIdField.val('0');
+			state.hasUserAdjustedMax = false;
 
 			const designFileInput = designModal.find('[data-threaddesk-design-file]').get(0);
 			if (designFileInput) {
@@ -1010,7 +1018,8 @@ jQuery(function ($) {
 				state.height = analysis.height;
 				state.sourcePixels = analysis.imageData.data;
 				state.fileType = loaded.isSvg ? 'svg' : 'raster';
-				await analyzeCurrentImage();
+				state.hasUserAdjustedMax = false;
+				await analyzeCurrentImage(true);
 			} catch (error) {
 				state.palette = [];
 				state.percentages = [];
