@@ -810,6 +810,16 @@ body.threaddesk-modal-open {
 	background: transparent;
 }
 
+
+.threaddesk-designer__design-vector-preview {
+	display: none;
+	width: 100%;
+	height: auto;
+	max-height: calc(var(--threaddesk-preview-max-height) - 20px);
+	object-fit: contain;
+	border-radius: 8px;
+}
+
 .threaddesk-designer__design-image-overlay {
 	display: none;
 	position: absolute;
@@ -828,11 +838,20 @@ body.threaddesk-modal-open {
 	visibility: visible;
 }
 
-.threaddesk-designer__design-image.has-upload[data-threaddesk-preview-mode='quantized'] .threaddesk-designer__design-image-upload {
+.threaddesk-designer__design-image.has-upload[data-threaddesk-preview-mode='quantized'] .threaddesk-designer__design-image-upload,
+.threaddesk-designer__design-image.has-upload[data-threaddesk-preview-mode='quantized-vector'] .threaddesk-designer__design-image-upload {
 	display: none;
 }
 
-.threaddesk-designer__design-image.has-upload svg {
+.threaddesk-designer__design-image.has-upload[data-threaddesk-preview-mode='quantized-vector'] .threaddesk-designer__design-canvas {
+	display: none;
+}
+
+.threaddesk-designer__design-image.has-upload[data-threaddesk-preview-mode='quantized-vector'] .threaddesk-designer__design-vector-preview {
+	display: block;
+}
+
+.threaddesk-designer__design-image.has-upload svg:not(.threaddesk-designer__design-vector-preview) {
 	display: none;
 }
 

@@ -188,6 +188,8 @@ jQuery(function ($) {
 		const previewImage = designModal.find('[data-threaddesk-design-upload-preview]');
 		const previewCanvas = designModal.find('[data-threaddesk-design-canvas]');
 		const previewSvg = previewContainer.find('svg');
+		const previewVector = $('<svg class="threaddesk-designer__design-vector-preview" aria-hidden="true" focusable="false"></svg>');
+		previewContainer.append(previewVector);
 		const maxColorInput = designModal.find('[data-threaddesk-max-colors]');
 		const colorCountOutput = designModal.find('[data-threaddesk-color-count]');
 		const statusEl = designModal.find('[data-threaddesk-design-status]');
@@ -287,6 +289,45 @@ jQuery(function ($) {
 			previewContainer.css('--threaddesk-preview-accent', colors[0] || defaultPalette[0]);
 		};
 
+
+		const buildVectorPathByColor = function (labels, sourcePixels, width, height, palette) {
+			if (!labels || !sourcePixels || !palette || !palette.length || !width || !height) {
+				return '';
+			}
+			const pathChunks = palette.map(function () { return []; });
+			for (let y = 0; y < height; y += 1) {
+				let runStart = 0;
+				let runLabel = -1;
+				for (let x = 0; x <= width; x += 1) {
+					let label = -1;
+					if (x < width) {
+						const pixelIndex = (y * width) + x;
+						const alpha = sourcePixels[(pixelIndex * 4) + 3];
+						if (alpha >= 8) {
+							label = labels[pixelIndex] || 0;
+						}
+					}
+					if (x < width && label === runLabel) {
+						continue;
+					}
+					if (runLabel >= 0 && (x - runStart) > 0 && pathChunks[runLabel]) {
+						const runWidth = x - runStart;
+						pathChunks[runLabel].push('M' + runStart + ' ' + y + 'h' + runWidth + 'v1h-' + runWidth + 'Z');
+					}
+					runStart = x;
+					runLabel = label;
+				}
+			}
+			const paths = [];
+			for (let i = 0; i < palette.length; i += 1) {
+				if (!pathChunks[i].length) {
+					continue;
+				}
+				paths.push('<path fill="' + palette[i] + '" d="' + pathChunks[i].join('') + '"/>');
+			}
+			return paths.join('');
+		};
+
 		const renderQuantizedPreview = function () {
 			if (!state.labels || !state.sourcePixels || !state.palette.length || !previewCanvas.length) {
 				return;
@@ -312,7 +353,15 @@ jQuery(function ($) {
 				output.data[px + 3] = alpha;
 			}
 			ctx.putImageData(output, 0, 0);
-			previewContainer.attr('data-threaddesk-preview-mode', 'quantized');
+
+			const vectorPaths = buildVectorPathByColor(state.labels, state.sourcePixels, state.width, state.height, state.palette);
+			if (vectorPaths && previewVector.length) {
+				previewVector.attr('viewBox', '0 0 ' + state.width + ' ' + state.height);
+				previewVector.html(vectorPaths);
+				previewContainer.attr('data-threaddesk-preview-mode', 'quantized-vector');
+			} else {
+				previewContainer.attr('data-threaddesk-preview-mode', 'quantized');
+			}
 			previewContainer.css('--threaddesk-preview-accent', state.palette[0] || defaultPalette[0]);
 		};
 
@@ -986,6 +1035,7 @@ jQuery(function ($) {
 				previewImage.attr('src', '');
 				previewContainer.removeClass('has-upload');
 				previewSvg.removeAttr('aria-hidden');
+				previewVector.empty();
 				state.palette = normalizePaletteToAllowed(defaultPalette.slice(0, 4));
 				state.percentages = [];
 				state.labels = null;
