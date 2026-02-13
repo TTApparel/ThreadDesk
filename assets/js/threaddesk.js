@@ -649,35 +649,39 @@ jQuery(function ($) {
 			}
 		};
 
+		const getSvgTextFromUrl = async function (url) {
+			if (!url) {
+				return '';
+			}
+			try {
+				if (/^data:image\/svg\+xml/i.test(url)) {
+					const comma = url.indexOf(',');
+					if (comma < 0) {
+						return '';
+					}
+					const header = url.slice(0, comma);
+					const body = url.slice(comma + 1);
+					return /;base64/i.test(header) ? atob(body) : decodeURIComponent(body);
+				}
+				const response = await fetch(url, { credentials: 'same-origin' });
+				if (!response.ok) {
+					return '';
+				}
+				return await response.text();
+			} catch (error) {
+				return '';
+			}
+		};
+
 		const getSvgDimensionsFromUrl = async function (url) {
 			if (!url) {
 				return null;
 			}
-			const isSvgUrl = /\.svg(?:[?#].*)?$/i.test(url) || /^data:image\/svg\+xml/i.test(url);
-			if (!isSvgUrl) {
+			const svgText = await getSvgTextFromUrl(url);
+			if (!svgText) {
 				return null;
 			}
-			try {
-				let svgText = '';
-				if (/^data:image\/svg\+xml/i.test(url)) {
-					const comma = url.indexOf(',');
-					if (comma < 0) {
-						return null;
-					}
-					const header = url.slice(0, comma);
-					const body = url.slice(comma + 1);
-					svgText = /;base64/i.test(header) ? atob(body) : decodeURIComponent(body);
-				} else {
-					const response = await fetch(url, { credentials: 'same-origin' });
-					if (!response.ok) {
-						return null;
-					}
-					svgText = await response.text();
-				}
-				return parseSvgDimensionsFromText(svgText);
-			} catch (error) {
-				return null;
-			}
+			return parseSvgDimensionsFromText(svgText);
 		};
 
 		const loadImageFromFile = function (file) {
@@ -848,6 +852,11 @@ jQuery(function ($) {
 			let settings = {};
 			try { palette = JSON.parse(paletteRaw || '[]'); } catch (e) {}
 			try { settings = JSON.parse(settingsRaw || '{}'); } catch (e) {}
+			const originalSvg = await getSvgTextFromUrl(previewUrl);
+			const originalSvgDimensions = parseSvgDimensionsFromText(originalSvg || '');
+			if (originalSvg && originalSvgDimensions) {
+				return originalSvg;
+			}
 			const normalizedPalette = normalizePaletteToAllowed(Array.isArray(palette) && palette.length ? palette : defaultPalette.slice(0, 4));
 			const maxColors = clamp(parseInt(settings.maximumColorCount, 10) || normalizedPalette.length || 4, 1, maxSwatches);
 			const image = new Image();
@@ -879,7 +888,8 @@ jQuery(function ($) {
 			if (!quantized || !quantized.labels) {
 				return '';
 			}
-			return buildVectorSvgMarkup(quantized.labels, analysis.imageData.data, analysis.width, analysis.height, normalizedPalette);
+			const exportPalette = normalizePaletteToAllowed((quantized.palette && quantized.palette.length) ? quantized.palette : normalizedPalette);
+			return buildVectorSvgMarkup(quantized.labels, analysis.imageData.data, analysis.width, analysis.height, exportPalette);
 		};
 
 		const recolorCardPreview = async function (imgEl, previewUrl, paletteRaw, settingsRaw) {
