@@ -204,6 +204,7 @@ jQuery(function ($) {
 		};
 		updatePreviewMaxHeight();
 		$(window).on('resize', updatePreviewMaxHeight);
+		previewContainer.css('--threaddesk-preview-bg', '#FFFFFF');
 
 		const clamp = function (value, min, max) {
 			return Math.max(min, Math.min(max, value));
@@ -281,12 +282,60 @@ jQuery(function ($) {
 			designModal.find('[data-threaddesk-design-settings]').val(JSON.stringify(state.analysisSettings));
 		};
 
+
+		const syncPreviewBackgroundColor = function () {
+			const hasWhite = (state.palette || []).some(function (hex) {
+				return String(hex || '').toUpperCase() === '#FFFFFF';
+			});
+			previewContainer.css('--threaddesk-preview-bg', hasWhite ? '#F6F6F6' : '#FFFFFF');
+		};
+
 		const renderVectorFallback = function () {
 			const colors = state.palette.length ? state.palette : [defaultPalette[0]];
 			designModal.find('[data-threaddesk-preview-layer]').each(function (index) {
 				$(this).attr('fill', colors[index] || colors[0]);
 			});
 			previewContainer.css('--threaddesk-preview-accent', colors[0] || defaultPalette[0]);
+			syncPreviewBackgroundColor();
+		};
+
+
+		const buildVectorPathByColor = function (labels, sourcePixels, width, height, palette) {
+			if (!labels || !sourcePixels || !palette || !palette.length || !width || !height) {
+				return '';
+			}
+			const pathChunks = palette.map(function () { return []; });
+			for (let y = 0; y < height; y += 1) {
+				let runStart = 0;
+				let runLabel = -1;
+				for (let x = 0; x <= width; x += 1) {
+					let label = -1;
+					if (x < width) {
+						const pixelIndex = (y * width) + x;
+						const alpha = sourcePixels[(pixelIndex * 4) + 3];
+						if (alpha >= 8) {
+							label = labels[pixelIndex] || 0;
+						}
+					}
+					if (x < width && label === runLabel) {
+						continue;
+					}
+					if (runLabel >= 0 && (x - runStart) > 0 && pathChunks[runLabel]) {
+						const runWidth = x - runStart;
+						pathChunks[runLabel].push('M' + runStart + ' ' + y + 'h' + runWidth + 'v1h-' + runWidth + 'Z');
+					}
+					runStart = x;
+					runLabel = label;
+				}
+			}
+			const paths = [];
+			for (let i = 0; i < palette.length; i += 1) {
+				if (!pathChunks[i].length) {
+					continue;
+				}
+				paths.push('<path fill="' + palette[i] + '" d="' + pathChunks[i].join('') + '"/>');
+			}
+			return paths.join('');
 		};
 
 
@@ -363,6 +412,7 @@ jQuery(function ($) {
 				previewContainer.attr('data-threaddesk-preview-mode', 'quantized');
 			}
 			previewContainer.css('--threaddesk-preview-accent', state.palette[0] || defaultPalette[0]);
+			syncPreviewBackgroundColor();
 		};
 
 		const queueRecolor = function () {
