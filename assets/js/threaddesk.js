@@ -161,7 +161,6 @@ jQuery(function ($) {
 		];
 		const minimumPercent = 0.5;
 		const mergeThreshold = 22;
-		const maxAnalysisDimension = 2000;
 		const maxSwatches = 8;
 		let uploadedPreviewUrl = null;
 		let recolorTimer = null;
@@ -537,20 +536,97 @@ jQuery(function ($) {
 			};
 		};
 
+
+		const parseSvgLength = function (value) {
+			if (typeof value !== 'string') {
+				return 0;
+			}
+			const trimmed = value.trim();
+			if (!trimmed || trimmed.endsWith('%')) {
+				return 0;
+			}
+			const numeric = parseFloat(trimmed);
+			return Number.isFinite(numeric) && numeric > 0 ? numeric : 0;
+		};
+
+		const parseSvgDimensionsFromText = function (svgText) {
+			if (!svgText || typeof svgText !== 'string') {
+				return null;
+			}
+			try {
+				const parser = new DOMParser();
+				const doc = parser.parseFromString(svgText, 'image/svg+xml');
+				const svg = doc && doc.documentElement && doc.documentElement.nodeName.toLowerCase() === 'svg'
+					? doc.documentElement
+					: doc.querySelector('svg');
+				if (!svg) {
+					return null;
+				}
+				let width = parseSvgLength(svg.getAttribute('width') || '');
+				let height = parseSvgLength(svg.getAttribute('height') || '');
+				const viewBox = (svg.getAttribute('viewBox') || '').trim();
+				if ((!width || !height) && viewBox) {
+					const parts = viewBox.split(/[\s,]+/).map(function (part) { return parseFloat(part); });
+					if (parts.length === 4 && Number.isFinite(parts[2]) && Number.isFinite(parts[3])) {
+						width = width || Math.max(0, parts[2]);
+						height = height || Math.max(0, parts[3]);
+					}
+				}
+				if (!width || !height) {
+					return null;
+				}
+				return { width: Math.round(width), height: Math.round(height) };
+			} catch (error) {
+				return null;
+			}
+		};
+
+		const getSvgDimensionsFromUrl = async function (url) {
+			if (!url) {
+				return null;
+			}
+			const isSvgUrl = /\.svg(?:[?#].*)?$/i.test(url) || /^data:image\/svg\+xml/i.test(url);
+			if (!isSvgUrl) {
+				return null;
+			}
+			try {
+				let svgText = '';
+				if (/^data:image\/svg\+xml/i.test(url)) {
+					const comma = url.indexOf(',');
+					if (comma < 0) {
+						return null;
+					}
+					const header = url.slice(0, comma);
+					const body = url.slice(comma + 1);
+					svgText = /;base64/i.test(header) ? atob(body) : decodeURIComponent(body);
+				} else {
+					const response = await fetch(url, { credentials: 'same-origin' });
+					if (!response.ok) {
+						return null;
+					}
+					svgText = await response.text();
+				}
+				return parseSvgDimensionsFromText(svgText);
+			} catch (error) {
+				return null;
+			}
+		};
+
 		const loadImageFromFile = function (file) {
 			return new Promise(function (resolve, reject) {
 				const isSvg = file.type === 'image/svg+xml' || /\.svg$/i.test(file.name || '');
 				const img = new Image();
-				img.onload = function () { resolve({ image: img, isSvg: isSvg }); };
+				img.onload = function () { resolve({ image: img, isSvg: isSvg, svgDimensions: null }); };
 				img.onerror = function () { reject(new Error('Failed to load image')); };
 				if (isSvg) {
 					const reader = new FileReader();
 					reader.onload = function () {
+						const svgDimensions = parseSvgDimensionsFromText(String(reader.result || ''));
 						const svgBlob = new Blob([reader.result], { type: 'image/svg+xml' });
 						const objectUrl = URL.createObjectURL(svgBlob);
 						img.onload = function () {
 							URL.revokeObjectURL(objectUrl);
-							resolve({ image: img, isSvg: true });
+							resolve({ image: img, isSvg: true, svgDimensions: svgDimensions });
 						};
 						img.onerror = function () {
 							URL.revokeObjectURL(objectUrl);
@@ -566,20 +642,47 @@ jQuery(function ($) {
 			});
 		};
 
-		const createAnalysisBuffer = function (image) {
-			const scale = Math.min(1, maxAnalysisDimension / Math.max(image.naturalWidth || image.width, image.naturalHeight || image.height));
-			const width = Math.max(1, Math.round((image.naturalWidth || image.width) * scale));
-			const height = Math.max(1, Math.round((image.naturalHeight || image.height) * scale));
+		const createAnalysisBuffer = function (image, preferredDimensions, options) {
+			const preferredWidth = preferredDimensions && preferredDimensions.width ? preferredDimensions.width : 0;
+			const preferredHeight = preferredDimensions && preferredDimensions.height ? preferredDimensions.height : 0;
+			const sourceWidth = Math.max(1, Math.round(image.naturalWidth || image.width || 1));
+			const sourceHeight = Math.max(1, Math.round(image.naturalHeight || image.height || 1));
+			const shouldBoostVectorFallback = !!(options && options.isVectorSource && !preferredWidth && !preferredHeight);
+			const vectorBoostScale = shouldBoostVectorFallback ? 6 : 1;
+			const vectorWidth = shouldBoostVectorFallback ? Math.min(4096, sourceWidth * vectorBoostScale) : sourceWidth;
+			const vectorHeight = shouldBoostVectorFallback ? Math.min(4096, sourceHeight * vectorBoostScale) : sourceHeight;
+			const baseWidth = Math.max(1, Math.round(preferredWidth || vectorWidth));
+			const baseHeight = Math.max(1, Math.round(preferredHeight || vectorHeight));
 			const canvas = document.createElement('canvas');
-			canvas.width = width;
-			canvas.height = height;
-			const ctx = canvas.getContext('2d', { willReadFrequently: true });
-			ctx.clearRect(0, 0, width, height);
-			ctx.drawImage(image, 0, 0, width, height);
-			return { width: width, height: height, imageData: ctx.getImageData(0, 0, width, height) };
+			let scale = 1;
+			let lastError = null;
+			for (let attempt = 0; attempt < 7; attempt += 1) {
+				const width = Math.max(1, Math.round(baseWidth * scale));
+				const height = Math.max(1, Math.round(baseHeight * scale));
+				try {
+					canvas.width = width;
+					canvas.height = height;
+					const ctx = canvas.getContext('2d', { willReadFrequently: true });
+					if (!ctx) {
+						throw new Error('Canvas 2D context unavailable');
+					}
+					ctx.clearRect(0, 0, width, height);
+					ctx.drawImage(image, 0, 0, width, height);
+					const imageData = ctx.getImageData(0, 0, width, height);
+					return { width: width, height: height, imageData: imageData };
+				} catch (error) {
+					lastError = error;
+					if (width <= 1 || height <= 1) {
+						break;
+					}
+					scale *= 0.75;
+				}
+			}
+			throw lastError || new Error('Unable to create analysis buffer');
 		};
 
-		const loadCanvasFromPreviewUrl = function (url) {
+		const loadCanvasFromPreviewUrl = async function (url) {
+			const svgDimensions = await getSvgDimensionsFromUrl(url);
 			return new Promise(function (resolve) {
 				if (!url || !previewCanvas.length) {
 					resolve(false);
@@ -588,9 +691,11 @@ jQuery(function ($) {
 				const img = new Image();
 				img.crossOrigin = 'anonymous';
 				img.onload = function () {
-					const analysis = createAnalysisBuffer(img);
+					const analysis = createAnalysisBuffer(img, svgDimensions, { isVectorSource: !!svgDimensions || /\.svg(?:[?#].*)?$/i.test(url) });
 					state.width = analysis.width;
 					state.height = analysis.height;
+					state.sourcePixels = analysis.imageData.data;
+					state.fileType = 'raster';
 					const canvas = previewCanvas.get(0);
 					canvas.width = analysis.width;
 					canvas.height = analysis.height;
@@ -605,6 +710,140 @@ jQuery(function ($) {
 				};
 				img.src = url;
 			});
+		};
+
+
+		const labelsToVectorSvgDataUrl = function (labels, sourcePixels, width, height, paletteHex) {
+			const safeWidth = Math.max(1, parseInt(width, 10) || 1);
+			const safeHeight = Math.max(1, parseInt(height, 10) || 1);
+			if (!labels || !sourcePixels || !paletteHex || !paletteHex.length) {
+				return '';
+			}
+			if ((safeWidth * safeHeight) > 160000) {
+				return '';
+			}
+
+			const rects = [];
+			for (let y = 0; y < safeHeight; y += 1) {
+				let runStart = 0;
+				let runLabel = -1;
+				let runAlpha = -1;
+				for (let x = 0; x <= safeWidth; x += 1) {
+					let label = -1;
+					let alpha = 0;
+					if (x < safeWidth) {
+						const pixelIndex = (y * safeWidth) + x;
+						const offset = pixelIndex * 4;
+						alpha = sourcePixels[offset + 3] || 0;
+						if (alpha >= 8) {
+							label = labels[pixelIndex] || 0;
+						}
+					}
+					const shouldFlush = x === safeWidth || label !== runLabel || alpha !== runAlpha;
+					if (!shouldFlush) {
+						continue;
+					}
+					if (runLabel >= 0 && runAlpha >= 8) {
+						const color = paletteHex[runLabel] || paletteHex[0] || '#111111';
+						const runWidth = x - runStart;
+						if (runAlpha >= 254) {
+							rects.push('<rect x="' + runStart + '" y="' + y + '" width="' + runWidth + '" height="1" fill="' + color + '"/>');
+						} else {
+							rects.push('<rect x="' + runStart + '" y="' + y + '" width="' + runWidth + '" height="1" fill="' + color + '" fill-opacity="' + (runAlpha / 255).toFixed(3) + '"/>');
+						}
+					}
+					runStart = x;
+					runLabel = label;
+					runAlpha = alpha;
+				}
+			}
+			if (!rects.length) {
+				return '';
+			}
+			const svgMarkup = '<svg xmlns="http://www.w3.org/2000/svg" width="' + safeWidth + '" height="' + safeHeight + '" viewBox="0 0 ' + safeWidth + ' ' + safeHeight + '" shape-rendering="crispEdges">' + rects.join('') + '</svg>';
+			return 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(svgMarkup);
+		};
+
+		const recolorCardPreview = async function (imgEl, previewUrl, paletteRaw, settingsRaw) {
+			if (!imgEl || !previewUrl) {
+				return;
+			}
+
+			let palette = [];
+			let settings = {};
+			try { palette = JSON.parse(paletteRaw || '[]'); } catch (e) {}
+			try { settings = JSON.parse(settingsRaw || '{}'); } catch (e) {}
+
+			const normalizedPalette = normalizePaletteToAllowed(Array.isArray(palette) && palette.length ? palette : defaultPalette.slice(0, 4));
+			const maxColors = clamp(parseInt(settings.maximumColorCount, 10) || normalizedPalette.length || 4, 1, maxSwatches);
+			const image = new Image();
+			image.crossOrigin = 'anonymous';
+			const svgDimensions = await getSvgDimensionsFromUrl(previewUrl);
+			const loaded = await new Promise(function (resolve) {
+				image.onload = function () { resolve(true); };
+				image.onerror = function () { resolve(false); };
+				image.src = previewUrl;
+			});
+
+			if (!loaded) {
+				return;
+			}
+
+			const analysis = createAnalysisBuffer(image, svgDimensions, { isVectorSource: !!svgDimensions || /\.svg(?:[?#].*)?$/i.test(previewUrl) });
+			const pixels = [];
+			const opaqueIndices = [];
+			for (let i = 0; i < analysis.imageData.data.length; i += 4) {
+				const alpha = analysis.imageData.data[i + 3];
+				if (alpha < 8) {
+					continue;
+				}
+				pixels.push([analysis.imageData.data[i], analysis.imageData.data[i + 1], analysis.imageData.data[i + 2]]);
+				opaqueIndices.push(i / 4);
+			}
+
+			if (!pixels.length) {
+				return;
+			}
+
+			const quantized = quantizeColors(pixels, opaqueIndices, analysis.width * analysis.height, maxColors);
+			if (!quantized || !quantized.labels) {
+				return;
+			}
+
+			const vectorDataUrl = labelsToVectorSvgDataUrl(
+				quantized.labels,
+				analysis.imageData.data,
+				analysis.width,
+				analysis.height,
+				normalizedPalette
+			);
+			if (vectorDataUrl) {
+				imgEl.src = vectorDataUrl;
+				return;
+			}
+
+			const canvas = document.createElement('canvas');
+			canvas.width = analysis.width;
+			canvas.height = analysis.height;
+			const ctx = canvas.getContext('2d');
+			const output = new Uint8ClampedArray(analysis.imageData.data.length);
+			const paletteRgb = normalizedPalette.map(hexToRgb);
+			for (let pixelIndex = 0; pixelIndex < quantized.labels.length; pixelIndex += 1) {
+				const offset = pixelIndex * 4;
+				const alpha = analysis.imageData.data[offset + 3];
+				if (alpha < 8) {
+					output[offset + 3] = 0;
+					continue;
+				}
+				const label = quantized.labels[pixelIndex] || 0;
+				const color = paletteRgb[label] || paletteRgb[0] || [0, 0, 0];
+				output[offset] = color[0];
+				output[offset + 1] = color[1];
+				output[offset + 2] = color[2];
+				output[offset + 3] = alpha;
+			}
+			ctx.putImageData(new ImageData(output, analysis.width, analysis.height), 0, 0);
+			imgEl.src = canvas.toDataURL('image/png');
 		};
 
 		const analyzeCurrentImage = async function () {
@@ -693,10 +932,14 @@ jQuery(function ($) {
 			state.palette = normalizePaletteToAllowed(Array.isArray(palette) && palette.length ? palette : defaultPalette.slice(0, 4));
 			state.analysisSettings.maximumColorCount = clamp(parseInt(settings.maximumColorCount, 10) || state.palette.length || 4, 1, maxSwatches);
 			maxColorInput.val(String(state.analysisSettings.maximumColorCount));
-			state.labels = null;
-			state.sourcePixels = null;
+			state.hasUserAdjustedMax = true;
 			state.percentages = [];
 			state.showPaletteOptions = false;
+			if (state.sourcePixels) {
+				await analyzeCurrentImage();
+				state.palette = normalizePaletteToAllowed(Array.isArray(palette) && palette.length ? palette : state.palette);
+				queueRecolor();
+			}
 			renderColorSwatches();
 			renderVectorFallback();
 			setStatus('Editing saved design');
@@ -762,7 +1005,7 @@ jQuery(function ($) {
 				previewContainer.addClass('has-upload');
 				previewSvg.attr('aria-hidden', 'true');
 
-				const analysis = createAnalysisBuffer(loaded.image);
+				const analysis = createAnalysisBuffer(loaded.image, loaded.svgDimensions || null, { isVectorSource: loaded.isSvg });
 				state.width = analysis.width;
 				state.height = analysis.height;
 				state.sourcePixels = analysis.imageData.data;
@@ -775,10 +1018,15 @@ jQuery(function ($) {
 				setStatus('No colors detected');
 				renderColorSwatches();
 			}
-			state.palette[index] = hex;
-			persistDesignMetadata();
-			queueRecolor();
-			renderColorSwatches();
+		});
+
+		$('[data-threaddesk-design-edit]').each(function () {
+			const trigger = $(this);
+			const previewUrl = trigger.attr('data-threaddesk-design-preview-url') || '';
+			const paletteRaw = trigger.attr('data-threaddesk-design-palette') || '[]';
+			const settingsRaw = trigger.attr('data-threaddesk-design-settings') || '{}';
+			const cardImage = trigger.closest('.threaddesk__card').find('.threaddesk__card-design-preview img').get(0);
+			recolorCardPreview(cardImage, previewUrl, paletteRaw, settingsRaw).catch(function () {});
 		});
 
 		$(document).on('click', '[data-threaddesk-inuse-color]', function (event) {
