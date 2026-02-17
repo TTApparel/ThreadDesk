@@ -213,6 +213,7 @@ jQuery(function ($) {
 		const colorCountOutput = designModal.find('[data-threaddesk-color-count]');
 		const statusEl = designModal.find('[data-threaddesk-design-status]');
 		const designIdField = designModal.find('[data-threaddesk-design-id-field]');
+		const designForm = designModal.find('form.threaddesk-auth-modal__form-inner').first();
 		const updatePreviewMaxHeight = function () {
 			const panelHeight = Math.round(designModal.find('.threaddesk-auth-modal__panel').innerHeight() || 0);
 			if (panelHeight <= 0) {
@@ -1621,6 +1622,24 @@ jQuery(function ($) {
 				trigger.prop('disabled', false);
 			}
 		});
+
+
+		if (designForm.length) {
+			designForm.on('submit', function () {
+				const svgField = designForm.find('[data-threaddesk-design-svg-markup]');
+				if (!svgField.length) {
+					return;
+				}
+				let svgMarkup = '';
+				if (state.labels && state.sourcePixels && state.palette.length && state.width && state.height) {
+					svgMarkup = buildVectorSvgMarkup(state.labels, state.sourcePixels, state.width, state.height, state.palette, previewVectorMaxPixels, state.analysisSettings);
+					if (!svgMarkup) {
+						svgMarkup = buildRectVectorSvgMarkup(state.labels, state.sourcePixels, state.width, state.height, state.palette, previewVectorMaxPixels * 2);
+					}
+				}
+				svgField.val(svgMarkup || '');
+			});
+		}
 
 		$(document).on('keyup', function (event) {
 			if (event.key === 'Escape') {

@@ -379,6 +379,75 @@ class TTA_ThreadDesk {
 		return add_query_arg( 'td_section', 'designs', trailingslashit( wc_get_account_endpoint_url( 'thread-desk' ) ) );
 	}
 
+
+	private function get_user_design_storage( $user_id ) {
+		$uploads = wp_upload_dir();
+		$user    = get_userdata( $user_id );
+		$login   = $user ? $user->user_login : 'user-' . (string) $user_id;
+		$folder  = sanitize_file_name( $login );
+		if ( '' === $folder ) {
+			$folder = 'user-' . (string) $user_id;
+		}
+
+		$base_dir = trailingslashit( $uploads['basedir'] ) . 'ThreadDesk/Designs/' . $folder;
+		$base_url = trailingslashit( $uploads['baseurl'] ) . 'ThreadDesk/Designs/' . rawurlencode( $folder );
+
+		if ( ! wp_mkdir_p( $base_dir ) ) {
+			return null;
+		}
+
+		return array(
+			'dir' => $base_dir,
+			'url' => $base_url,
+		);
+	}
+
+	private function persist_design_svg_file( $design_id, $svg_markup, $base_name, $storage ) {
+		if ( ! is_array( $storage ) || empty( $storage['dir'] ) || empty( $storage['url'] ) ) {
+			return;
+		}
+		$svg_markup = is_string( $svg_markup ) ? trim( $svg_markup ) : '';
+		if ( '' === $svg_markup || false === stripos( $svg_markup, '<svg' ) ) {
+			return;
+		}
+
+		$base_name = sanitize_file_name( $base_name );
+		if ( '' === $base_name ) {
+			$base_name = 'design-' . (string) $design_id;
+		}
+		$svg_filename = $base_name . '.svg';
+		$svg_path     = trailingslashit( $storage['dir'] ) . $svg_filename;
+		$svg_url      = trailingslashit( $storage['url'] ) . rawurlencode( $svg_filename );
+
+		$bytes = file_put_contents( $svg_path, $svg_markup );
+		if ( false === $bytes ) {
+			return;
+		}
+
+		update_post_meta( $design_id, 'design_svg_file_path', $svg_path );
+		update_post_meta( $design_id, 'design_svg_file_url', esc_url_raw( $svg_url ) );
+		update_post_meta( $design_id, 'design_svg_file_name', $svg_filename );
+	}
+
+	private function maybe_delete_design_file( $path ) {
+		$path = is_string( $path ) ? trim( $path ) : '';
+		if ( '' === $path || ! file_exists( $path ) || ! is_file( $path ) ) {
+			return;
+		}
+		@unlink( $path );
+	}
+
+	private function maybe_delete_design_files_for_post( $design_id ) {
+		$paths = array(
+			(string) get_post_meta( $design_id, 'design_original_file_path', true ),
+			(string) get_post_meta( $design_id, 'design_svg_file_path', true ),
+		);
+
+		foreach ( $paths as $path ) {
+			$this->maybe_delete_design_file( $path );
+		}
+	}
+
 	public function handle_save_design() {
 		if ( ! is_user_logged_in() ) {
 			wp_die( esc_html__( 'Unauthorized.', 'threaddesk' ) );
@@ -386,18 +455,31 @@ class TTA_ThreadDesk {
 
 		check_admin_referer( 'tta_threaddesk_save_design' );
 
+		$current_user_id   = get_current_user_id();
 		$existing_design_id = isset( $_POST['threaddesk_design_id'] ) ? absint( $_POST['threaddesk_design_id'] ) : 0;
-		$design_id = 0;
-		$upload = null;
-		$file_name = '';
+		$design_id         = 0;
+		$upload            = null;
+		$file_name         = '';
+		$storage           = $this->get_user_design_storage( $current_user_id );
+
+		if ( ! $storage ) {
+			if ( function_exists( 'wc_add_notice' ) ) {
+				wc_add_notice( __( 'Unable to access your design storage directory.', 'threaddesk' ), 'error' );
+			}
+			wp_safe_redirect( $this->get_designs_redirect_url() );
+			exit;
+		}
 
 		if ( $existing_design_id > 0 ) {
 			$existing = get_post( $existing_design_id );
-			if ( $existing && 'tta_design' === $existing->post_type && (int) $existing->post_author === get_current_user_id() ) {
+			if ( $existing && 'tta_design' === $existing->post_type && (int) $existing->post_author === $current_user_id ) {
 				$design_id = $existing_design_id;
 				$file_name = (string) get_post_meta( $design_id, 'design_file_name', true );
 			}
 		}
+
+		$old_original_path = $design_id ? (string) get_post_meta( $design_id, 'design_original_file_path', true ) : '';
+		$old_svg_path      = $design_id ? (string) get_post_meta( $design_id, 'design_svg_file_path', true ) : '';
 
 		if ( ! empty( $_FILES['threaddesk_design_file']['name'] ) ) {
 			require_once ABSPATH . 'wp-admin/includes/file.php';
@@ -431,7 +513,7 @@ class TTA_ThreadDesk {
 					'post_type'   => 'tta_design',
 					'post_status' => 'private',
 					'post_title'  => $title,
-					'post_author' => get_current_user_id(),
+					'post_author' => $current_user_id,
 				)
 			);
 
@@ -463,23 +545,72 @@ class TTA_ThreadDesk {
 		$settings     = json_decode( $settings_raw, true );
 		$settings     = is_array( $settings ) ? $settings : array();
 		$settings_clean = array(
-			'minimumPercent'    => isset( $settings['minimumPercent'] ) ? (float) $settings['minimumPercent'] : 0.5,
-			'mergeThreshold'    => isset( $settings['mergeThreshold'] ) ? (int) $settings['mergeThreshold'] : 22,
-			'maximumColorCount' => isset( $settings['maximumColorCount'] ) ? (int) $settings['maximumColorCount'] : 4,
+			'minimumPercent'      => isset( $settings['minimumPercent'] ) ? (float) $settings['minimumPercent'] : 0.5,
+			'mergeThreshold'      => isset( $settings['mergeThreshold'] ) ? (int) $settings['mergeThreshold'] : 22,
+			'maximumColorCount'   => isset( $settings['maximumColorCount'] ) ? (int) $settings['maximumColorCount'] : 4,
+			'potraceTurdsize'     => isset( $settings['potraceTurdsize'] ) ? (int) $settings['potraceTurdsize'] : 2,
+			'potraceAlphamax'     => isset( $settings['potraceAlphamax'] ) ? (float) $settings['potraceAlphamax'] : 1.0,
+			'potraceOpticurve'    => isset( $settings['potraceOpticurve'] ) ? (bool) $settings['potraceOpticurve'] : true,
+			'potraceOpttolerance' => isset( $settings['potraceOpttolerance'] ) ? (float) $settings['potraceOpttolerance'] : 0.2,
+			'multiScanSmooth'     => ! empty( $settings['multiScanSmooth'] ),
+			'multiScanStack'      => ! isset( $settings['multiScanStack'] ) || (bool) $settings['multiScanStack'],
 		);
 
 		$color_count = isset( $_POST['threaddesk_design_color_count'] ) ? absint( $_POST['threaddesk_design_color_count'] ) : count( $palette );
+		$svg_markup  = isset( $_POST['threaddesk_design_svg_markup'] ) ? wp_unslash( $_POST['threaddesk_design_svg_markup'] ) : '';
 
-		if ( $upload && isset( $upload['url'] ) ) {
-			update_post_meta( $design_id, 'design_preview_url', esc_url_raw( $upload['url'] ) );
+		if ( $upload && isset( $upload['file'] ) ) {
+			$incoming_name      = sanitize_file_name( wp_basename( $upload['file'] ) );
+			$target_name        = wp_unique_filename( $storage['dir'], $incoming_name );
+			$target_path        = trailingslashit( $storage['dir'] ) . $target_name;
+			$target_url         = trailingslashit( $storage['url'] ) . rawurlencode( $target_name );
+			$move_succeeded     = @rename( $upload['file'], $target_path );
+
+			if ( ! $move_succeeded ) {
+				$move_succeeded = @copy( $upload['file'], $target_path );
+				if ( $move_succeeded ) {
+					@unlink( $upload['file'] );
+				}
+			}
+
+			if ( ! $move_succeeded ) {
+				if ( function_exists( 'wc_add_notice' ) ) {
+					wc_add_notice( __( 'Unable to finalize design upload.', 'threaddesk' ), 'error' );
+				}
+				wp_safe_redirect( $this->get_designs_redirect_url() );
+				exit;
+			}
+
+			$file_name = $target_name;
+			update_post_meta( $design_id, 'design_preview_url', esc_url_raw( $target_url ) );
+			update_post_meta( $design_id, 'design_original_file_path', $target_path );
+			update_post_meta( $design_id, 'design_original_file_url', esc_url_raw( $target_url ) );
+
 			$updated_title = sanitize_text_field( preg_replace( '/\.[^.]+$/', '', $file_name ) );
 			if ( '' !== $updated_title ) {
 				wp_update_post( array( 'ID' => $design_id, 'post_title' => $updated_title ) );
 			}
+
+			if ( $old_original_path && $old_original_path !== $target_path ) {
+				$this->maybe_delete_design_file( $old_original_path );
+			}
 		}
+
 		if ( '' !== $file_name ) {
 			update_post_meta( $design_id, 'design_file_name', $file_name );
 		}
+
+		$svg_base_name = sanitize_file_name( preg_replace( '/\.[^.]+$/', '', (string) $file_name ) );
+		if ( '' === $svg_base_name ) {
+			$svg_base_name = sanitize_file_name( get_the_title( $design_id ) );
+		}
+		$this->persist_design_svg_file( $design_id, $svg_markup, $svg_base_name, $storage );
+
+		$current_svg_path = (string) get_post_meta( $design_id, 'design_svg_file_path', true );
+		if ( $old_svg_path && $current_svg_path && $old_svg_path !== $current_svg_path ) {
+			$this->maybe_delete_design_file( $old_svg_path );
+		}
+
 		update_post_meta( $design_id, 'design_palette', wp_json_encode( $palette ) );
 		update_post_meta( $design_id, 'design_color_count', $color_count );
 		update_post_meta( $design_id, 'design_analysis_settings', wp_json_encode( $settings_clean ) );
@@ -510,6 +641,7 @@ class TTA_ThreadDesk {
 			exit;
 		}
 
+		$this->maybe_delete_design_files_for_post( $design_id );
 		wp_delete_post( $design_id, true );
 		if ( function_exists( 'wc_add_notice' ) ) {
 			wc_add_notice( __( 'Design deleted.', 'threaddesk' ), 'success' );
