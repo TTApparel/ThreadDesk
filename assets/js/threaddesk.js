@@ -164,6 +164,9 @@ jQuery(function ($) {
 		const minimumPercent = 0.5;
 		const mergeThreshold = 22;
 		const maxSwatches = 8;
+		const traceSpeckles = 2;
+		const traceSmoothCorners = 1.0;
+		const traceOptimize = 0.2;
 		const designPreviewMaxDimension = 960;
 		const designCardMaxDimension = 420;
 		const exportVectorMaxDimension = 2400;
@@ -183,6 +186,9 @@ jQuery(function ($) {
 			analysisSettings: {
 				minimumPercent: minimumPercent,
 				mergeThreshold: mergeThreshold,
+				traceSpeckles: traceSpeckles,
+				traceSmoothCorners: traceSmoothCorners,
+				traceOptimize: traceOptimize,
 				maximumColorCount: 8,
 			},
 			hasUserAdjustedMax: false,
@@ -314,36 +320,192 @@ jQuery(function ($) {
 			if ((width * height) > pixelLimit) {
 				return '';
 			}
-			const pathChunks = palette.map(function () { return []; });
-			for (let y = 0; y < height; y += 1) {
-				let runStart = 0;
-				let runLabel = -1;
-				for (let x = 0; x <= width; x += 1) {
-					let label = -1;
-					if (x < width) {
-						const pixelIndex = (y * width) + x;
-						const alpha = sourcePixels[(pixelIndex * 4) + 3];
-						if (alpha >= 8) {
-							label = labels[pixelIndex] || 0;
-						}
-					}
-					if (x < width && label === runLabel) {
+
+			const toKey = function (x, y) {
+				return String(x) + ',' + String(y);
+			};
+
+			const parseKey = function (key) {
+				const parts = key.split(',');
+				return [parseInt(parts[0], 10) || 0, parseInt(parts[1], 10) || 0];
+			};
+
+			const hasPixel = function (x, y, targetLabel) {
+				if (x < 0 || y < 0 || x >= width || y >= height) {
+					return false;
+				}
+				const pixelIndex = (y * width) + x;
+				const alpha = sourcePixels[(pixelIndex * 4) + 3] || 0;
+				if (alpha < 8) {
+					return false;
+				}
+				return (labels[pixelIndex] || 0) === targetLabel;
+			};
+
+			const polygonArea = function (points) {
+				if (!points || points.length < 3) {
+					return 0;
+				}
+				let area = 0;
+				for (let i = 0; i < points.length; i += 1) {
+					const current = points[i];
+					const next = points[(i + 1) % points.length];
+					area += (current[0] * next[1]) - (next[0] * current[1]);
+				}
+				return Math.abs(area) / 2;
+			};
+
+			const removeCollinearPoints = function (points, epsilon) {
+				if (points.length < 3) {
+					return points;
+				}
+				const tolerance = Math.max(0, Number(epsilon) || 0);
+				const cleaned = [];
+				for (let i = 0; i < points.length; i += 1) {
+					const prev = points[(i - 1 + points.length) % points.length];
+					const current = points[i];
+					const next = points[(i + 1) % points.length];
+					const dx1 = current[0] - prev[0];
+					const dy1 = current[1] - prev[1];
+					const dx2 = next[0] - current[0];
+					const dy2 = next[1] - current[1];
+					const cross = Math.abs((dx1 * dy2) - (dy1 * dx2));
+					if (cross <= tolerance) {
 						continue;
 					}
-					if (runLabel >= 0 && (x - runStart) > 0 && pathChunks[runLabel]) {
-						const runWidth = x - runStart;
-						pathChunks[runLabel].push('M' + runStart + ' ' + y + 'h' + runWidth + 'v1h-' + runWidth + 'Z');
-					}
-					runStart = x;
-					runLabel = label;
+					cleaned.push(current);
 				}
-			}
+				return cleaned.length >= 3 ? cleaned : points;
+			};
+
+			const smoothClosedLoopPath = function (points) {
+				if (!points || points.length < 3) {
+					return '';
+				}
+				const cornerScale = clamp(Number(state.analysisSettings.traceSmoothCorners), 0, 1) * 0.5;
+				const maxRadius = 0.45;
+				const entries = [];
+				const exits = [];
+				for (let i = 0; i < points.length; i += 1) {
+					const prev = points[(i - 1 + points.length) % points.length];
+					const current = points[i];
+					const next = points[(i + 1) % points.length];
+					const inDx = current[0] - prev[0];
+					const inDy = current[1] - prev[1];
+					const outDx = next[0] - current[0];
+					const outDy = next[1] - current[1];
+					const inLen = Math.hypot(inDx, inDy);
+					const outLen = Math.hypot(outDx, outDy);
+					if (!inLen || !outLen) {
+						entries.push([current[0], current[1]]);
+						exits.push([current[0], current[1]]);
+						continue;
+					}
+					const radius = Math.min(maxRadius, inLen * cornerScale, outLen * cornerScale);
+					entries.push([
+						current[0] - ((inDx / inLen) * radius),
+						current[1] - ((inDy / inLen) * radius),
+					]);
+					exits.push([
+						current[0] + ((outDx / outLen) * radius),
+						current[1] + ((outDy / outLen) * radius),
+					]);
+				}
+
+				const commands = [];
+				commands.push('M' + entries[0][0].toFixed(3) + ' ' + entries[0][1].toFixed(3));
+				for (let i = 0; i < points.length; i += 1) {
+					const corner = points[i];
+					const exit = exits[i];
+					const nextEntry = entries[(i + 1) % points.length];
+					commands.push('Q' + corner[0].toFixed(3) + ' ' + corner[1].toFixed(3) + ' ' + exit[0].toFixed(3) + ' ' + exit[1].toFixed(3));
+					commands.push('L' + nextEntry[0].toFixed(3) + ' ' + nextEntry[1].toFixed(3));
+				}
+				commands.push('Z');
+				return commands.join('');
+			};
+
+			const buildLoopsForLabel = function (targetLabel) {
+				const outgoing = new Map();
+				const edges = [];
+				const speckleThreshold = Math.max(0, parseInt(state.analysisSettings.traceSpeckles, 10) || traceSpeckles);
+				const optimizeTolerance = Math.max(0, Number(state.analysisSettings.traceOptimize));
+				const addEdge = function (x1, y1, x2, y2) {
+					const edge = { start: toKey(x1, y1), end: toKey(x2, y2), used: false };
+					edges.push(edge);
+					if (!outgoing.has(edge.start)) {
+						outgoing.set(edge.start, []);
+					}
+					outgoing.get(edge.start).push(edge);
+				};
+
+				for (let y = 0; y < height; y += 1) {
+					for (let x = 0; x < width; x += 1) {
+						if (!hasPixel(x, y, targetLabel)) {
+							continue;
+						}
+						if (!hasPixel(x, y - 1, targetLabel)) {
+							addEdge(x, y, x + 1, y);
+						}
+						if (!hasPixel(x + 1, y, targetLabel)) {
+							addEdge(x + 1, y, x + 1, y + 1);
+						}
+						if (!hasPixel(x, y + 1, targetLabel)) {
+							addEdge(x + 1, y + 1, x, y + 1);
+						}
+						if (!hasPixel(x - 1, y, targetLabel)) {
+							addEdge(x, y + 1, x, y);
+						}
+					}
+				}
+
+				const loops = [];
+				edges.forEach(function (edge) {
+					if (edge.used) {
+						return;
+					}
+					const loop = [];
+					let current = edge;
+					const loopStart = edge.start;
+					while (current && !current.used) {
+						current.used = true;
+						loop.push(parseKey(current.start));
+						if (current.end === loopStart) {
+							break;
+						}
+						const nextCandidates = outgoing.get(current.end) || [];
+						let nextEdge = null;
+						for (let i = 0; i < nextCandidates.length; i += 1) {
+							if (!nextCandidates[i].used) {
+								nextEdge = nextCandidates[i];
+								break;
+							}
+						}
+						current = nextEdge;
+					}
+					if (loop.length >= 3) {
+						const simplified = removeCollinearPoints(loop, optimizeTolerance);
+						if (polygonArea(simplified) >= speckleThreshold) {
+							loops.push(simplified);
+						}
+					}
+				});
+				return loops;
+			};
+
 			const paths = [];
 			for (let i = 0; i < palette.length; i += 1) {
-				if (!pathChunks[i].length) {
+				const loops = buildLoopsForLabel(i);
+				if (!loops.length) {
 					continue;
 				}
-				paths.push('<path fill="' + palette[i] + '" d="' + pathChunks[i].join('') + '"/>');
+				const loopPaths = loops.map(function (loop) {
+					return smoothClosedLoopPath(loop);
+				}).filter(Boolean);
+				if (!loopPaths.length) {
+					continue;
+				}
+				paths.push('<path fill="' + palette[i] + '" d="' + loopPaths.join('') + '" fill-rule="evenodd"/>');
 			}
 			return paths.join('');
 		};
