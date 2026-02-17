@@ -173,6 +173,7 @@ jQuery(function ($) {
 		const designPreviewMaxDimension = 960;
 		const designCardMaxDimension = 420;
 		const exportVectorMaxDimension = 2400;
+		const savedVectorMatchPreviewMaxDimension = designPreviewMaxDimension;
 		const previewVectorMaxPixels = 260000;
 		const exportVectorMaxPixels = 4000000;
 		let uploadedPreviewUrl = null;
@@ -1257,7 +1258,7 @@ jQuery(function ($) {
 			if (!loaded) {
 				return '';
 			}
-			const analysis = createAnalysisBuffer(image, svgDimensions, { maxDimension: exportVectorMaxDimension });
+			const analysis = createAnalysisBuffer(image, svgDimensions, { maxDimension: savedVectorMatchPreviewMaxDimension });
 			const quantSource = createQuantizationPixels(
 				analysis.imageData.data,
 				analysis.width,
@@ -1271,11 +1272,11 @@ jQuery(function ($) {
 			if (!quantized || !quantized.labels) {
 				return '';
 			}
-			const pathSvg = buildVectorSvgMarkup(quantized.labels, analysis.imageData.data, analysis.width, analysis.height, normalizedPalette, exportVectorMaxPixels, settings);
+			const pathSvg = buildVectorSvgMarkup(quantized.labels, analysis.imageData.data, analysis.width, analysis.height, normalizedPalette, previewVectorMaxPixels, settings);
 			if (pathSvg) {
 				return pathSvg;
 			}
-			return buildRectVectorSvgMarkup(quantized.labels, analysis.imageData.data, analysis.width, analysis.height, normalizedPalette, exportVectorMaxPixels * 2);
+			return buildRectVectorSvgMarkup(quantized.labels, analysis.imageData.data, analysis.width, analysis.height, normalizedPalette, previewVectorMaxPixels * 2);
 			} catch (error) {
 				return '';
 			}
