@@ -246,6 +246,15 @@ jQuery(function ($) {
 			const db = a[2] - b[2];
 			return (dr * dr) + (dg * dg) + (db * db);
 		};
+		const blendRgbOverWhite = function (r, g, b, alpha) {
+			const a = clamp((Number(alpha) || 0) / 255, 0, 1);
+			const inv = 1 - a;
+			return [
+				Math.round((r * a) + (255 * inv)),
+				Math.round((g * a) + (255 * inv)),
+				Math.round((b * a) + (255 * inv)),
+			];
+		};
 		const findClosestAllowedColor = function (hex) {
 			const rgb = hexToRgb(hex);
 			let best = allowedSwatchPalette[0] || { hex: '#111111', name: 'Black' };
@@ -378,6 +387,66 @@ jQuery(function ($) {
 				return cleaned.length >= 3 ? cleaned : points;
 			};
 
+			const pointToSegmentDistance = function (point, start, end) {
+				const vx = end[0] - start[0];
+				const vy = end[1] - start[1];
+				const wx = point[0] - start[0];
+				const wy = point[1] - start[1];
+				const c1 = (vx * wx) + (vy * wy);
+				if (c1 <= 0) {
+					return Math.hypot(point[0] - start[0], point[1] - start[1]);
+				}
+				const c2 = (vx * vx) + (vy * vy);
+				if (c2 <= c1) {
+					return Math.hypot(point[0] - end[0], point[1] - end[1]);
+				}
+				const t = c1 / c2;
+				const projX = start[0] + (t * vx);
+				const projY = start[1] + (t * vy);
+				return Math.hypot(point[0] - projX, point[1] - projY);
+			};
+
+			const simplifyOpenPolyline = function (points, epsilon) {
+				if (!points || points.length < 3) {
+					return points || [];
+				}
+				const tolerance = Math.max(0, Number(epsilon) || 0);
+				if (!tolerance) {
+					return points.slice(0);
+				}
+				const first = points[0];
+				const last = points[points.length - 1];
+				let maxDist = -1;
+				let idx = -1;
+				for (let i = 1; i < points.length - 1; i += 1) {
+					const dist = pointToSegmentDistance(points[i], first, last);
+					if (dist > maxDist) {
+						maxDist = dist;
+						idx = i;
+					}
+				}
+				if (maxDist <= tolerance || idx < 0) {
+					return [first, last];
+				}
+				const left = simplifyOpenPolyline(points.slice(0, idx + 1), tolerance);
+				const right = simplifyOpenPolyline(points.slice(idx), tolerance);
+				return left.slice(0, -1).concat(right);
+			};
+
+			const simplifyClosedLoop = function (points, epsilon) {
+				if (!points || points.length < 4) {
+					return points || [];
+				}
+				const tolerance = Math.max(0, Number(epsilon) || 0);
+				if (!tolerance) {
+					return points.slice(0);
+				}
+				const polyline = points.concat([points[0]]);
+				const simplified = simplifyOpenPolyline(polyline, tolerance);
+				const reopened = simplified.slice(0, -1);
+				return reopened.length >= 3 ? reopened : points;
+			};
+
 			const smoothClosedLoopPath = function (points) {
 				if (!points || points.length < 3) {
 					return '';
@@ -430,6 +499,7 @@ jQuery(function ($) {
 				const edges = [];
 				const speckleThreshold = Math.max(0, parseInt(state.analysisSettings.traceSpeckles, 10) || traceSpeckles);
 				const optimizeTolerance = Math.max(0, Number(state.analysisSettings.traceOptimize));
+				const simplifyTolerance = 0.35 + (optimizeTolerance * 2.0);
 				const addEdge = function (x1, y1, x2, y2) {
 					const edge = { start: toKey(x1, y1), end: toKey(x2, y2), used: false };
 					edges.push(edge);
@@ -484,7 +554,7 @@ jQuery(function ($) {
 						current = nextEdge;
 					}
 					if (loop.length >= 3) {
-						const simplified = removeCollinearPoints(loop, optimizeTolerance);
+						const simplified = simplifyClosedLoop(removeCollinearPoints(loop, optimizeTolerance), simplifyTolerance);
 						if (polygonArea(simplified) >= speckleThreshold) {
 							loops.push(simplified);
 						}
@@ -1090,7 +1160,8 @@ jQuery(function ($) {
 				if (alpha < 8) {
 					continue;
 				}
-				pixels.push([analysis.imageData.data[i], analysis.imageData.data[i + 1], analysis.imageData.data[i + 2]]);
+				const blended = blendRgbOverWhite(analysis.imageData.data[i], analysis.imageData.data[i + 1], analysis.imageData.data[i + 2], alpha);
+				pixels.push(blended);
 				opaqueIndices.push(i / 4);
 			}
 			if (!pixels.length) {
@@ -1143,7 +1214,8 @@ jQuery(function ($) {
 				if (alpha < 8) {
 					continue;
 				}
-				pixels.push([analysis.imageData.data[i], analysis.imageData.data[i + 1], analysis.imageData.data[i + 2]]);
+				const blended = blendRgbOverWhite(analysis.imageData.data[i], analysis.imageData.data[i + 1], analysis.imageData.data[i + 2], alpha);
+				pixels.push(blended);
 				opaqueIndices.push(i / 4);
 			}
 
@@ -1205,7 +1277,8 @@ jQuery(function ($) {
 				if (alpha < 8) {
 					continue;
 				}
-				pixels.push([state.sourcePixels[i], state.sourcePixels[i + 1], state.sourcePixels[i + 2]]);
+				const blended = blendRgbOverWhite(state.sourcePixels[i], state.sourcePixels[i + 1], state.sourcePixels[i + 2], alpha);
+				pixels.push(blended);
 				opaqueIndices.push(i / 4);
 			}
 			if (!pixels.length) {
