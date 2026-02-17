@@ -164,7 +164,7 @@ jQuery(function ($) {
 		const minimumPercent = 0.5;
 		const mergeThreshold = 22;
 		const maxSwatches = 8;
-		const potraceTurdsize = 2;
+		const potraceTurdsize = 4;
 		const potraceAlphamax = 1.0;
 		const potraceOpticurve = true;
 		const potraceOpttolerance = 0.2;
@@ -353,17 +353,22 @@ jQuery(function ($) {
 				return (sourcePixels[(pixelIndex * 4) + 3] || 0) >= 8;
 			};
 
+			const gm = new Uint8Array(width * height);
 			const createBinaryMaskForLabel = function (targetLabel) {
-				const mask = new Uint8Array(width * height);
 				for (let pixelIndex = 0; pixelIndex < labels.length; pixelIndex += 1) {
 					if (!isOpaquePixel(pixelIndex)) {
+						if (!useStack) {
+							gm[pixelIndex] = 0;
+						}
 						continue;
 					}
 					if ((labels[pixelIndex] || 0) === targetLabel) {
-						mask[pixelIndex] = 1;
+						gm[pixelIndex] = 1;
+					} else if (!useStack) {
+						gm[pixelIndex] = 0;
 					}
 				}
-				return mask;
+				return gm;
 			};
 
 			const hasMaskPixel = function (x, y, mask) {
@@ -519,7 +524,7 @@ jQuery(function ($) {
 			const buildLoopsForLabel = function (targetLabel, mask) {
 				const outgoing = new Map();
 				const edges = [];
-				const speckleThreshold = Math.max(0, parseInt(state.analysisSettings.potraceTurdsize, 10) || potraceTurdsize);
+				const speckleThreshold = Math.max(potraceTurdsize, parseInt(state.analysisSettings.potraceTurdsize, 10) || potraceTurdsize);
 				const optimizeTolerance = Math.max(0, Number(state.analysisSettings.potraceOpttolerance));
 				const simplifyTolerance = optimizeTolerance;
 				const addEdge = function (x1, y1, x2, y2) {
@@ -760,7 +765,7 @@ jQuery(function ($) {
 			if (!sourcePixels || !width || !height) {
 				return { pixels: [], opaqueIndices: [] };
 			}
-			const working = useSmooth ? blurRgbaSource(sourcePixels, width, height) : sourcePixels;
+			const working = sourcePixels;
 			const pixels = [];
 			const opaqueIndices = [];
 			for (let i = 0; i < working.length; i += 4) {
@@ -1419,7 +1424,7 @@ jQuery(function ($) {
 			try { settings = JSON.parse(settingsRaw); } catch (e) {}
 			state.palette = normalizePaletteToAllowed(Array.isArray(palette) && palette.length ? palette : defaultPalette.slice(0, 4));
 			state.analysisSettings.maximumColorCount = clamp(parseInt(settings.maximumColorCount, 10) || state.palette.length || 4, 1, maxSwatches);
-			state.analysisSettings.potraceTurdsize = Math.max(0, parseInt(settings.potraceTurdsize, 10) || parseInt(settings.traceSpeckles, 10) || potraceTurdsize);
+			state.analysisSettings.potraceTurdsize = Math.max(potraceTurdsize, parseInt(settings.potraceTurdsize, 10) || parseInt(settings.traceSpeckles, 10) || potraceTurdsize);
 			state.analysisSettings.potraceAlphamax = clamp(Number(settings.potraceAlphamax), 0, 1.334);
 			if (!Number.isFinite(state.analysisSettings.potraceAlphamax)) {
 				state.analysisSettings.potraceAlphamax = clamp(Number(settings.traceSmoothCorners), 0, 1.334);
@@ -1435,7 +1440,7 @@ jQuery(function ($) {
 			if (!Number.isFinite(state.analysisSettings.potraceOpttolerance)) {
 				state.analysisSettings.potraceOpttolerance = potraceOpttolerance;
 			}
-			state.analysisSettings.multiScanSmooth = settings.multiScanSmooth === true;
+			state.analysisSettings.multiScanSmooth = false;
 			state.analysisSettings.multiScanStack = settings.multiScanStack !== false;
 			maxColorInput.val(String(state.analysisSettings.maximumColorCount));
 			state.hasUserAdjustedMax = true;

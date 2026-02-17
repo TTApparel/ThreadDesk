@@ -548,11 +548,11 @@ class TTA_ThreadDesk {
 			'minimumPercent'      => isset( $settings['minimumPercent'] ) ? (float) $settings['minimumPercent'] : 0.5,
 			'mergeThreshold'      => isset( $settings['mergeThreshold'] ) ? (int) $settings['mergeThreshold'] : 22,
 			'maximumColorCount'   => isset( $settings['maximumColorCount'] ) ? (int) $settings['maximumColorCount'] : 4,
-			'potraceTurdsize'     => isset( $settings['potraceTurdsize'] ) ? (int) $settings['potraceTurdsize'] : 2,
+			'potraceTurdsize'     => max( 4, isset( $settings['potraceTurdsize'] ) ? (int) $settings['potraceTurdsize'] : 4 ),
 			'potraceAlphamax'     => isset( $settings['potraceAlphamax'] ) ? (float) $settings['potraceAlphamax'] : 1.0,
 			'potraceOpticurve'    => isset( $settings['potraceOpticurve'] ) ? (bool) $settings['potraceOpticurve'] : true,
 			'potraceOpttolerance' => isset( $settings['potraceOpttolerance'] ) ? (float) $settings['potraceOpttolerance'] : 0.2,
-			'multiScanSmooth'     => ! empty( $settings['multiScanSmooth'] ),
+			'multiScanSmooth'     => false,
 			'multiScanStack'      => ! isset( $settings['multiScanStack'] ) || (bool) $settings['multiScanStack'],
 		);
 
