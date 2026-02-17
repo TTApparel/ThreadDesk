@@ -164,6 +164,9 @@ jQuery(function ($) {
 		const minimumPercent = 0.5;
 		const mergeThreshold = 22;
 		const maxSwatches = 8;
+		const traceSpeckles = 2;
+		const traceSmoothCorners = 1.0;
+		const traceOptimize = 0.2;
 		const designPreviewMaxDimension = 960;
 		const designCardMaxDimension = 420;
 		const exportVectorMaxDimension = 2400;
@@ -183,6 +186,9 @@ jQuery(function ($) {
 			analysisSettings: {
 				minimumPercent: minimumPercent,
 				mergeThreshold: mergeThreshold,
+				traceSpeckles: traceSpeckles,
+				traceSmoothCorners: traceSmoothCorners,
+				traceOptimize: traceOptimize,
 				maximumColorCount: 8,
 			},
 			hasUserAdjustedMax: false,
@@ -336,10 +342,24 @@ jQuery(function ($) {
 				return (labels[pixelIndex] || 0) === targetLabel;
 			};
 
-			const removeCollinearPoints = function (points) {
+			const polygonArea = function (points) {
+				if (!points || points.length < 3) {
+					return 0;
+				}
+				let area = 0;
+				for (let i = 0; i < points.length; i += 1) {
+					const current = points[i];
+					const next = points[(i + 1) % points.length];
+					area += (current[0] * next[1]) - (next[0] * current[1]);
+				}
+				return Math.abs(area) / 2;
+			};
+
+			const removeCollinearPoints = function (points, epsilon) {
 				if (points.length < 3) {
 					return points;
 				}
+				const tolerance = Math.max(0, Number(epsilon) || 0);
 				const cleaned = [];
 				for (let i = 0; i < points.length; i += 1) {
 					const prev = points[(i - 1 + points.length) % points.length];
@@ -349,7 +369,8 @@ jQuery(function ($) {
 					const dy1 = current[1] - prev[1];
 					const dx2 = next[0] - current[0];
 					const dy2 = next[1] - current[1];
-					if ((dx1 * dy2) === (dy1 * dx2)) {
+					const cross = Math.abs((dx1 * dy2) - (dy1 * dx2));
+					if (cross <= tolerance) {
 						continue;
 					}
 					cleaned.push(current);
@@ -361,7 +382,7 @@ jQuery(function ($) {
 				if (!points || points.length < 3) {
 					return '';
 				}
-				const cornerScale = 0.35;
+				const cornerScale = clamp(Number(state.analysisSettings.traceSmoothCorners), 0, 1) * 0.5;
 				const maxRadius = 0.45;
 				const entries = [];
 				const exits = [];
@@ -407,6 +428,8 @@ jQuery(function ($) {
 			const buildLoopsForLabel = function (targetLabel) {
 				const outgoing = new Map();
 				const edges = [];
+				const speckleThreshold = Math.max(0, parseInt(state.analysisSettings.traceSpeckles, 10) || traceSpeckles);
+				const optimizeTolerance = Math.max(0, Number(state.analysisSettings.traceOptimize));
 				const addEdge = function (x1, y1, x2, y2) {
 					const edge = { start: toKey(x1, y1), end: toKey(x2, y2), used: false };
 					edges.push(edge);
@@ -461,7 +484,10 @@ jQuery(function ($) {
 						current = nextEdge;
 					}
 					if (loop.length >= 3) {
-						loops.push(removeCollinearPoints(loop));
+						const simplified = removeCollinearPoints(loop, optimizeTolerance);
+						if (polygonArea(simplified) >= speckleThreshold) {
+							loops.push(simplified);
+						}
 					}
 				});
 				return loops;
