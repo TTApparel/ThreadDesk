@@ -165,10 +165,10 @@ jQuery(function ($) {
 		const mergeThreshold = 22;
 		const maxSwatches = 8;
 		const potraceTurdsize = 2;
-		const potraceAlphamax = 1.0;
+		const potraceAlphamax = 1.15;
 		const potraceOpticurve = true;
-		const potraceOpttolerance = 0.2;
-		const multiScanSmooth = false;
+		const potraceOpttolerance = 0.28;
+		const multiScanSmooth = true;
 		const multiScanStack = true;
 		const designPreviewMaxDimension = 960;
 		const designCardMaxDimension = 420;
@@ -770,7 +770,7 @@ jQuery(function ($) {
 			if (!sourcePixels || !width || !height) {
 				return { pixels: [], opaqueIndices: [] };
 			}
-			const working = sourcePixels;
+			const working = useSmooth ? blurRgbaSource(blurRgbaSource(sourcePixels, width, height), width, height) : sourcePixels;
 			const pixels = [];
 			const opaqueIndices = [];
 			for (let i = 0; i < working.length; i += 4) {
@@ -1445,7 +1445,7 @@ jQuery(function ($) {
 			if (!Number.isFinite(state.analysisSettings.potraceOpttolerance)) {
 				state.analysisSettings.potraceOpttolerance = potraceOpttolerance;
 			}
-			state.analysisSettings.multiScanSmooth = false;
+			state.analysisSettings.multiScanSmooth = settings.multiScanSmooth !== false;
 			state.analysisSettings.multiScanStack = settings.multiScanStack !== false;
 			maxColorInput.val(String(state.analysisSettings.maximumColorCount));
 			state.hasUserAdjustedMax = true;
