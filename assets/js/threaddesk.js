@@ -334,6 +334,7 @@ jQuery(function ($) {
 				return '';
 			}
 			const pixelLimit = Math.max(1, parseInt(maxPixels, 10) || previewVectorMaxPixels);
+			const useStack = !vectorSettings || vectorSettings.multiScanStack !== false;
 			if ((width * height) > pixelLimit) {
 				return '';
 			}
