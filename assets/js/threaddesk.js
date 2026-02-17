@@ -164,9 +164,10 @@ jQuery(function ($) {
 		const minimumPercent = 0.5;
 		const mergeThreshold = 22;
 		const maxSwatches = 8;
-		const traceSpeckles = 2;
-		const traceSmoothCorners = 1.0;
-		const traceOptimize = 0.2;
+		const potraceTurdsize = 2;
+		const potraceAlphamax = 1.0;
+		const potraceOpticurve = true;
+		const potraceOpttolerance = 0.2;
 		const designPreviewMaxDimension = 960;
 		const designCardMaxDimension = 420;
 		const exportVectorMaxDimension = 2400;
@@ -186,9 +187,10 @@ jQuery(function ($) {
 			analysisSettings: {
 				minimumPercent: minimumPercent,
 				mergeThreshold: mergeThreshold,
-				traceSpeckles: traceSpeckles,
-				traceSmoothCorners: traceSmoothCorners,
-				traceOptimize: traceOptimize,
+				potraceTurdsize: potraceTurdsize,
+				potraceAlphamax: potraceAlphamax,
+				potraceOpticurve: potraceOpticurve,
+				potraceOpttolerance: potraceOpttolerance,
 				maximumColorCount: 8,
 			},
 			hasUserAdjustedMax: false,
@@ -451,7 +453,7 @@ jQuery(function ($) {
 				if (!points || points.length < 3) {
 					return '';
 				}
-				const cornerScale = clamp(Number(state.analysisSettings.traceSmoothCorners), 0, 1) * 0.5;
+				const cornerScale = clamp(Number(state.analysisSettings.potraceAlphamax), 0, 1.334) * 0.375;
 				const maxRadius = 0.45;
 				const entries = [];
 				const exits = [];
@@ -497,9 +499,9 @@ jQuery(function ($) {
 			const buildLoopsForLabel = function (targetLabel) {
 				const outgoing = new Map();
 				const edges = [];
-				const speckleThreshold = Math.max(0, parseInt(state.analysisSettings.traceSpeckles, 10) || traceSpeckles);
-				const optimizeTolerance = Math.max(0, Number(state.analysisSettings.traceOptimize));
-				const simplifyTolerance = 0.35 + (optimizeTolerance * 2.0);
+				const speckleThreshold = Math.max(0, parseInt(state.analysisSettings.potraceTurdsize, 10) || potraceTurdsize);
+				const optimizeTolerance = Math.max(0, Number(state.analysisSettings.potraceOpttolerance));
+				const simplifyTolerance = optimizeTolerance;
 				const addEdge = function (x1, y1, x2, y2) {
 					const edge = { start: toKey(x1, y1), end: toKey(x2, y2), used: false };
 					edges.push(edge);
@@ -569,8 +571,14 @@ jQuery(function ($) {
 				if (!loops.length) {
 					continue;
 				}
+				const useOpticurve = state.analysisSettings.potraceOpticurve !== false;
 				const loopPaths = loops.map(function (loop) {
-					return smoothClosedLoopPath(loop);
+					if (useOpticurve) {
+						return smoothClosedLoopPath(loop);
+					}
+					return 'M' + loop.map(function (point, pointIndex) {
+						return (pointIndex ? 'L' : '') + point[0].toFixed(3) + ' ' + point[1].toFixed(3);
+					}).join('') + 'Z';
 				}).filter(Boolean);
 				if (!loopPaths.length) {
 					continue;
