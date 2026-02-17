@@ -89,6 +89,8 @@ $nav_base = trailingslashit( wc_get_account_endpoint_url( 'thread-desk' ) );
 					<?php $design_file_name = get_post_meta( $design->ID, 'design_file_name', true ); ?>
 					<?php $design_palette = get_post_meta( $design->ID, 'design_palette', true ); ?>
 					<?php $design_settings = get_post_meta( $design->ID, 'design_analysis_settings', true ); ?>
+					<?php $design_svg_url = get_post_meta( $design->ID, 'design_svg_file_url', true ); ?>
+					<?php $design_svg_name = get_post_meta( $design->ID, 'design_svg_file_name', true ); ?>
 					<div class="threaddesk__card">
 						<?php if ( $design_preview ) : ?>
 							<div class="threaddesk__card-design-preview">
@@ -117,7 +119,9 @@ $nav_base = trailingslashit( wc_get_account_endpoint_url( 'thread-desk' ) );
 								data-threaddesk-design-preview-url="<?php echo esc_url( $design_preview ); ?>"
 								data-threaddesk-design-file-name="<?php echo esc_attr( $design_file_name ); ?>"
 								data-threaddesk-design-palette="<?php echo esc_attr( $design_palette ? $design_palette : '[]' ); ?>"
-								data-threaddesk-design-settings="<?php echo esc_attr( $design_settings ? $design_settings : '{}' ); ?>">
+								data-threaddesk-design-settings="<?php echo esc_attr( $design_settings ? $design_settings : '{}' ); ?>"
+								data-threaddesk-design-svg-url="<?php echo esc_url( $design_svg_url ); ?>"
+								data-threaddesk-design-svg-name="<?php echo esc_attr( $design_svg_name ); ?>">
 								<?php echo esc_html__( 'Save', 'threaddesk' ); ?>
 							</button>
 							<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">

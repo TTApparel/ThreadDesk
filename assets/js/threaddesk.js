@@ -362,40 +362,7 @@ jQuery(function ($) {
 						mask[pixelIndex] = 1;
 					}
 				}
-				if (useStack) {
-					return mask;
-				}
-				const carved = mask.slice(0);
-				for (let y = 0; y < height; y += 1) {
-					for (let x = 0; x < width; x += 1) {
-						const pixelIndex = (y * width) + x;
-						if (!mask[pixelIndex]) {
-							continue;
-						}
-						const neighbors = [
-							[x - 1, y],
-							[x + 1, y],
-							[x, y - 1],
-							[x, y + 1],
-						];
-						for (let i = 0; i < neighbors.length; i += 1) {
-							const nx = neighbors[i][0];
-							const ny = neighbors[i][1];
-							if (nx < 0 || ny < 0 || nx >= width || ny >= height) {
-								continue;
-							}
-							const nIndex = (ny * width) + nx;
-							if (!isOpaquePixel(nIndex)) {
-								continue;
-							}
-							if ((labels[nIndex] || 0) !== targetLabel) {
-								carved[pixelIndex] = 0;
-								break;
-							}
-						}
-					}
-				}
-				return carved;
+				return mask;
 			};
 
 			const hasMaskPixel = function (x, y, mask) {
@@ -1597,6 +1564,8 @@ jQuery(function ($) {
 		$(document).on('click', '[data-threaddesk-design-download-svg]', async function (event) {
 			event.preventDefault();
 			const trigger = $(this);
+			const persistedSvgUrl = trigger.attr('data-threaddesk-design-svg-url') || '';
+			const persistedSvgName = trigger.attr('data-threaddesk-design-svg-name') || '';
 			const previewUrl = trigger.attr('data-threaddesk-design-preview-url') || '';
 			const paletteRaw = trigger.attr('data-threaddesk-design-palette') || '[]';
 			const settingsRaw = trigger.attr('data-threaddesk-design-settings') || '{}';
@@ -1604,6 +1573,15 @@ jQuery(function ($) {
 			const baseName = fileNameRaw.replace(/\.[^.]+$/, '') || 'design';
 			trigger.prop('disabled', true);
 			try {
+				if (persistedSvgUrl) {
+					const link = document.createElement('a');
+					link.href = persistedSvgUrl;
+					link.download = persistedSvgName || (baseName + '-vector.svg');
+					document.body.appendChild(link);
+					link.click();
+					document.body.removeChild(link);
+					return;
+				}
 				const svgMarkup = await createSavedDesignVectorMarkup(previewUrl, paletteRaw, settingsRaw);
 				if (!svgMarkup) {
 					setStatus('Unable to generate vector for this design');
