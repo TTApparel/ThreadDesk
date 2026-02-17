@@ -172,6 +172,7 @@ $nav_base = trailingslashit( wc_get_account_endpoint_url( 'thread-desk' ) );
 				<input type="hidden" name="threaddesk_design_palette" data-threaddesk-design-palette value="[]" />
 				<input type="hidden" name="threaddesk_design_color_count" data-threaddesk-design-color-count value="0" />
 				<input type="hidden" name="threaddesk_design_analysis_settings" data-threaddesk-design-settings value="{}" />
+				<input type="hidden" name="threaddesk_design_svg_markup" data-threaddesk-design-svg-markup value="" />
 
 				<div class="threaddesk-designer__controls">
 					<div class="threaddesk-designer__control-head">
