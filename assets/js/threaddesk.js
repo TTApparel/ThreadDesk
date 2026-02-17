@@ -107,15 +107,24 @@ jQuery(function ($) {
 	const designModal = $('.threaddesk-design-modal');
 
 	if (designModal.length) {
-		const openDesignModal = function () {
+		let lastDesignTrigger = null;
+		const openDesignModal = function (triggerEl) {
+			lastDesignTrigger = triggerEl || document.activeElement || lastDesignTrigger;
 			designModal.addClass('is-active').attr('aria-hidden', 'false');
 			$('body').addClass('threaddesk-modal-open');
 			updatePreviewMaxHeight();
 		};
 
 		const closeDesignModal = function () {
+			const focused = document.activeElement;
+			if (focused && designModal.get(0) && designModal.get(0).contains(focused)) {
+				try { focused.blur(); } catch (e) {}
+			}
 			designModal.removeClass('is-active').attr('aria-hidden', 'true');
 			$('body').removeClass('threaddesk-modal-open');
+			if (lastDesignTrigger && typeof lastDesignTrigger.focus === 'function') {
+				try { lastDesignTrigger.focus(); } catch (e) {}
+			}
 		};
 
 		const defaultPalette = ['#111111', '#ffffff', '#1f1f1f', '#3a3a3a', '#f24c3d', '#3366ff', '#21b573', '#f6b200'];
@@ -164,14 +173,19 @@ jQuery(function ($) {
 		const minimumPercent = 0.5;
 		const mergeThreshold = 22;
 		const maxSwatches = 8;
-		const traceSpeckles = 2;
-		const traceSmoothCorners = 1.0;
-		const traceOptimize = 0.2;
+		const potraceTurdsize = 2;
+		const potraceAlphamax = 1.15;
+		const potraceOpticurve = true;
+		const potraceOpttolerance = 0.28;
+		const multiScanSmooth = true;
+		const multiScanStack = true;
 		const designPreviewMaxDimension = 960;
 		const designCardMaxDimension = 420;
 		const exportVectorMaxDimension = 2400;
+		const savedVectorMatchPreviewMaxDimension = designPreviewMaxDimension;
 		const previewVectorMaxPixels = 260000;
 		const exportVectorMaxPixels = 4000000;
+		const highResVectorMaxPixels = 36000000;
 		let uploadedPreviewUrl = null;
 		let recolorTimer = null;
 		let reanalyzeTimer = null;
@@ -186,9 +200,12 @@ jQuery(function ($) {
 			analysisSettings: {
 				minimumPercent: minimumPercent,
 				mergeThreshold: mergeThreshold,
-				traceSpeckles: traceSpeckles,
-				traceSmoothCorners: traceSmoothCorners,
-				traceOptimize: traceOptimize,
+				potraceTurdsize: potraceTurdsize,
+				potraceAlphamax: potraceAlphamax,
+				potraceOpticurve: potraceOpticurve,
+				potraceOpttolerance: potraceOpttolerance,
+				multiScanSmooth: multiScanSmooth,
+				multiScanStack: multiScanStack,
 				maximumColorCount: 8,
 			},
 			hasUserAdjustedMax: false,
@@ -206,6 +223,7 @@ jQuery(function ($) {
 		const colorCountOutput = designModal.find('[data-threaddesk-color-count]');
 		const statusEl = designModal.find('[data-threaddesk-design-status]');
 		const designIdField = designModal.find('[data-threaddesk-design-id-field]');
+		const designForm = designModal.find('form.threaddesk-auth-modal__form-inner').first();
 		const updatePreviewMaxHeight = function () {
 			const panelHeight = Math.round(designModal.find('.threaddesk-auth-modal__panel').innerHeight() || 0);
 			if (panelHeight <= 0) {
@@ -321,11 +339,17 @@ jQuery(function ($) {
 		};
 
 
-		const buildVectorPathByColor = function (labels, sourcePixels, width, height, palette, maxPixels) {
+		const buildVectorPathByColor = function (labels, sourcePixels, width, height, palette, maxPixels, vectorSettings) {
 			if (!labels || !sourcePixels || !palette || !palette.length || !width || !height) {
 				return '';
 			}
 			const pixelLimit = Math.max(1, parseInt(maxPixels, 10) || previewVectorMaxPixels);
+			const useStack = !vectorSettings || vectorSettings.multiScanStack !== false;
+			const traceSettings = vectorSettings || {};
+			const layerAlphamax = clamp(Number(traceSettings.potraceAlphamax), 0, 1.334);
+			const layerOpttolerance = Math.max(0, Number(traceSettings.potraceOpttolerance));
+			const layerTurdsize = Math.max(0, parseInt(traceSettings.potraceTurdsize, 10) || potraceTurdsize);
+			const layerOpticurve = traceSettings.potraceOpticurve !== false;
 			if ((width * height) > pixelLimit) {
 				return '';
 			}
@@ -339,16 +363,33 @@ jQuery(function ($) {
 				return [parseInt(parts[0], 10) || 0, parseInt(parts[1], 10) || 0];
 			};
 
-			const hasPixel = function (x, y, targetLabel) {
+			const isOpaquePixel = function (pixelIndex) {
+				return (sourcePixels[(pixelIndex * 4) + 3] || 0) >= 8;
+			};
+
+			const gm = new Uint8Array(width * height);
+			const createBinaryMaskForLabel = function (targetLabel) {
+				for (let pixelIndex = 0; pixelIndex < labels.length; pixelIndex += 1) {
+					if (!isOpaquePixel(pixelIndex)) {
+						if (!useStack) {
+							gm[pixelIndex] = 0;
+						}
+						continue;
+					}
+					if ((labels[pixelIndex] || 0) === targetLabel) {
+						gm[pixelIndex] = 1;
+					} else if (!useStack) {
+						gm[pixelIndex] = 0;
+					}
+				}
+				return gm;
+			};
+
+			const hasMaskPixel = function (x, y, mask) {
 				if (x < 0 || y < 0 || x >= width || y >= height) {
 					return false;
 				}
-				const pixelIndex = (y * width) + x;
-				const alpha = sourcePixels[(pixelIndex * 4) + 3] || 0;
-				if (alpha < 8) {
-					return false;
-				}
-				return (labels[pixelIndex] || 0) === targetLabel;
+				return !!mask[(y * width) + x];
 			};
 
 			const polygonArea = function (points) {
@@ -451,14 +492,27 @@ jQuery(function ($) {
 				if (!points || points.length < 3) {
 					return '';
 				}
-				const cornerScale = clamp(Number(state.analysisSettings.traceSmoothCorners), 0, 1) * 0.5;
-				const maxRadius = 0.45;
+				const cornerScale = layerAlphamax * 0.65;
+				const maxRadius = 1.15;
+
+				const relaxationPasses = clamp(Math.round(layerOpttolerance * 4), 0, 2);
+				let workingPoints = points.slice(0);
+				for (let pass = 0; pass < relaxationPasses; pass += 1) {
+					workingPoints = workingPoints.map(function (point, pointIndex) {
+						const prev = workingPoints[(pointIndex - 1 + workingPoints.length) % workingPoints.length];
+						const next = workingPoints[(pointIndex + 1) % workingPoints.length];
+						return [
+							(point[0] * 0.6) + ((prev[0] + next[0]) * 0.2),
+							(point[1] * 0.6) + ((prev[1] + next[1]) * 0.2),
+						];
+					});
+				}
 				const entries = [];
 				const exits = [];
-				for (let i = 0; i < points.length; i += 1) {
-					const prev = points[(i - 1 + points.length) % points.length];
-					const current = points[i];
-					const next = points[(i + 1) % points.length];
+				for (let i = 0; i < workingPoints.length; i += 1) {
+					const prev = workingPoints[(i - 1 + workingPoints.length) % workingPoints.length];
+					const current = workingPoints[i];
+					const next = workingPoints[(i + 1) % workingPoints.length];
 					const inDx = current[0] - prev[0];
 					const inDy = current[1] - prev[1];
 					const outDx = next[0] - current[0];
@@ -483,10 +537,10 @@ jQuery(function ($) {
 
 				const commands = [];
 				commands.push('M' + entries[0][0].toFixed(3) + ' ' + entries[0][1].toFixed(3));
-				for (let i = 0; i < points.length; i += 1) {
-					const corner = points[i];
+				for (let i = 0; i < workingPoints.length; i += 1) {
+					const corner = workingPoints[i];
 					const exit = exits[i];
-					const nextEntry = entries[(i + 1) % points.length];
+					const nextEntry = entries[(i + 1) % workingPoints.length];
 					commands.push('Q' + corner[0].toFixed(3) + ' ' + corner[1].toFixed(3) + ' ' + exit[0].toFixed(3) + ' ' + exit[1].toFixed(3));
 					commands.push('L' + nextEntry[0].toFixed(3) + ' ' + nextEntry[1].toFixed(3));
 				}
@@ -494,12 +548,12 @@ jQuery(function ($) {
 				return commands.join('');
 			};
 
-			const buildLoopsForLabel = function (targetLabel) {
+			const buildLoopsForLabel = function (targetLabel, mask) {
 				const outgoing = new Map();
 				const edges = [];
-				const speckleThreshold = Math.max(0, parseInt(state.analysisSettings.traceSpeckles, 10) || traceSpeckles);
-				const optimizeTolerance = Math.max(0, Number(state.analysisSettings.traceOptimize));
-				const simplifyTolerance = 0.35 + (optimizeTolerance * 2.0);
+				const speckleThreshold = layerTurdsize;
+				const optimizeTolerance = layerOpttolerance;
+				const simplifyTolerance = optimizeTolerance;
 				const addEdge = function (x1, y1, x2, y2) {
 					const edge = { start: toKey(x1, y1), end: toKey(x2, y2), used: false };
 					edges.push(edge);
@@ -511,19 +565,19 @@ jQuery(function ($) {
 
 				for (let y = 0; y < height; y += 1) {
 					for (let x = 0; x < width; x += 1) {
-						if (!hasPixel(x, y, targetLabel)) {
+						if (!hasMaskPixel(x, y, mask)) {
 							continue;
 						}
-						if (!hasPixel(x, y - 1, targetLabel)) {
+						if (!hasMaskPixel(x, y - 1, mask)) {
 							addEdge(x, y, x + 1, y);
 						}
-						if (!hasPixel(x + 1, y, targetLabel)) {
+						if (!hasMaskPixel(x + 1, y, mask)) {
 							addEdge(x + 1, y, x + 1, y + 1);
 						}
-						if (!hasPixel(x, y + 1, targetLabel)) {
+						if (!hasMaskPixel(x, y + 1, mask)) {
 							addEdge(x + 1, y + 1, x, y + 1);
 						}
-						if (!hasPixel(x - 1, y, targetLabel)) {
+						if (!hasMaskPixel(x - 1, y, mask)) {
 							addEdge(x, y + 1, x, y);
 						}
 					}
@@ -565,12 +619,19 @@ jQuery(function ($) {
 
 			const paths = [];
 			for (let i = 0; i < palette.length; i += 1) {
-				const loops = buildLoopsForLabel(i);
+				const binaryMask = createBinaryMaskForLabel(i);
+				const loops = buildLoopsForLabel(i, binaryMask);
 				if (!loops.length) {
 					continue;
 				}
+				const useOpticurve = layerOpticurve;
 				const loopPaths = loops.map(function (loop) {
-					return smoothClosedLoopPath(loop);
+					if (useOpticurve) {
+						return smoothClosedLoopPath(loop);
+					}
+					return 'M' + loop.map(function (point, pointIndex) {
+						return (pointIndex ? 'L' : '') + point[0].toFixed(3) + ' ' + point[1].toFixed(3);
+					}).join('') + 'Z';
 				}).filter(Boolean);
 				if (!loopPaths.length) {
 					continue;
@@ -606,7 +667,7 @@ jQuery(function ($) {
 			}
 			ctx.putImageData(output, 0, 0);
 
-			const vectorPaths = buildVectorPathByColor(state.labels, state.sourcePixels, state.width, state.height, state.palette, previewVectorMaxPixels);
+			const vectorPaths = buildVectorPathByColor(state.labels, state.sourcePixels, state.width, state.height, state.palette, previewVectorMaxPixels, state.analysisSettings);
 			if (vectorPaths && previewVector.length) {
 				previewVector.attr('viewBox', '0 0 ' + state.width + ' ' + state.height);
 				previewVector.html(vectorPaths);
@@ -725,6 +786,52 @@ jQuery(function ($) {
 				centroids.push(pixels[farthestIndex].slice(0, 3));
 			}
 			return centroids;
+		};
+
+		const createQuantizationPixels = function (sourcePixels, width, height, useSmooth) {
+			if (!sourcePixels || !width || !height) {
+				return { pixels: [], opaqueIndices: [] };
+			}
+			const working = useSmooth ? blurRgbaSource(blurRgbaSource(sourcePixels, width, height), width, height) : sourcePixels;
+			const pixels = [];
+			const opaqueIndices = [];
+			for (let i = 0; i < working.length; i += 4) {
+				const alpha = sourcePixels[i + 3];
+				if (alpha < 8) {
+					continue;
+				}
+				const blended = blendRgbOverWhite(working[i], working[i + 1], working[i + 2], alpha);
+				pixels.push(blended);
+				opaqueIndices.push(i / 4);
+			}
+			return { pixels: pixels, opaqueIndices: opaqueIndices };
+		};
+
+		const blurRgbaSource = function (sourcePixels, width, height) {
+			const out = new Uint8ClampedArray(sourcePixels.length);
+			const kernel = [1, 2, 1];
+			for (let y = 0; y < height; y += 1) {
+				for (let x = 0; x < width; x += 1) {
+					const dst = ((y * width) + x) * 4;
+					out[dst + 3] = sourcePixels[dst + 3];
+					for (let channel = 0; channel < 3; channel += 1) {
+						let sum = 0;
+						let weight = 0;
+						for (let oy = -1; oy <= 1; oy += 1) {
+							const yy = clamp(y + oy, 0, height - 1);
+							for (let ox = -1; ox <= 1; ox += 1) {
+								const xx = clamp(x + ox, 0, width - 1);
+								const w = kernel[ox + 1] * kernel[oy + 1];
+								const src = ((yy * width) + xx) * 4;
+								sum += sourcePixels[src + channel] * w;
+								weight += w;
+							}
+						}
+						out[dst + channel] = Math.round(sum / Math.max(1, weight));
+					}
+				}
+			}
+			return out;
 		};
 
 		const quantizeColors = function (pixels, opaqueIndices, totalPixels, maxColors) {
@@ -1075,12 +1182,12 @@ jQuery(function ($) {
 			return 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(svgMarkup);
 		};
 
-		const buildVectorSvgMarkup = function (labels, sourcePixels, width, height, palette, maxPixels) {
-			const vectorPaths = buildVectorPathByColor(labels, sourcePixels, width, height, palette, maxPixels);
+		const buildVectorSvgMarkup = function (labels, sourcePixels, width, height, palette, maxPixels, vectorSettings) {
+			const vectorPaths = buildVectorPathByColor(labels, sourcePixels, width, height, palette, maxPixels, vectorSettings);
 			if (!vectorPaths) {
 				return '';
 			}
-			return '<svg xmlns="http://www.w3.org/2000/svg" width="' + width + '" height="' + height + '" viewBox="0 0 ' + width + ' ' + height + '" shape-rendering="crispEdges">' + vectorPaths + '</svg>';
+			return '<svg xmlns="http://www.w3.org/2000/svg" width="' + width + '" height="' + height + '" viewBox="0 0 ' + width + ' ' + height + '" shape-rendering="geometricPrecision">' + vectorPaths + '</svg>';
 		};
 
 		const buildRectVectorSvgMarkup = function (labels, sourcePixels, width, height, palette, maxPixels) {
@@ -1152,30 +1259,25 @@ jQuery(function ($) {
 			if (!loaded) {
 				return '';
 			}
-			const analysis = createAnalysisBuffer(image, svgDimensions, { maxDimension: exportVectorMaxDimension });
-			const pixels = [];
-			const opaqueIndices = [];
-			for (let i = 0; i < analysis.imageData.data.length; i += 4) {
-				const alpha = analysis.imageData.data[i + 3];
-				if (alpha < 8) {
-					continue;
-				}
-				const blended = blendRgbOverWhite(analysis.imageData.data[i], analysis.imageData.data[i + 1], analysis.imageData.data[i + 2], alpha);
-				pixels.push(blended);
-				opaqueIndices.push(i / 4);
-			}
-			if (!pixels.length) {
+			const analysis = createAnalysisBuffer(image, svgDimensions, { maxDimension: Math.max(image.naturalWidth || 1, image.naturalHeight || 1) });
+			const quantSource = createQuantizationPixels(
+				analysis.imageData.data,
+				analysis.width,
+				analysis.height,
+				settings.multiScanSmooth === true
+			);
+			if (!quantSource.pixels.length) {
 				return '';
 			}
-			const quantized = quantizeColors(pixels, opaqueIndices, analysis.width * analysis.height, maxColors);
+			const quantized = quantizeColors(quantSource.pixels, quantSource.opaqueIndices, analysis.width * analysis.height, maxColors);
 			if (!quantized || !quantized.labels) {
 				return '';
 			}
-			const pathSvg = buildVectorSvgMarkup(quantized.labels, analysis.imageData.data, analysis.width, analysis.height, normalizedPalette, exportVectorMaxPixels);
+			const pathSvg = buildVectorSvgMarkup(quantized.labels, analysis.imageData.data, analysis.width, analysis.height, normalizedPalette, highResVectorMaxPixels, settings);
 			if (pathSvg) {
 				return pathSvg;
 			}
-			return buildRectVectorSvgMarkup(quantized.labels, analysis.imageData.data, analysis.width, analysis.height, normalizedPalette, exportVectorMaxPixels * 2);
+			return buildRectVectorSvgMarkup(quantized.labels, analysis.imageData.data, analysis.width, analysis.height, normalizedPalette, highResVectorMaxPixels * 2);
 			} catch (error) {
 				return '';
 			}
@@ -1207,23 +1309,18 @@ jQuery(function ($) {
 			}
 
 			const analysis = createAnalysisBuffer(image, svgDimensions, { maxDimension: designCardMaxDimension });
-			const pixels = [];
-			const opaqueIndices = [];
-			for (let i = 0; i < analysis.imageData.data.length; i += 4) {
-				const alpha = analysis.imageData.data[i + 3];
-				if (alpha < 8) {
-					continue;
-				}
-				const blended = blendRgbOverWhite(analysis.imageData.data[i], analysis.imageData.data[i + 1], analysis.imageData.data[i + 2], alpha);
-				pixels.push(blended);
-				opaqueIndices.push(i / 4);
-			}
+			const quantSource = createQuantizationPixels(
+				analysis.imageData.data,
+				analysis.width,
+				analysis.height,
+				settings.multiScanSmooth === true
+			);
 
-			if (!pixels.length) {
+			if (!quantSource.pixels.length) {
 				return;
 			}
 
-			const quantized = quantizeColors(pixels, opaqueIndices, analysis.width * analysis.height, maxColors);
+			const quantized = quantizeColors(quantSource.pixels, quantSource.opaqueIndices, analysis.width * analysis.height, maxColors);
 			if (!quantized || !quantized.labels) {
 				return;
 			}
@@ -1270,18 +1367,13 @@ jQuery(function ($) {
 			}
 			setStatus('Analyzing colors…');
 			await new Promise(function (resolve) { window.setTimeout(resolve, 0); });
-			const pixels = [];
-			const opaqueIndices = [];
-			for (let i = 0; i < state.sourcePixels.length; i += 4) {
-				const alpha = state.sourcePixels[i + 3];
-				if (alpha < 8) {
-					continue;
-				}
-				const blended = blendRgbOverWhite(state.sourcePixels[i], state.sourcePixels[i + 1], state.sourcePixels[i + 2], alpha);
-				pixels.push(blended);
-				opaqueIndices.push(i / 4);
-			}
-			if (!pixels.length) {
+			const quantSource = createQuantizationPixels(
+				state.sourcePixels,
+				state.width,
+				state.height,
+				state.analysisSettings.multiScanSmooth === true
+			);
+			if (!quantSource.pixels.length) {
 				state.palette = [];
 				state.percentages = [];
 				state.labels = null;
@@ -1292,7 +1384,7 @@ jQuery(function ($) {
 
 			const maxColors = clamp(parseInt(maxColorInput.val(), 10) || 4, 1, maxSwatches);
 			state.analysisSettings.maximumColorCount = maxColors;
-			const quantized = quantizeColors(pixels, opaqueIndices, state.width * state.height, maxColors);
+			const quantized = quantizeColors(quantSource.pixels, quantSource.opaqueIndices, state.width * state.height, maxColors);
 			if (!quantized || !quantized.palette.length) {
 				state.palette = [];
 				state.percentages = [];
@@ -1316,7 +1408,7 @@ jQuery(function ($) {
 		};
 
 		const openAndPromptDesignUpload = function () {
-			openDesignModal();
+			openDesignModal(document.activeElement);
 			designIdField.val('0');
 			state.hasUserAdjustedMax = false;
 			const designFileInput = designModal.find('[data-threaddesk-design-file]').get(0);
@@ -1338,7 +1430,7 @@ jQuery(function ($) {
 
 		$(document).on('click', '[data-threaddesk-design-edit]', async function (event) {
 			event.preventDefault();
-			openDesignModal();
+			openDesignModal(this);
 			const designId = parseInt($(this).attr('data-threaddesk-design-id'), 10) || 0;
 			const previewUrl = $(this).attr('data-threaddesk-design-preview-url') || '';
 			const fileName = $(this).attr('data-threaddesk-design-file-name') || 'No file selected';
@@ -1359,6 +1451,24 @@ jQuery(function ($) {
 			try { settings = JSON.parse(settingsRaw); } catch (e) {}
 			state.palette = normalizePaletteToAllowed(Array.isArray(palette) && palette.length ? palette : defaultPalette.slice(0, 4));
 			state.analysisSettings.maximumColorCount = clamp(parseInt(settings.maximumColorCount, 10) || state.palette.length || 4, 1, maxSwatches);
+			state.analysisSettings.potraceTurdsize = Math.max(0, parseInt(settings.potraceTurdsize, 10) || parseInt(settings.traceSpeckles, 10) || potraceTurdsize);
+			state.analysisSettings.potraceAlphamax = clamp(Number(settings.potraceAlphamax), 0, 1.334);
+			if (!Number.isFinite(state.analysisSettings.potraceAlphamax)) {
+				state.analysisSettings.potraceAlphamax = clamp(Number(settings.traceSmoothCorners), 0, 1.334);
+			}
+			if (!Number.isFinite(state.analysisSettings.potraceAlphamax)) {
+				state.analysisSettings.potraceAlphamax = potraceAlphamax;
+			}
+			state.analysisSettings.potraceOpticurve = settings.potraceOpticurve !== false;
+			state.analysisSettings.potraceOpttolerance = Math.max(0, Number(settings.potraceOpttolerance));
+			if (!Number.isFinite(state.analysisSettings.potraceOpttolerance)) {
+				state.analysisSettings.potraceOpttolerance = Math.max(0, Number(settings.traceOptimize));
+			}
+			if (!Number.isFinite(state.analysisSettings.potraceOpttolerance)) {
+				state.analysisSettings.potraceOpttolerance = potraceOpttolerance;
+			}
+			state.analysisSettings.multiScanSmooth = settings.multiScanSmooth !== false;
+			state.analysisSettings.multiScanStack = settings.multiScanStack !== false;
 			maxColorInput.val(String(state.analysisSettings.maximumColorCount));
 			state.hasUserAdjustedMax = true;
 			state.percentages = [];
@@ -1487,6 +1597,8 @@ jQuery(function ($) {
 		$(document).on('click', '[data-threaddesk-design-download-svg]', async function (event) {
 			event.preventDefault();
 			const trigger = $(this);
+			const persistedSvgUrl = trigger.attr('data-threaddesk-design-svg-url') || '';
+			const persistedSvgName = trigger.attr('data-threaddesk-design-svg-name') || '';
 			const previewUrl = trigger.attr('data-threaddesk-design-preview-url') || '';
 			const paletteRaw = trigger.attr('data-threaddesk-design-palette') || '[]';
 			const settingsRaw = trigger.attr('data-threaddesk-design-settings') || '{}';
@@ -1494,6 +1606,15 @@ jQuery(function ($) {
 			const baseName = fileNameRaw.replace(/\.[^.]+$/, '') || 'design';
 			trigger.prop('disabled', true);
 			try {
+				if (persistedSvgUrl) {
+					const link = document.createElement('a');
+					link.href = persistedSvgUrl;
+					link.download = persistedSvgName || (baseName + '-vector.svg');
+					document.body.appendChild(link);
+					link.click();
+					document.body.removeChild(link);
+					return;
+				}
 				const svgMarkup = await createSavedDesignVectorMarkup(previewUrl, paletteRaw, settingsRaw);
 				if (!svgMarkup) {
 					setStatus('Unable to generate vector for this design');
@@ -1512,6 +1633,42 @@ jQuery(function ($) {
 				trigger.prop('disabled', false);
 			}
 		});
+
+
+		if (designForm.length) {
+			designForm.on('submit', async function (event) {
+				if (designForm.data('threaddeskSubmitting')) {
+					return;
+				}
+				event.preventDefault();
+				const svgField = designForm.find('[data-threaddesk-design-svg-markup]');
+				if (!svgField.length) {
+					designForm.data('threaddeskSubmitting', true);
+					designForm.get(0).submit();
+					return;
+				}
+				const submitButton = designForm.find('[type="submit"]').first();
+				submitButton.prop('disabled', true);
+				let svgMarkup = '';
+				const currentPreviewUrl = (previewImage.attr('src') || '').trim();
+				if (currentPreviewUrl) {
+					svgMarkup = await createSavedDesignVectorMarkup(
+						currentPreviewUrl,
+						JSON.stringify(state.palette || []),
+						JSON.stringify(state.analysisSettings || {})
+					);
+				}
+				if (!svgMarkup && state.labels && state.sourcePixels && state.palette.length && state.width && state.height) {
+					svgMarkup = buildVectorSvgMarkup(state.labels, state.sourcePixels, state.width, state.height, state.palette, exportVectorMaxPixels, state.analysisSettings);
+					if (!svgMarkup) {
+						svgMarkup = buildRectVectorSvgMarkup(state.labels, state.sourcePixels, state.width, state.height, state.palette, exportVectorMaxPixels * 2);
+					}
+				}
+				svgField.val(svgMarkup || '');
+				designForm.data('threaddeskSubmitting', true);
+				designForm.get(0).submit();
+			});
+		}
 
 		$(document).on('keyup', function (event) {
 			if (event.key === 'Escape') {
