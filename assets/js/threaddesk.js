@@ -164,7 +164,7 @@ jQuery(function ($) {
 		const minimumPercent = 0.5;
 		const mergeThreshold = 22;
 		const maxSwatches = 8;
-		const potraceTurdsize = 4;
+		const potraceTurdsize = 2;
 		const potraceAlphamax = 1.0;
 		const potraceOpticurve = true;
 		const potraceOpttolerance = 0.2;
@@ -336,6 +336,11 @@ jQuery(function ($) {
 			}
 			const pixelLimit = Math.max(1, parseInt(maxPixels, 10) || previewVectorMaxPixels);
 			const useStack = !vectorSettings || vectorSettings.multiScanStack !== false;
+			const traceSettings = vectorSettings || {};
+			const layerAlphamax = clamp(Number(traceSettings.potraceAlphamax), 0, 1.334);
+			const layerOpttolerance = Math.max(0, Number(traceSettings.potraceOpttolerance));
+			const layerTurdsize = Math.max(0, parseInt(traceSettings.potraceTurdsize, 10) || potraceTurdsize);
+			const layerOpticurve = traceSettings.potraceOpticurve !== false;
 			if ((width * height) > pixelLimit) {
 				return '';
 			}
@@ -478,7 +483,7 @@ jQuery(function ($) {
 				if (!points || points.length < 3) {
 					return '';
 				}
-				const cornerScale = clamp(Number(state.analysisSettings.potraceAlphamax), 0, 1.334) * 0.375;
+				const cornerScale = layerAlphamax * 0.375;
 				const maxRadius = 0.45;
 				const entries = [];
 				const exits = [];
@@ -524,8 +529,8 @@ jQuery(function ($) {
 			const buildLoopsForLabel = function (targetLabel, mask) {
 				const outgoing = new Map();
 				const edges = [];
-				const speckleThreshold = Math.max(potraceTurdsize, parseInt(state.analysisSettings.potraceTurdsize, 10) || potraceTurdsize);
-				const optimizeTolerance = Math.max(0, Number(state.analysisSettings.potraceOpttolerance));
+				const speckleThreshold = layerTurdsize;
+				const optimizeTolerance = layerOpttolerance;
 				const simplifyTolerance = optimizeTolerance;
 				const addEdge = function (x1, y1, x2, y2) {
 					const edge = { start: toKey(x1, y1), end: toKey(x2, y2), used: false };
@@ -597,7 +602,7 @@ jQuery(function ($) {
 				if (!loops.length) {
 					continue;
 				}
-				const useOpticurve = state.analysisSettings.potraceOpticurve !== false;
+				const useOpticurve = layerOpticurve;
 				const loopPaths = loops.map(function (loop) {
 					if (useOpticurve) {
 						return smoothClosedLoopPath(loop);
@@ -1424,7 +1429,7 @@ jQuery(function ($) {
 			try { settings = JSON.parse(settingsRaw); } catch (e) {}
 			state.palette = normalizePaletteToAllowed(Array.isArray(palette) && palette.length ? palette : defaultPalette.slice(0, 4));
 			state.analysisSettings.maximumColorCount = clamp(parseInt(settings.maximumColorCount, 10) || state.palette.length || 4, 1, maxSwatches);
-			state.analysisSettings.potraceTurdsize = Math.max(potraceTurdsize, parseInt(settings.potraceTurdsize, 10) || parseInt(settings.traceSpeckles, 10) || potraceTurdsize);
+			state.analysisSettings.potraceTurdsize = Math.max(0, parseInt(settings.potraceTurdsize, 10) || parseInt(settings.traceSpeckles, 10) || potraceTurdsize);
 			state.analysisSettings.potraceAlphamax = clamp(Number(settings.potraceAlphamax), 0, 1.334);
 			if (!Number.isFinite(state.analysisSettings.potraceAlphamax)) {
 				state.analysisSettings.potraceAlphamax = clamp(Number(settings.traceSmoothCorners), 0, 1.334);
