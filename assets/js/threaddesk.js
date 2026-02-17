@@ -176,6 +176,7 @@ jQuery(function ($) {
 		const savedVectorMatchPreviewMaxDimension = designPreviewMaxDimension;
 		const previewVectorMaxPixels = 260000;
 		const exportVectorMaxPixels = 4000000;
+		const highResVectorMaxPixels = 36000000;
 		let uploadedPreviewUrl = null;
 		let recolorTimer = null;
 		let reanalyzeTimer = null;
@@ -1226,7 +1227,7 @@ jQuery(function ($) {
 			if (!loaded) {
 				return '';
 			}
-			const analysis = createAnalysisBuffer(image, svgDimensions, { maxDimension: savedVectorMatchPreviewMaxDimension });
+			const analysis = createAnalysisBuffer(image, svgDimensions, { maxDimension: Math.max(image.naturalWidth || 1, image.naturalHeight || 1) });
 			const quantSource = createQuantizationPixels(
 				analysis.imageData.data,
 				analysis.width,
@@ -1240,11 +1241,11 @@ jQuery(function ($) {
 			if (!quantized || !quantized.labels) {
 				return '';
 			}
-			const pathSvg = buildVectorSvgMarkup(quantized.labels, analysis.imageData.data, analysis.width, analysis.height, normalizedPalette, previewVectorMaxPixels, settings);
+			const pathSvg = buildVectorSvgMarkup(quantized.labels, analysis.imageData.data, analysis.width, analysis.height, normalizedPalette, highResVectorMaxPixels, settings);
 			if (pathSvg) {
 				return pathSvg;
 			}
-			return buildRectVectorSvgMarkup(quantized.labels, analysis.imageData.data, analysis.width, analysis.height, normalizedPalette, previewVectorMaxPixels * 2);
+			return buildRectVectorSvgMarkup(quantized.labels, analysis.imageData.data, analysis.width, analysis.height, normalizedPalette, highResVectorMaxPixels * 2);
 			} catch (error) {
 				return '';
 			}
@@ -1603,19 +1604,37 @@ jQuery(function ($) {
 
 
 		if (designForm.length) {
-			designForm.on('submit', function () {
-				const svgField = designForm.find('[data-threaddesk-design-svg-markup]');
-				if (!svgField.length) {
+			designForm.on('submit', async function (event) {
+				if (designForm.data('threaddeskSubmitting')) {
 					return;
 				}
+				event.preventDefault();
+				const svgField = designForm.find('[data-threaddesk-design-svg-markup]');
+				if (!svgField.length) {
+					designForm.data('threaddeskSubmitting', true);
+					designForm.get(0).submit();
+					return;
+				}
+				const submitButton = designForm.find('[type="submit"]').first();
+				submitButton.prop('disabled', true);
 				let svgMarkup = '';
-				if (state.labels && state.sourcePixels && state.palette.length && state.width && state.height) {
+				const currentPreviewUrl = (previewImage.attr('src') || '').trim();
+				if (currentPreviewUrl) {
+					svgMarkup = await createSavedDesignVectorMarkup(
+						currentPreviewUrl,
+						JSON.stringify(state.palette || []),
+						JSON.stringify(state.analysisSettings || {})
+					);
+				}
+				if (!svgMarkup && state.labels && state.sourcePixels && state.palette.length && state.width && state.height) {
 					svgMarkup = buildVectorSvgMarkup(state.labels, state.sourcePixels, state.width, state.height, state.palette, exportVectorMaxPixels, state.analysisSettings);
 					if (!svgMarkup) {
 						svgMarkup = buildRectVectorSvgMarkup(state.labels, state.sourcePixels, state.width, state.height, state.palette, exportVectorMaxPixels * 2);
 					}
 				}
 				svgField.val(svgMarkup || '');
+				designForm.data('threaddeskSubmitting', true);
+				designForm.get(0).submit();
 			});
 		}
 
