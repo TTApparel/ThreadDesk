@@ -402,10 +402,10 @@ jQuery(function ($) {
 				}
 				const tolerance = Math.max(0, Number(epsilon) || 0);
 				const cleaned = [];
-				for (let i = 0; i < points.length; i += 1) {
-					const prev = points[(i - 1 + points.length) % points.length];
-					const current = points[i];
-					const next = points[(i + 1) % points.length];
+				for (let i = 0; i < workingPoints.length; i += 1) {
+					const prev = workingPoints[(i - 1 + workingPoints.length) % workingPoints.length];
+					const current = workingPoints[i];
+					const next = workingPoints[(i + 1) % workingPoints.length];
 					const dx1 = current[0] - prev[0];
 					const dy1 = current[1] - prev[1];
 					const dx2 = next[0] - current[0];
@@ -483,14 +483,27 @@ jQuery(function ($) {
 				if (!points || points.length < 3) {
 					return '';
 				}
-				const cornerScale = layerAlphamax * 0.375;
-				const maxRadius = 0.45;
+				const cornerScale = layerAlphamax * 0.65;
+				const maxRadius = 1.15;
+
+				const relaxationPasses = clamp(Math.round(layerOpttolerance * 4), 0, 2);
+				let workingPoints = points.slice(0);
+				for (let pass = 0; pass < relaxationPasses; pass += 1) {
+					workingPoints = workingPoints.map(function (point, pointIndex) {
+						const prev = workingPoints[(pointIndex - 1 + workingPoints.length) % workingPoints.length];
+						const next = workingPoints[(pointIndex + 1) % workingPoints.length];
+						return [
+							(point[0] * 0.6) + ((prev[0] + next[0]) * 0.2),
+							(point[1] * 0.6) + ((prev[1] + next[1]) * 0.2),
+						];
+					});
+				}
 				const entries = [];
 				const exits = [];
-				for (let i = 0; i < points.length; i += 1) {
-					const prev = points[(i - 1 + points.length) % points.length];
-					const current = points[i];
-					const next = points[(i + 1) % points.length];
+				for (let i = 0; i < workingPoints.length; i += 1) {
+					const prev = workingPoints[(i - 1 + workingPoints.length) % workingPoints.length];
+					const current = workingPoints[i];
+					const next = workingPoints[(i + 1) % workingPoints.length];
 					const inDx = current[0] - prev[0];
 					const inDy = current[1] - prev[1];
 					const outDx = next[0] - current[0];
@@ -515,10 +528,10 @@ jQuery(function ($) {
 
 				const commands = [];
 				commands.push('M' + entries[0][0].toFixed(3) + ' ' + entries[0][1].toFixed(3));
-				for (let i = 0; i < points.length; i += 1) {
-					const corner = points[i];
+				for (let i = 0; i < workingPoints.length; i += 1) {
+					const corner = workingPoints[i];
 					const exit = exits[i];
-					const nextEntry = entries[(i + 1) % points.length];
+					const nextEntry = entries[(i + 1) % workingPoints.length];
 					commands.push('Q' + corner[0].toFixed(3) + ' ' + corner[1].toFixed(3) + ' ' + exit[0].toFixed(3) + ' ' + exit[1].toFixed(3));
 					commands.push('L' + nextEntry[0].toFixed(3) + ' ' + nextEntry[1].toFixed(3));
 				}
@@ -1165,7 +1178,7 @@ jQuery(function ($) {
 			if (!vectorPaths) {
 				return '';
 			}
-			return '<svg xmlns="http://www.w3.org/2000/svg" width="' + width + '" height="' + height + '" viewBox="0 0 ' + width + ' ' + height + '" shape-rendering="crispEdges">' + vectorPaths + '</svg>';
+			return '<svg xmlns="http://www.w3.org/2000/svg" width="' + width + '" height="' + height + '" viewBox="0 0 ' + width + ' ' + height + '" shape-rendering="geometricPrecision">' + vectorPaths + '</svg>';
 		};
 
 		const buildRectVectorSvgMarkup = function (labels, sourcePixels, width, height, palette, maxPixels) {
