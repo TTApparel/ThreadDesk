@@ -5,7 +5,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 $context = isset( $context ) ? $context : array();
 $user    = isset( $context['user'] ) ? $context['user'] : null;
-$cover   = ! empty( $context['cover_image'] ) ? $context['cover_image'] : 'https://via.placeholder.com/1200x240.png?text=ThreadDesk+Cover';
+$cover   = ! empty( $context['cover_image'] ) ? $context['cover_image'] : THREDDESK_URL . 'assets/images/threaddesk-cover-fallback.svg';
 $company = ! empty( $context['company'] ) ? $context['company'] : __( 'Client Company', 'threaddesk' );
 $client_name = ! empty( $context['client_name'] ) ? $context['client_name'] : __( 'Client Name', 'threaddesk' );
 $avatar_url  = ! empty( $context['avatar_url'] ) ? $context['avatar_url'] : '';

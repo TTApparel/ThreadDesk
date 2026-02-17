@@ -107,15 +107,24 @@ jQuery(function ($) {
 	const designModal = $('.threaddesk-design-modal');
 
 	if (designModal.length) {
-		const openDesignModal = function () {
+		let lastDesignTrigger = null;
+		const openDesignModal = function (triggerEl) {
+			lastDesignTrigger = triggerEl || document.activeElement || lastDesignTrigger;
 			designModal.addClass('is-active').attr('aria-hidden', 'false');
 			$('body').addClass('threaddesk-modal-open');
 			updatePreviewMaxHeight();
 		};
 
 		const closeDesignModal = function () {
+			const focused = document.activeElement;
+			if (focused && designModal.get(0) && designModal.get(0).contains(focused)) {
+				try { focused.blur(); } catch (e) {}
+			}
 			designModal.removeClass('is-active').attr('aria-hidden', 'true');
 			$('body').removeClass('threaddesk-modal-open');
+			if (lastDesignTrigger && typeof lastDesignTrigger.focus === 'function') {
+				try { lastDesignTrigger.focus(); } catch (e) {}
+			}
 		};
 
 		const defaultPalette = ['#111111', '#ffffff', '#1f1f1f', '#3a3a3a', '#f24c3d', '#3366ff', '#21b573', '#f6b200'];
@@ -1399,7 +1408,7 @@ jQuery(function ($) {
 		};
 
 		const openAndPromptDesignUpload = function () {
-			openDesignModal();
+			openDesignModal(document.activeElement);
 			designIdField.val('0');
 			state.hasUserAdjustedMax = false;
 			const designFileInput = designModal.find('[data-threaddesk-design-file]').get(0);
@@ -1421,7 +1430,7 @@ jQuery(function ($) {
 
 		$(document).on('click', '[data-threaddesk-design-edit]', async function (event) {
 			event.preventDefault();
-			openDesignModal();
+			openDesignModal(this);
 			const designId = parseInt($(this).attr('data-threaddesk-design-id'), 10) || 0;
 			const previewUrl = $(this).attr('data-threaddesk-design-preview-url') || '';
 			const fileName = $(this).attr('data-threaddesk-design-file-name') || 'No file selected';
