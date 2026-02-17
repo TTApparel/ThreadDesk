@@ -1632,9 +1632,9 @@ jQuery(function ($) {
 				}
 				let svgMarkup = '';
 				if (state.labels && state.sourcePixels && state.palette.length && state.width && state.height) {
-					svgMarkup = buildVectorSvgMarkup(state.labels, state.sourcePixels, state.width, state.height, state.palette, previewVectorMaxPixels, state.analysisSettings);
+					svgMarkup = buildVectorSvgMarkup(state.labels, state.sourcePixels, state.width, state.height, state.palette, exportVectorMaxPixels, state.analysisSettings);
 					if (!svgMarkup) {
-						svgMarkup = buildRectVectorSvgMarkup(state.labels, state.sourcePixels, state.width, state.height, state.palette, previewVectorMaxPixels * 2);
+						svgMarkup = buildRectVectorSvgMarkup(state.labels, state.sourcePixels, state.width, state.height, state.palette, exportVectorMaxPixels * 2);
 					}
 				}
 				svgField.val(svgMarkup || '');
