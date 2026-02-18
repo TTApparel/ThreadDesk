@@ -1231,11 +1231,11 @@ jQuery(function ($) {
 				if (!quantized || !quantized.labels) {
 					return '';
 				}
-				const pathSvg = buildVectorSvgMarkup(quantized.labels, analysis.imageData.data, analysis.width, analysis.height, quantized.palette, highResVectorMaxPixels, traceSettings);
+				const pathSvg = buildVectorSvgMarkup(quantized.labels, analysis.imageData.data, analysis.width, analysis.height, normalizedPalette, highResVectorMaxPixels, traceSettings);
 				if (pathSvg) {
 					return pathSvg;
 				}
-				return buildRectVectorSvgMarkup(quantized.labels, analysis.imageData.data, analysis.width, analysis.height, quantized.palette, highResVectorMaxPixels * 2);
+				return buildRectVectorSvgMarkup(quantized.labels, analysis.imageData.data, analysis.width, analysis.height, normalizedPalette, highResVectorMaxPixels * 2);
 			} catch (error) {
 				return '';
 			}
@@ -1599,18 +1599,20 @@ jQuery(function ($) {
 				const submitButton = designForm.find('[type="submit"]').first();
 				submitButton.prop('disabled', true);
 				let svgMarkup = '';
-				const currentPreviewUrl = (previewImage.attr('src') || '').trim();
-				if (currentPreviewUrl) {
-					svgMarkup = await createSavedDesignVectorMarkup(
-						currentPreviewUrl,
-						JSON.stringify(state.palette || []),
-						JSON.stringify(state.analysisSettings || {})
-					);
-				}
-				if (!svgMarkup && state.labels && state.sourcePixels && state.palette.length && state.width && state.height) {
+				if (state.labels && state.sourcePixels && state.palette.length && state.width && state.height) {
 					svgMarkup = buildVectorSvgMarkup(state.labels, state.sourcePixels, state.width, state.height, state.palette, exportVectorMaxPixels, state.analysisSettings);
 					if (!svgMarkup) {
 						svgMarkup = buildRectVectorSvgMarkup(state.labels, state.sourcePixels, state.width, state.height, state.palette, exportVectorMaxPixels * 2);
+					}
+				}
+				if (!svgMarkup) {
+					const currentPreviewUrl = (previewImage.attr('src') || '').trim();
+					if (currentPreviewUrl) {
+						svgMarkup = await createSavedDesignVectorMarkup(
+							currentPreviewUrl,
+							JSON.stringify(state.palette || []),
+							JSON.stringify(state.analysisSettings || {})
+						);
 					}
 				}
 				svgField.val(svgMarkup || '');
