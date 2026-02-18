@@ -240,6 +240,18 @@ jQuery(function ($) {
 			return Math.max(min, Math.min(max, value));
 		};
 
+		const resolveTraceSettings = function (settings) {
+			const raw = settings || {};
+			return {
+				potraceTurdsize: potraceTurdsize,
+				potraceAlphamax: potraceAlphamax,
+				potraceOpticurve: potraceOpticurve,
+				potraceOpttolerance: potraceOpttolerance,
+				multiScanSmooth: raw.multiScanSmooth !== false,
+				multiScanStack: true,
+			};
+		};
+
 		const hexToRgb = function (hex) {
 			const normalized = (hex || '').replace('#', '');
 			if (!/^[0-9a-fA-F]{6}$/.test(normalized)) {
@@ -344,8 +356,8 @@ jQuery(function ($) {
 				return '';
 			}
 			const pixelLimit = Math.max(1, parseInt(maxPixels, 10) || previewVectorMaxPixels);
-			const useStack = !vectorSettings || vectorSettings.multiScanStack !== false;
-			const traceSettings = vectorSettings || {};
+			const traceSettings = resolveTraceSettings(vectorSettings);
+			const useStack = traceSettings.multiScanStack === true;
 			const layerAlphamax = clamp(Number(traceSettings.potraceAlphamax), 0, 1.334);
 			const layerOpttolerance = Math.max(0, Number(traceSettings.potraceOpttolerance));
 			const layerTurdsize = Math.max(0, parseInt(traceSettings.potraceTurdsize, 10) || potraceTurdsize);
@@ -845,6 +857,7 @@ jQuery(function ($) {
 			const seed = seedFromPixels(pixels);
 			let centroids = chooseInitialCentroids(pixels, k, seed);
 			const labels = new Uint8Array(pixels.length);
+
 			for (let iter = 0; iter < 7; iter += 1) {
 				const sums = Array.from({ length: k }, function () {
 					return { r: 0, g: 0, b: 0, count: 0 };
@@ -876,71 +889,12 @@ jQuery(function ($) {
 				}
 			}
 
-			const counts = Array.from({ length: k }, function () { return 0; });
-			for (let i = 0; i < labels.length; i += 1) {
-				counts[labels[i]] += 1;
-			}
-			const minCount = Math.max(1, Math.floor((minimumPercent / 100) * pixels.length));
-			let survivors = [];
-			for (let c = 0; c < k; c += 1) {
-				if (counts[c] >= minCount) {
-					survivors.push({ color: centroids[c].slice(0, 3), count: counts[c], from: [c] });
-				}
-			}
-			if (!survivors.length) {
-				const strongest = counts.indexOf(Math.max.apply(null, counts));
-				survivors = [{ color: centroids[strongest].slice(0, 3), count: counts[strongest], from: [strongest] }];
-			}
-
-			const merged = [];
-			survivors.sort(function (a, b) { return b.count - a.count; });
-			survivors.forEach(function (candidate) {
-				let mergedInto = null;
-				for (let i = 0; i < merged.length; i += 1) {
-					if (Math.sqrt(colorDistanceSq(candidate.color, merged[i].color)) <= mergeThreshold) {
-						mergedInto = merged[i];
-						break;
-					}
-				}
-				if (!mergedInto) {
-					merged.push({ color: candidate.color.slice(0, 3), count: candidate.count, from: candidate.from.slice(0) });
-					return;
-				}
-				const total = mergedInto.count + candidate.count;
-				mergedInto.color = [
-					((mergedInto.color[0] * mergedInto.count) + (candidate.color[0] * candidate.count)) / total,
-					((mergedInto.color[1] * mergedInto.count) + (candidate.color[1] * candidate.count)) / total,
-					((mergedInto.color[2] * mergedInto.count) + (candidate.color[2] * candidate.count)) / total,
-				];
-				mergedInto.count = total;
-				mergedInto.from = mergedInto.from.concat(candidate.from);
-			});
-
-			merged.sort(function (a, b) { return b.count - a.count; });
-			const finalClusters = merged.slice(0, k);
-			const oldToFinal = {};
-			for (let i = 0; i < finalClusters.length; i += 1) {
-				finalClusters[i].from.forEach(function (oldIndex) { oldToFinal[oldIndex] = i; });
-			}
-
 			const fullLabels = new Uint8Array(totalPixels);
-			const fullCounts = Array.from({ length: finalClusters.length }, function () { return 0; });
+			const fullCounts = Array.from({ length: k }, function () { return 0; });
 			for (let i = 0; i < labels.length; i += 1) {
-				let finalIndex = oldToFinal[labels[i]];
-				if (typeof finalIndex === 'undefined') {
-					let nearest = 0;
-					let nearestDist = Number.POSITIVE_INFINITY;
-					for (let c = 0; c < finalClusters.length; c += 1) {
-						const dist = colorDistanceSq(pixels[i], finalClusters[c].color);
-						if (dist < nearestDist) {
-							nearestDist = dist;
-							nearest = c;
-						}
-					}
-					finalIndex = nearest;
-				}
-				fullLabels[opaqueIndices[i]] = finalIndex;
-				fullCounts[finalIndex] += 1;
+				const colorIndex = labels[i] || 0;
+				fullLabels[opaqueIndices[i]] = colorIndex;
+				fullCounts[colorIndex] += 1;
 			}
 
 			const totalOpaque = fullCounts.reduce(function (sum, v) { return sum + v; }, 0);
@@ -949,7 +903,7 @@ jQuery(function ($) {
 			});
 
 			return {
-				palette: finalClusters.map(function (cluster) { return rgbToHex(cluster.color); }),
+				palette: centroids.map(function (clusterColor) { return rgbToHex(clusterColor); }),
 				percentages: percentages,
 				labels: fullLabels,
 			};
@@ -1250,37 +1204,38 @@ jQuery(function ($) {
 			try { settings = JSON.parse(settingsRaw || '{}'); } catch (e) {}
 			const normalizedPalette = normalizePaletteToAllowed(Array.isArray(palette) && palette.length ? palette : defaultPalette.slice(0, 4));
 			try {
-			const maxColors = clamp(parseInt(settings.maximumColorCount, 10) || normalizedPalette.length || 4, 1, maxSwatches);
-			const image = new Image();
-			image.crossOrigin = 'anonymous';
-			const svgDimensions = await getSvgDimensionsFromUrl(previewUrl);
-			const loaded = await new Promise(function (resolve) {
-				image.onload = function () { resolve(true); };
-				image.onerror = function () { resolve(false); };
-				image.src = previewUrl;
-			});
-			if (!loaded) {
-				return '';
-			}
-			const analysis = createAnalysisBuffer(image, svgDimensions, { maxDimension: Math.max(image.naturalWidth || 1, image.naturalHeight || 1) });
-			const quantSource = createQuantizationPixels(
-				analysis.imageData.data,
-				analysis.width,
-				analysis.height,
-				settings.multiScanSmooth === true
-			);
-			if (!quantSource.pixels.length) {
-				return '';
-			}
-			const quantized = quantizeColors(quantSource.pixels, quantSource.opaqueIndices, analysis.width * analysis.height, maxColors);
-			if (!quantized || !quantized.labels) {
-				return '';
-			}
-			const pathSvg = buildVectorSvgMarkup(quantized.labels, analysis.imageData.data, analysis.width, analysis.height, normalizedPalette, highResVectorMaxPixels, settings);
-			if (pathSvg) {
-				return pathSvg;
-			}
-			return buildRectVectorSvgMarkup(quantized.labels, analysis.imageData.data, analysis.width, analysis.height, normalizedPalette, highResVectorMaxPixels * 2);
+				const maxColors = clamp(parseInt(settings.maximumColorCount, 10) || normalizedPalette.length || 4, 1, maxSwatches);
+				const image = new Image();
+				image.crossOrigin = 'anonymous';
+				const svgDimensions = await getSvgDimensionsFromUrl(previewUrl);
+				const loaded = await new Promise(function (resolve) {
+					image.onload = function () { resolve(true); };
+					image.onerror = function () { resolve(false); };
+					image.src = previewUrl;
+				});
+				if (!loaded) {
+					return '';
+				}
+				const analysis = createAnalysisBuffer(image, svgDimensions, { maxDimension: Math.max(image.naturalWidth || 1, image.naturalHeight || 1) });
+				const traceSettings = resolveTraceSettings(settings);
+				const quantSource = createQuantizationPixels(
+					analysis.imageData.data,
+					analysis.width,
+					analysis.height,
+					traceSettings.multiScanSmooth === true
+				);
+				if (!quantSource.pixels.length) {
+					return '';
+				}
+				const quantized = quantizeColors(quantSource.pixels, quantSource.opaqueIndices, analysis.width * analysis.height, maxColors);
+				if (!quantized || !quantized.labels) {
+					return '';
+				}
+				const pathSvg = buildVectorSvgMarkup(quantized.labels, analysis.imageData.data, analysis.width, analysis.height, quantized.palette, highResVectorMaxPixels, traceSettings);
+				if (pathSvg) {
+					return pathSvg;
+				}
+				return buildRectVectorSvgMarkup(quantized.labels, analysis.imageData.data, analysis.width, analysis.height, quantized.palette, highResVectorMaxPixels * 2);
 			} catch (error) {
 				return '';
 			}
@@ -1312,11 +1267,12 @@ jQuery(function ($) {
 			}
 
 			const analysis = createAnalysisBuffer(image, svgDimensions, { maxDimension: designCardMaxDimension });
+			const traceSettings = resolveTraceSettings(settings);
 			const quantSource = createQuantizationPixels(
 				analysis.imageData.data,
 				analysis.width,
 				analysis.height,
-				settings.multiScanSmooth === true
+				traceSettings.multiScanSmooth === true
 			);
 
 			if (!quantSource.pixels.length) {
@@ -1370,11 +1326,12 @@ jQuery(function ($) {
 			}
 			setStatus('Analyzing colors…');
 			await new Promise(function (resolve) { window.setTimeout(resolve, 0); });
+			const traceSettings = resolveTraceSettings(state.analysisSettings);
 			const quantSource = createQuantizationPixels(
 				state.sourcePixels,
 				state.width,
 				state.height,
-				state.analysisSettings.multiScanSmooth === true
+				traceSettings.multiScanSmooth === true
 			);
 			if (!quantSource.pixels.length) {
 				state.palette = [];
@@ -1454,24 +1411,13 @@ jQuery(function ($) {
 			try { settings = JSON.parse(settingsRaw); } catch (e) {}
 			state.palette = normalizePaletteToAllowed(Array.isArray(palette) && palette.length ? palette : defaultPalette.slice(0, 4));
 			state.analysisSettings.maximumColorCount = clamp(parseInt(settings.maximumColorCount, 10) || state.palette.length || 4, 1, maxSwatches);
-			state.analysisSettings.potraceTurdsize = Math.max(0, parseInt(settings.potraceTurdsize, 10) || parseInt(settings.traceSpeckles, 10) || potraceTurdsize);
-			state.analysisSettings.potraceAlphamax = clamp(Number(settings.potraceAlphamax), 0, 1.334);
-			if (!Number.isFinite(state.analysisSettings.potraceAlphamax)) {
-				state.analysisSettings.potraceAlphamax = clamp(Number(settings.traceSmoothCorners), 0, 1.334);
-			}
-			if (!Number.isFinite(state.analysisSettings.potraceAlphamax)) {
-				state.analysisSettings.potraceAlphamax = potraceAlphamax;
-			}
-			state.analysisSettings.potraceOpticurve = settings.potraceOpticurve !== false;
-			state.analysisSettings.potraceOpttolerance = Math.max(0, Number(settings.potraceOpttolerance));
-			if (!Number.isFinite(state.analysisSettings.potraceOpttolerance)) {
-				state.analysisSettings.potraceOpttolerance = Math.max(0, Number(settings.traceOptimize));
-			}
-			if (!Number.isFinite(state.analysisSettings.potraceOpttolerance)) {
-				state.analysisSettings.potraceOpttolerance = potraceOpttolerance;
-			}
-			state.analysisSettings.multiScanSmooth = settings.multiScanSmooth !== false;
-			state.analysisSettings.multiScanStack = settings.multiScanStack !== false;
+			const traceSettings = resolveTraceSettings(settings);
+			state.analysisSettings.potraceTurdsize = traceSettings.potraceTurdsize;
+			state.analysisSettings.potraceAlphamax = traceSettings.potraceAlphamax;
+			state.analysisSettings.potraceOpticurve = traceSettings.potraceOpticurve;
+			state.analysisSettings.potraceOpttolerance = traceSettings.potraceOpttolerance;
+			state.analysisSettings.multiScanSmooth = traceSettings.multiScanSmooth;
+			state.analysisSettings.multiScanStack = traceSettings.multiScanStack;
 			maxColorInput.val(String(state.analysisSettings.maximumColorCount));
 			state.hasUserAdjustedMax = true;
 			state.percentages = [];
