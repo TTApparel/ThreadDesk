@@ -240,6 +240,18 @@ jQuery(function ($) {
 			return Math.max(min, Math.min(max, value));
 		};
 
+		const resolveTraceSettings = function (settings) {
+			const raw = settings || {};
+			return {
+				potraceTurdsize: potraceTurdsize,
+				potraceAlphamax: potraceAlphamax,
+				potraceOpticurve: potraceOpticurve,
+				potraceOpttolerance: potraceOpttolerance,
+				multiScanSmooth: raw.multiScanSmooth !== false,
+				multiScanStack: true,
+			};
+		};
+
 		const hexToRgb = function (hex) {
 			const normalized = (hex || '').replace('#', '');
 			if (!/^[0-9a-fA-F]{6}$/.test(normalized)) {
@@ -344,8 +356,8 @@ jQuery(function ($) {
 				return '';
 			}
 			const pixelLimit = Math.max(1, parseInt(maxPixels, 10) || previewVectorMaxPixels);
-			const useStack = !vectorSettings || vectorSettings.multiScanStack !== false;
-			const traceSettings = vectorSettings || {};
+			const traceSettings = resolveTraceSettings(vectorSettings);
+			const useStack = traceSettings.multiScanStack === true;
 			const layerAlphamax = clamp(Number(traceSettings.potraceAlphamax), 0, 1.334);
 			const layerOpttolerance = Math.max(0, Number(traceSettings.potraceOpttolerance));
 			const layerTurdsize = Math.max(0, parseInt(traceSettings.potraceTurdsize, 10) || potraceTurdsize);
@@ -1250,37 +1262,38 @@ jQuery(function ($) {
 			try { settings = JSON.parse(settingsRaw || '{}'); } catch (e) {}
 			const normalizedPalette = normalizePaletteToAllowed(Array.isArray(palette) && palette.length ? palette : defaultPalette.slice(0, 4));
 			try {
-			const maxColors = clamp(parseInt(settings.maximumColorCount, 10) || normalizedPalette.length || 4, 1, maxSwatches);
-			const image = new Image();
-			image.crossOrigin = 'anonymous';
-			const svgDimensions = await getSvgDimensionsFromUrl(previewUrl);
-			const loaded = await new Promise(function (resolve) {
-				image.onload = function () { resolve(true); };
-				image.onerror = function () { resolve(false); };
-				image.src = previewUrl;
-			});
-			if (!loaded) {
-				return '';
-			}
-			const analysis = createAnalysisBuffer(image, svgDimensions, { maxDimension: Math.max(image.naturalWidth || 1, image.naturalHeight || 1) });
-			const quantSource = createQuantizationPixels(
-				analysis.imageData.data,
-				analysis.width,
-				analysis.height,
-				settings.multiScanSmooth === true
-			);
-			if (!quantSource.pixels.length) {
-				return '';
-			}
-			const quantized = quantizeColors(quantSource.pixels, quantSource.opaqueIndices, analysis.width * analysis.height, maxColors);
-			if (!quantized || !quantized.labels) {
-				return '';
-			}
-			const pathSvg = buildVectorSvgMarkup(quantized.labels, analysis.imageData.data, analysis.width, analysis.height, normalizedPalette, highResVectorMaxPixels, settings);
-			if (pathSvg) {
-				return pathSvg;
-			}
-			return buildRectVectorSvgMarkup(quantized.labels, analysis.imageData.data, analysis.width, analysis.height, normalizedPalette, highResVectorMaxPixels * 2);
+				const maxColors = clamp(parseInt(settings.maximumColorCount, 10) || normalizedPalette.length || 4, 1, maxSwatches);
+				const image = new Image();
+				image.crossOrigin = 'anonymous';
+				const svgDimensions = await getSvgDimensionsFromUrl(previewUrl);
+				const loaded = await new Promise(function (resolve) {
+					image.onload = function () { resolve(true); };
+					image.onerror = function () { resolve(false); };
+					image.src = previewUrl;
+				});
+				if (!loaded) {
+					return '';
+				}
+				const analysis = createAnalysisBuffer(image, svgDimensions, { maxDimension: Math.max(image.naturalWidth || 1, image.naturalHeight || 1) });
+				const traceSettings = resolveTraceSettings(settings);
+				const quantSource = createQuantizationPixels(
+					analysis.imageData.data,
+					analysis.width,
+					analysis.height,
+					traceSettings.multiScanSmooth === true
+				);
+				if (!quantSource.pixels.length) {
+					return '';
+				}
+				const quantized = quantizeColors(quantSource.pixels, quantSource.opaqueIndices, analysis.width * analysis.height, maxColors);
+				if (!quantized || !quantized.labels) {
+					return '';
+				}
+				const pathSvg = buildVectorSvgMarkup(quantized.labels, analysis.imageData.data, analysis.width, analysis.height, normalizedPalette, highResVectorMaxPixels, traceSettings);
+				if (pathSvg) {
+					return pathSvg;
+				}
+				return buildRectVectorSvgMarkup(quantized.labels, analysis.imageData.data, analysis.width, analysis.height, normalizedPalette, highResVectorMaxPixels * 2);
 			} catch (error) {
 				return '';
 			}
@@ -1312,11 +1325,12 @@ jQuery(function ($) {
 			}
 
 			const analysis = createAnalysisBuffer(image, svgDimensions, { maxDimension: designCardMaxDimension });
+			const traceSettings = resolveTraceSettings(settings);
 			const quantSource = createQuantizationPixels(
 				analysis.imageData.data,
 				analysis.width,
 				analysis.height,
-				settings.multiScanSmooth === true
+				traceSettings.multiScanSmooth === true
 			);
 
 			if (!quantSource.pixels.length) {
@@ -1370,11 +1384,12 @@ jQuery(function ($) {
 			}
 			setStatus('Analyzing colors…');
 			await new Promise(function (resolve) { window.setTimeout(resolve, 0); });
+			const traceSettings = resolveTraceSettings(state.analysisSettings);
 			const quantSource = createQuantizationPixels(
 				state.sourcePixels,
 				state.width,
 				state.height,
-				state.analysisSettings.multiScanSmooth === true
+				traceSettings.multiScanSmooth === true
 			);
 			if (!quantSource.pixels.length) {
 				state.palette = [];
@@ -1454,24 +1469,13 @@ jQuery(function ($) {
 			try { settings = JSON.parse(settingsRaw); } catch (e) {}
 			state.palette = normalizePaletteToAllowed(Array.isArray(palette) && palette.length ? palette : defaultPalette.slice(0, 4));
 			state.analysisSettings.maximumColorCount = clamp(parseInt(settings.maximumColorCount, 10) || state.palette.length || 4, 1, maxSwatches);
-			state.analysisSettings.potraceTurdsize = Math.max(0, parseInt(settings.potraceTurdsize, 10) || parseInt(settings.traceSpeckles, 10) || potraceTurdsize);
-			state.analysisSettings.potraceAlphamax = clamp(Number(settings.potraceAlphamax), 0, 1.334);
-			if (!Number.isFinite(state.analysisSettings.potraceAlphamax)) {
-				state.analysisSettings.potraceAlphamax = clamp(Number(settings.traceSmoothCorners), 0, 1.334);
-			}
-			if (!Number.isFinite(state.analysisSettings.potraceAlphamax)) {
-				state.analysisSettings.potraceAlphamax = potraceAlphamax;
-			}
-			state.analysisSettings.potraceOpticurve = settings.potraceOpticurve !== false;
-			state.analysisSettings.potraceOpttolerance = Math.max(0, Number(settings.potraceOpttolerance));
-			if (!Number.isFinite(state.analysisSettings.potraceOpttolerance)) {
-				state.analysisSettings.potraceOpttolerance = Math.max(0, Number(settings.traceOptimize));
-			}
-			if (!Number.isFinite(state.analysisSettings.potraceOpttolerance)) {
-				state.analysisSettings.potraceOpttolerance = potraceOpttolerance;
-			}
-			state.analysisSettings.multiScanSmooth = settings.multiScanSmooth !== false;
-			state.analysisSettings.multiScanStack = settings.multiScanStack !== false;
+			const traceSettings = resolveTraceSettings(settings);
+			state.analysisSettings.potraceTurdsize = traceSettings.potraceTurdsize;
+			state.analysisSettings.potraceAlphamax = traceSettings.potraceAlphamax;
+			state.analysisSettings.potraceOpticurve = traceSettings.potraceOpticurve;
+			state.analysisSettings.potraceOpttolerance = traceSettings.potraceOpttolerance;
+			state.analysisSettings.multiScanSmooth = traceSettings.multiScanSmooth;
+			state.analysisSettings.multiScanStack = traceSettings.multiScanStack;
 			maxColorInput.val(String(state.analysisSettings.maximumColorCount));
 			state.hasUserAdjustedMax = true;
 			state.percentages = [];
