@@ -381,15 +381,11 @@ jQuery(function ($) {
 
 			const gm = new Uint8Array(width * height);
 			gm.fill(0);
-			let detectedColorCount = 0;
-			for (let pixelIndex = 0; pixelIndex < labels.length; pixelIndex += 1) {
-				if (!isOpaquePixel(pixelIndex)) {
-					continue;
-				}
-				detectedColorCount = Math.max(detectedColorCount, (labels[pixelIndex] || 0) + 1);
-			}
-			const scanCount = Math.max(1, Math.min(palette.length, detectedColorCount || palette.length));
-			const colorOrder = Array.from({ length: scanCount }, function (_, index) { return index; });
+			const colorOrder = Array.from({ length: palette.length }, function (_, index) { return index; });
+			const diagnosticsEnabled = !!(window && window.THREADDESK_TRACE_DIAGNOSTICS);
+			const diagnostics = diagnosticsEnabled
+				? { blackCounts: [], appendedIndices: [], styleMismatch: false, hasPathTransform: false }
+				: null;
 			const createBinaryMaskForLabel = function (targetLabel) {
 				for (let pixelIndex = 0; pixelIndex < labels.length; pixelIndex += 1) {
 					if (!isOpaquePixel(pixelIndex)) {
@@ -638,10 +634,23 @@ jQuery(function ($) {
 				return loops;
 			};
 
+			const countBlackPixels = function (mask) {
+				let count = 0;
+				for (let i = 0; i < mask.length; i += 1) {
+					if (mask[i]) {
+						count += 1;
+					}
+				}
+				return count;
+			};
+
 			const paths = [];
 			for (let orderIndex = 0; orderIndex < colorOrder.length; orderIndex += 1) {
 				const colorIndex = colorOrder[orderIndex];
 				const binaryMask = createBinaryMaskForLabel(colorIndex);
+				if (diagnostics) {
+					diagnostics.blackCounts.push(countBlackPixels(binaryMask));
+				}
 				const loops = buildLoopsForLabel(binaryMask);
 				if (!loops.length) {
 					continue;
@@ -658,7 +667,37 @@ jQuery(function ($) {
 				if (!loopPaths.length) {
 					continue;
 				}
-				paths.push('<path fill="' + palette[colorIndex] + '" d="' + loopPaths.join('') + '" fill-rule="evenodd"/>');
+				const fillColor = palette[colorIndex] || palette[0] || '#111111';
+				if (diagnostics && fillColor !== palette[colorIndex]) {
+					diagnostics.styleMismatch = true;
+				}
+				const layerPathMarkup = '<path fill="' + fillColor + '" d="' + loopPaths.join('') + '" fill-rule="evenodd"/>';
+				if (diagnostics && /\stransform\s*=/.test(layerPathMarkup)) {
+					diagnostics.hasPathTransform = true;
+				}
+				paths.push(layerPathMarkup);
+				if (diagnostics) {
+					diagnostics.appendedIndices.push(colorIndex);
+				}
+			}
+
+			if (diagnostics) {
+				const monotonic = diagnostics.blackCounts.every(function (count, index) {
+					return index === 0 || count >= diagnostics.blackCounts[index - 1];
+				});
+				const appendOrderValid = diagnostics.appendedIndices.every(function (indexValue, index) {
+					return indexValue === index || indexValue > diagnostics.appendedIndices[index - 1];
+				});
+				if (!monotonic || !appendOrderValid || diagnostics.styleMismatch || diagnostics.hasPathTransform) {
+					console.warn('[ThreadDesk trace diagnostics]', {
+						monotonic: monotonic,
+						appendOrderValid: appendOrderValid,
+						styleMismatch: diagnostics.styleMismatch,
+						hasPathTransform: diagnostics.hasPathTransform,
+						appendedIndices: diagnostics.appendedIndices,
+						blackCounts: diagnostics.blackCounts,
+					});
+				}
 			}
 			return paths.join('');
 		};
