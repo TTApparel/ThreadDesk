@@ -381,7 +381,9 @@ jQuery(function ($) {
 
 			const gm = new Uint8Array(width * height);
 			gm.fill(0);
-			const colorOrder = Array.from({ length: palette.length }, function (_, index) { return index; });
+			const colorOrder = Array.from({ length: palette.length }, function (_, index) {
+				return (palette.length - 1) - index;
+			});
 			const diagnosticsEnabled = !!(window && window.THREADDESK_TRACE_DIAGNOSTICS);
 			const diagnostics = diagnosticsEnabled
 				? { blackCounts: [], appendedIndices: [], styleMismatch: false, hasPathTransform: false }
