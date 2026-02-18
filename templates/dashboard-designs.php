@@ -5,7 +5,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 $context = isset( $context ) ? $context : array();
 $user    = isset( $context['user'] ) ? $context['user'] : null;
-$cover   = ! empty( $context['cover_image'] ) ? $context['cover_image'] : THREDDESK_URL . 'assets/images/threaddesk-cover-fallback.svg';
+$cover   = ! empty( $context['cover_image'] ) ? $context['cover_image'] : '';
 $company = ! empty( $context['company'] ) ? $context['company'] : __( 'Client Company', 'threaddesk' );
 $client_name = ! empty( $context['client_name'] ) ? $context['client_name'] : __( 'Client Name', 'threaddesk' );
 $avatar_url  = ! empty( $context['avatar_url'] ) ? $context['avatar_url'] : '';
@@ -37,6 +37,16 @@ if ( $user ) {
 }
 $profile_name = $profile_name ? $profile_name : $client_name;
 $profile_username = $user ? $user->user_login : __( 'Username', 'threaddesk' );
+
+
+if ( '' === $cover ) {
+	$cover_label = trim( (string) $profile_username );
+	if ( '' === $cover_label ) {
+		$cover_label = (string) __( 'Username', 'threaddesk' );
+	}
+	$cover_svg = '<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="240" viewBox="0 0 1200 240" role="img" aria-label="ThreadDesk Cover"><defs><linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#0f1720"/><stop offset="100%" stop-color="#1e2d3f"/></linearGradient></defs><rect width="1200" height="240" fill="url(#bg)"/><text x="50%" y="54%" dominant-baseline="middle" text-anchor="middle" fill="#e6edf5" font-family="Arial, sans-serif" font-size="52" font-weight="700">' . esc_html( $cover_label ) . '</text></svg>';
+	$cover = 'data:image/svg+xml;charset=UTF-8,' . rawurlencode( $cover_svg );
+}
 
 $nav_base = trailingslashit( wc_get_account_endpoint_url( 'thread-desk' ) );
 ?>
