@@ -174,9 +174,9 @@ jQuery(function ($) {
 		const mergeThreshold = 22;
 		const maxSwatches = 8;
 		const potraceTurdsize = 2;
-		const potraceAlphamax = 1.15;
+		const potraceAlphamax = 1.0;
 		const potraceOpticurve = true;
-		const potraceOpttolerance = 0.28;
+		const potraceOpttolerance = 0.2;
 		const multiScanSmooth = true;
 		const multiScanStack = true;
 		const designPreviewMaxDimension = 960;
@@ -368,23 +368,7 @@ jQuery(function ($) {
 			};
 
 			const gm = new Uint8Array(width * height);
-			const labelPixelCounts = Array.from({ length: palette.length }, function () { return 0; });
-			for (let pixelIndex = 0; pixelIndex < labels.length; pixelIndex += 1) {
-				if (!isOpaquePixel(pixelIndex)) {
-					continue;
-				}
-				const label = labels[pixelIndex] || 0;
-				if (label >= 0 && label < labelPixelCounts.length) {
-					labelPixelCounts[label] += 1;
-				}
-			}
-			const colorOrder = Array.from({ length: palette.length }, function (_, index) { return index; }).sort(function (a, b) {
-				const countDiff = labelPixelCounts[a] - labelPixelCounts[b];
-				if (countDiff !== 0) {
-					return countDiff;
-				}
-				return a - b;
-			});
+			const colorOrder = Array.from({ length: palette.length }, function (_, index) { return index; });
 			const createBinaryMaskForLabel = function (targetLabel) {
 				for (let pixelIndex = 0; pixelIndex < labels.length; pixelIndex += 1) {
 					if (!isOpaquePixel(pixelIndex)) {
@@ -657,7 +641,7 @@ jQuery(function ($) {
 				}
 				paths.push('<path fill="' + palette[colorIndex] + '" d="' + loopPaths.join('') + '" fill-rule="evenodd"/>');
 			}
-			return paths.reverse().join('');
+			return paths.join('');
 		};
 
 		const renderQuantizedPreview = function () {
