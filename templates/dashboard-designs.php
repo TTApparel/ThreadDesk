@@ -5,7 +5,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 $context = isset( $context ) ? $context : array();
 $user    = isset( $context['user'] ) ? $context['user'] : null;
-$cover   = ! empty( $context['cover_image'] ) ? $context['cover_image'] : 'https://via.placeholder.com/1200x240.png?text=ThreadDesk+Cover';
+$cover   = ! empty( $context['cover_image'] ) ? $context['cover_image'] : '';
 $company = ! empty( $context['company'] ) ? $context['company'] : __( 'Client Company', 'threaddesk' );
 $client_name = ! empty( $context['client_name'] ) ? $context['client_name'] : __( 'Client Name', 'threaddesk' );
 $avatar_url  = ! empty( $context['avatar_url'] ) ? $context['avatar_url'] : '';
@@ -37,6 +37,16 @@ if ( $user ) {
 }
 $profile_name = $profile_name ? $profile_name : $client_name;
 $profile_username = $user ? $user->user_login : __( 'Username', 'threaddesk' );
+
+
+if ( '' === $cover ) {
+	$cover_label = trim( (string) $profile_username );
+	if ( '' === $cover_label ) {
+		$cover_label = (string) __( 'Username', 'threaddesk' );
+	}
+	$cover_svg = '<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="240" viewBox="0 0 1200 240" role="img" aria-label="ThreadDesk Cover"><defs><linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#0f1720"/><stop offset="100%" stop-color="#1e2d3f"/></linearGradient></defs><rect width="1200" height="240" fill="url(#bg)"/><text x="50%" y="54%" dominant-baseline="middle" text-anchor="middle" fill="#e6edf5" font-family="Arial, sans-serif" font-size="52" font-weight="700">' . esc_html( $cover_label ) . '</text></svg>';
+	$cover = 'data:image/svg+xml;charset=UTF-8,' . rawurlencode( $cover_svg );
+}
 
 $nav_base = trailingslashit( wc_get_account_endpoint_url( 'thread-desk' ) );
 ?>
@@ -89,6 +99,8 @@ $nav_base = trailingslashit( wc_get_account_endpoint_url( 'thread-desk' ) );
 					<?php $design_file_name = get_post_meta( $design->ID, 'design_file_name', true ); ?>
 					<?php $design_palette = get_post_meta( $design->ID, 'design_palette', true ); ?>
 					<?php $design_settings = get_post_meta( $design->ID, 'design_analysis_settings', true ); ?>
+					<?php $design_svg_url = get_post_meta( $design->ID, 'design_svg_file_url', true ); ?>
+					<?php $design_svg_name = get_post_meta( $design->ID, 'design_svg_file_name', true ); ?>
 					<div class="threaddesk__card">
 						<?php if ( $design_preview ) : ?>
 							<div class="threaddesk__card-design-preview">
@@ -117,7 +129,9 @@ $nav_base = trailingslashit( wc_get_account_endpoint_url( 'thread-desk' ) );
 								data-threaddesk-design-preview-url="<?php echo esc_url( $design_preview ); ?>"
 								data-threaddesk-design-file-name="<?php echo esc_attr( $design_file_name ); ?>"
 								data-threaddesk-design-palette="<?php echo esc_attr( $design_palette ? $design_palette : '[]' ); ?>"
-								data-threaddesk-design-settings="<?php echo esc_attr( $design_settings ? $design_settings : '{}' ); ?>">
+								data-threaddesk-design-settings="<?php echo esc_attr( $design_settings ? $design_settings : '{}' ); ?>"
+								data-threaddesk-design-svg-url="<?php echo esc_url( $design_svg_url ); ?>"
+								data-threaddesk-design-svg-name="<?php echo esc_attr( $design_svg_name ); ?>">
 								<?php echo esc_html__( 'Save', 'threaddesk' ); ?>
 							</button>
 							<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
@@ -172,6 +186,7 @@ $nav_base = trailingslashit( wc_get_account_endpoint_url( 'thread-desk' ) );
 				<input type="hidden" name="threaddesk_design_palette" data-threaddesk-design-palette value="[]" />
 				<input type="hidden" name="threaddesk_design_color_count" data-threaddesk-design-color-count value="0" />
 				<input type="hidden" name="threaddesk_design_analysis_settings" data-threaddesk-design-settings value="{}" />
+				<input type="hidden" name="threaddesk_design_svg_markup" data-threaddesk-design-svg-markup value="" />
 
 				<div class="threaddesk-designer__controls">
 					<div class="threaddesk-designer__control-head">
