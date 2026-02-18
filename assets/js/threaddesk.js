@@ -380,13 +380,20 @@ jQuery(function ($) {
 			};
 
 			const gm = new Uint8Array(width * height);
-			const colorOrder = Array.from({ length: palette.length }, function (_, index) { return index; });
+			gm.fill(0);
+			let detectedColorCount = 0;
+			for (let pixelIndex = 0; pixelIndex < labels.length; pixelIndex += 1) {
+				if (!isOpaquePixel(pixelIndex)) {
+					continue;
+				}
+				detectedColorCount = Math.max(detectedColorCount, (labels[pixelIndex] || 0) + 1);
+			}
+			const scanCount = Math.max(1, Math.min(palette.length, detectedColorCount || palette.length));
+			const colorOrder = Array.from({ length: scanCount }, function (_, index) { return index; });
 			const createBinaryMaskForLabel = function (targetLabel) {
 				for (let pixelIndex = 0; pixelIndex < labels.length; pixelIndex += 1) {
 					if (!isOpaquePixel(pixelIndex)) {
-						if (!useStack) {
-							gm[pixelIndex] = 0;
-						}
+						gm[pixelIndex] = 0;
 						continue;
 					}
 					if ((labels[pixelIndex] || 0) === targetLabel) {
@@ -562,7 +569,7 @@ jQuery(function ($) {
 				return commands.join('');
 			};
 
-			const buildLoopsForLabel = function (targetLabel, mask) {
+			const buildLoopsForLabel = function (mask) {
 				const outgoing = new Map();
 				const edges = [];
 				const speckleThreshold = layerTurdsize;
@@ -635,7 +642,7 @@ jQuery(function ($) {
 			for (let orderIndex = 0; orderIndex < colorOrder.length; orderIndex += 1) {
 				const colorIndex = colorOrder[orderIndex];
 				const binaryMask = createBinaryMaskForLabel(colorIndex);
-				const loops = buildLoopsForLabel(colorIndex, binaryMask);
+				const loops = buildLoopsForLabel(binaryMask);
 				if (!loops.length) {
 					continue;
 				}
