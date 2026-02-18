@@ -857,6 +857,7 @@ jQuery(function ($) {
 			const seed = seedFromPixels(pixels);
 			let centroids = chooseInitialCentroids(pixels, k, seed);
 			const labels = new Uint8Array(pixels.length);
+
 			for (let iter = 0; iter < 7; iter += 1) {
 				const sums = Array.from({ length: k }, function () {
 					return { r: 0, g: 0, b: 0, count: 0 };
@@ -888,71 +889,12 @@ jQuery(function ($) {
 				}
 			}
 
-			const counts = Array.from({ length: k }, function () { return 0; });
-			for (let i = 0; i < labels.length; i += 1) {
-				counts[labels[i]] += 1;
-			}
-			const minCount = Math.max(1, Math.floor((minimumPercent / 100) * pixels.length));
-			let survivors = [];
-			for (let c = 0; c < k; c += 1) {
-				if (counts[c] >= minCount) {
-					survivors.push({ color: centroids[c].slice(0, 3), count: counts[c], from: [c] });
-				}
-			}
-			if (!survivors.length) {
-				const strongest = counts.indexOf(Math.max.apply(null, counts));
-				survivors = [{ color: centroids[strongest].slice(0, 3), count: counts[strongest], from: [strongest] }];
-			}
-
-			const merged = [];
-			survivors.sort(function (a, b) { return b.count - a.count; });
-			survivors.forEach(function (candidate) {
-				let mergedInto = null;
-				for (let i = 0; i < merged.length; i += 1) {
-					if (Math.sqrt(colorDistanceSq(candidate.color, merged[i].color)) <= mergeThreshold) {
-						mergedInto = merged[i];
-						break;
-					}
-				}
-				if (!mergedInto) {
-					merged.push({ color: candidate.color.slice(0, 3), count: candidate.count, from: candidate.from.slice(0) });
-					return;
-				}
-				const total = mergedInto.count + candidate.count;
-				mergedInto.color = [
-					((mergedInto.color[0] * mergedInto.count) + (candidate.color[0] * candidate.count)) / total,
-					((mergedInto.color[1] * mergedInto.count) + (candidate.color[1] * candidate.count)) / total,
-					((mergedInto.color[2] * mergedInto.count) + (candidate.color[2] * candidate.count)) / total,
-				];
-				mergedInto.count = total;
-				mergedInto.from = mergedInto.from.concat(candidate.from);
-			});
-
-			merged.sort(function (a, b) { return b.count - a.count; });
-			const finalClusters = merged.slice(0, k);
-			const oldToFinal = {};
-			for (let i = 0; i < finalClusters.length; i += 1) {
-				finalClusters[i].from.forEach(function (oldIndex) { oldToFinal[oldIndex] = i; });
-			}
-
 			const fullLabels = new Uint8Array(totalPixels);
-			const fullCounts = Array.from({ length: finalClusters.length }, function () { return 0; });
+			const fullCounts = Array.from({ length: k }, function () { return 0; });
 			for (let i = 0; i < labels.length; i += 1) {
-				let finalIndex = oldToFinal[labels[i]];
-				if (typeof finalIndex === 'undefined') {
-					let nearest = 0;
-					let nearestDist = Number.POSITIVE_INFINITY;
-					for (let c = 0; c < finalClusters.length; c += 1) {
-						const dist = colorDistanceSq(pixels[i], finalClusters[c].color);
-						if (dist < nearestDist) {
-							nearestDist = dist;
-							nearest = c;
-						}
-					}
-					finalIndex = nearest;
-				}
-				fullLabels[opaqueIndices[i]] = finalIndex;
-				fullCounts[finalIndex] += 1;
+				const colorIndex = labels[i] || 0;
+				fullLabels[opaqueIndices[i]] = colorIndex;
+				fullCounts[colorIndex] += 1;
 			}
 
 			const totalOpaque = fullCounts.reduce(function (sum, v) { return sum + v; }, 0);
@@ -961,7 +903,7 @@ jQuery(function ($) {
 			});
 
 			return {
-				palette: finalClusters.map(function (cluster) { return rgbToHex(cluster.color); }),
+				palette: centroids.map(function (clusterColor) { return rgbToHex(clusterColor); }),
 				percentages: percentages,
 				labels: fullLabels,
 			};
@@ -1289,11 +1231,11 @@ jQuery(function ($) {
 				if (!quantized || !quantized.labels) {
 					return '';
 				}
-				const pathSvg = buildVectorSvgMarkup(quantized.labels, analysis.imageData.data, analysis.width, analysis.height, normalizedPalette, highResVectorMaxPixels, traceSettings);
+				const pathSvg = buildVectorSvgMarkup(quantized.labels, analysis.imageData.data, analysis.width, analysis.height, quantized.palette, highResVectorMaxPixels, traceSettings);
 				if (pathSvg) {
 					return pathSvg;
 				}
-				return buildRectVectorSvgMarkup(quantized.labels, analysis.imageData.data, analysis.width, analysis.height, normalizedPalette, highResVectorMaxPixels * 2);
+				return buildRectVectorSvgMarkup(quantized.labels, analysis.imageData.data, analysis.width, analysis.height, quantized.palette, highResVectorMaxPixels * 2);
 			} catch (error) {
 				return '';
 			}
