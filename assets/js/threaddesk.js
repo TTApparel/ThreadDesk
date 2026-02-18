@@ -406,8 +406,9 @@ jQuery(function ($) {
 			};
 
 			const removeCollinearPoints = function (points, epsilon) {
-				if (points.length < 3) {
-					return points;
+				const workingPoints = points || [];
+				if (workingPoints.length < 3) {
+					return workingPoints;
 				}
 				const tolerance = Math.max(0, Number(epsilon) || 0);
 				const cleaned = [];
@@ -425,7 +426,7 @@ jQuery(function ($) {
 					}
 					cleaned.push(current);
 				}
-				return cleaned.length >= 3 ? cleaned : points;
+				return cleaned.length >= 3 ? cleaned : workingPoints;
 			};
 
 			const pointToSegmentDistance = function (point, start, end) {
