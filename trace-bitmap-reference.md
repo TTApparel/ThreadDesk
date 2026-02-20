@@ -4,7 +4,6 @@ This document is a **single-file, implementation-oriented specification** for re
 
 - Multiple scans
 - Detection mode: **Colors** (`MS_C` / `TRACE_QUANT_COLOR`)
-- **Stack ON** (assumed always on in this reference)
 - Potrace shaping settings:
   - `turdsize = 2` (Speckles)
   - `alphamax = 1.0` (Smooth corners)
@@ -13,8 +12,7 @@ This document is a **single-file, implementation-oriented specification** for re
 The emphasis here is the exact manner in which:
 1. the source image is quantized,
 2. each color index is iterated,
-3. the pass mask is built for each index under **Stack ON**,
-4. each traced layer is appended in deterministic index order.
+3. each traced layer is appended in deterministic index order.
 
 ---
 
@@ -42,18 +40,17 @@ potraceParams->turdsize     = 2;
 The flow is:
 
 1. Convert source bitmap to RGB map.
-2. If configured, apply Gaussian blur to RGB map (**before quantization**).
+2. Apply Gaussian blur to RGB map (**before quantization**).
 3. Quantize RGB map to an `IndexedMap` with `scans` palette entries.
 4. Create one shared binary `GrayMap` mask (white initialized).
 5. For each `colorIndex` in `[0, nrColors)`:
    - fill mask pixels belonging to that index with black,
-   - because Stack is ON, leave non-matching pixels unchanged,
+   - leave non-matching pixels unchanged,
    - trace resulting mask with Potrace,
    - style traced path with palette color `clut[colorIndex]`,
    - append traced layer in loop order.
-6. Optionally remove bottom-most layer if requested.
 
-Important: with **Stack ON**, the mask is cumulative from one pass to the next.
+Important: the mask is cumulative from one pass to the next.
 
 ---
 
@@ -61,7 +58,7 @@ Important: with **Stack ON**, the mask is cumulative from one pass to the next.
 
 ### 3.1 Pre-quantization blur
 
-If multiscans smooth is enabled, blur happens *before* quantization.
+Blur happens *before* quantization.
 That reduces high-frequency edge stair-stepping and small isolated classes.
 
 ```cpp
@@ -90,7 +87,7 @@ Avoid introducing dithering if you are pursuing strict parity.
 
 ---
 
-## 4) Color iteration + mask building with Stack ON (deep detail)
+## 4) Color iteration + mask building 
 
 This is the critical section.
 
@@ -107,11 +104,11 @@ for (int y = 0; y < gm->height; ++y) {
 }
 ```
 
-### 4.2 Per-index update rule (Stack ON)
+### 4.2 Per-index update rule
 
 For each pass `colorIndex`:
 - if pixel belongs to current index: set black
-- else: **do nothing** (because Stack ON)
+- else: **do nothing**
 
 ```cpp
 for (int colorIndex = 0; colorIndex < indexed->nrColors; ++colorIndex) {
@@ -245,7 +242,7 @@ If your renderer paints in insertion order:
 - `out[0]` is painted first (bottom)
 - `out[n-1]` is painted last (top)
 
-Because masks are cumulative under Stack ON, upper layers can visually dominate if not composited the same way as your reference system.
+Because masks are cumulative, upper layers can visually dominate if not composited the same way as your reference system.
 
 ### 7.3 Do not reorder during parity work
 
@@ -254,7 +251,7 @@ Reordering breaks deterministic parity even if tracing itself is correct.
 
 ---
 
-## 8) Fully consolidated reference function (Stack ON profile)
+## 8) Fully consolidated reference function
 
 ```cpp
 struct TraceBitmapConfig {
@@ -333,11 +330,6 @@ std::vector<Layer> trace_bitmap_multicolor_colors_stack_on(
         out.push_back({style_buf, d});
     }
 
-    // 5) Optional behavior
-    if (cfg.remove_background && out.size() > 1) {
-        out.erase(out.end() - 1);
-    }
-
     gm->destroy(gm);
     indexed->destroy(indexed);
     potrace_param_free(params);
@@ -363,7 +355,7 @@ for (int i = 0; i < indexed->nrColors; ++i) {
 }
 ```
 
-### 9.2 Log cumulative black pixel count per pass (Stack ON)
+### 9.2 Log cumulative black pixel count per pass
 
 ```cpp
 auto count_black = [&](GrayMap *gm) {
@@ -435,17 +427,14 @@ including the condition that only resets non-matching pixels when stack is OFF.
 
 ---
 
-## 13) Stack ON truth table (pixel update contract)
+## 13) Stack truth table (pixel update contract)
 
 For each pass and each pixel:
 
 | Condition | Stack flag | Action on `gm(x,y)` |
 |---|---|---|
 | `idx == colorIndex` | ON/OFF | Set `GRAYMAP_BLACK` |
-| `idx != colorIndex` | ON | **No-op** (leave prior value) |
-| `idx != colorIndex` | OFF | Set `GRAYMAP_WHITE` |
-
-For this reference profile, Stack is ON, so only the first two rows apply.
+| `idx != colorIndex` | ON | **No-op** (leave prior value) 
 
 Reference implementation expression:
 
@@ -544,7 +533,7 @@ for (int i = 0; i < out.size(); ++i) {
 
 1. **Per-layer re-quantization** (wrong): causes index drift and unstable layering.
 2. **Dithering left enabled in quantizer**: introduces micro-islands and jagged outlines.
-3. **Stack ON implemented as overwrite instead of cumulative update**.
+3. **Stack implemented as overwrite instead of cumulative update**.
 4. **Potrace parameters set once but overridden in helper functions later**.
 5. **Preview pipeline mistaken for final render pipeline**.
 6. **Color index mapped to sorted palette instead of original quantizer `clut` order**.
@@ -589,10 +578,10 @@ If your implementation follows the process below, it is aligned with this refere
 
 1. Load source image and construct analysis buffer once.
 2. Resolve one trace settings object and keep it fixed for the call.
-3. Apply optional pre-quantization blur only if multiscan smooth is enabled.
+3. Apply optional pre-quantization blur.
 4. Quantize once to `(labels, palette, percentages)`.
 5. Do **not** post-merge, re-sort, or relabel classes after quantization.
-6. Iterate `colorIndex` in ascending order, using one shared cumulative mask for Stack ON.
+6. Iterate `colorIndex` in ascending order, using one shared cumulative mask.
 7. Trace each pass and append path output in the same index order.
 8. Style each layer with quantizer palette entry `palette[colorIndex]` (CLUT-equivalent).
 9. Return final SVG; keep any non-tracing fallback path separate from parity evaluation.
@@ -615,7 +604,7 @@ For repeatable parity from run to run, also lock:
 - blur kernel/radius for pre-quantization smoothing,
 - image resampling policy before quantization (if any).
 
-Even with the same Stack ON tracing logic, differences in those pre-quantization details can change label maps and therefore final path geometry.
+Even with the same Stack tracing logic, differences in those pre-quantization details can change label maps and therefore final path geometry.
 
 ### Quick “correctness assertion pack”
 
@@ -635,7 +624,7 @@ for (int i = 0; i < layers.size(); ++i) {
     assert(layers[i].fill == palette[i]);
 }
 
-// Stack ON cumulative mask growth
+// Stack cumulative mask growth
 for (int i = 1; i < black_counts.size(); ++i) {
     assert(black_counts[i] >= black_counts[i - 1]);
 }
