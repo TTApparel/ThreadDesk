@@ -251,6 +251,7 @@ jQuery(function ($) {
 				potraceOpttolerance: potraceOpttolerance,
 				multiScanSmooth: raw.multiScanSmooth !== false,
 				multiScanStack: true,
+				exportReverseOrder: raw.exportReverseOrder === true,
 			};
 		};
 
@@ -410,7 +411,8 @@ jQuery(function ($) {
 			if (!layerMarkup.length) {
 				return '';
 			}
-			return '<svg xmlns="http://www.w3.org/2000/svg" width="' + safeWidth + '" height="' + safeHeight + '" viewBox="0 0 ' + safeWidth + ' ' + safeHeight + '" shape-rendering="geometricPrecision">' + layerMarkup.join('') + '</svg>';
+			const orderedLayerMarkup = traceSettings.exportReverseOrder === true ? layerMarkup.slice().reverse() : layerMarkup;
+			return '<svg xmlns="http://www.w3.org/2000/svg" width="' + safeWidth + '" height="' + safeHeight + '" viewBox="0 0 ' + safeWidth + ' ' + safeHeight + '" shape-rendering="geometricPrecision">' + orderedLayerMarkup.join('') + '</svg>';
 		};
 
 
@@ -855,11 +857,13 @@ jQuery(function ($) {
 		};
 
 		const buildSmoothExportSvgMarkup = function (labels, sourcePixels, width, height, palette, maxPixels, vectorSettings) {
-			return buildVectorSvgMarkup(labels, sourcePixels, width, height, palette, maxPixels, vectorSettings);
+			const exportSettings = $.extend({}, vectorSettings || {}, { exportReverseOrder: true });
+			return buildVectorSvgMarkup(labels, sourcePixels, width, height, palette, maxPixels, exportSettings);
 		};
 
 		const buildRectVectorSvgMarkup = function (labels, sourcePixels, width, height, palette, maxPixels, vectorSettings) {
-			return buildTraceBitmapSvgMarkup(labels, sourcePixels, width, height, palette, maxPixels, vectorSettings);
+			const exportSettings = $.extend({}, vectorSettings || {}, { exportReverseOrder: true });
+			return buildTraceBitmapSvgMarkup(labels, sourcePixels, width, height, palette, maxPixels, exportSettings);
 		};
 
 
