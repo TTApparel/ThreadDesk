@@ -613,25 +613,24 @@ body.threaddesk-modal-open {
 
 .threaddesk__card--design {
 	position: relative;
-	padding-top: 12px;
-}
-
-.threaddesk__card-header--design {
-	align-items: flex-start;
-	margin-bottom: 10px;
-	gap: 10px;
+	padding-top: 10px;
 }
 
 .threaddesk__card-title-form {
-	flex: 1 1 auto;
+	margin: 0;
+	margin-bottom: 10px;
+}
+
+.threaddesk__card-title {
 	margin: 0;
 }
 
 .threaddesk__card-title-input {
 	width: 100%;
-	font-size: 16px;
-	font-weight: 600;
-	line-height: 1.25;
+	font-family: inherit;
+	font-size: 0.83em;
+	font-weight: 700;
+	line-height: 1.67;
 	border: 0;
 	padding: 0;
 	background: transparent;
@@ -651,7 +650,7 @@ body.threaddesk-modal-open {
 }
 
 .threaddesk__card-delete-button {
-	border: 0;
+	border: none;
 	background: transparent;
 	padding: 0;
 	width: 18px;
@@ -660,6 +659,11 @@ body.threaddesk-modal-open {
 	font-size: 16px;
 	cursor: pointer;
 	color: #8b1f1f;
+	transition: transform 0.18s ease;
+}
+
+.threaddesk__card-delete-button:hover {
+	transform: rotate(190deg);
 }
 
 .threaddesk__card-header {
@@ -1053,4 +1057,3 @@ body.threaddesk-modal-open {
 .threaddesk-designer__palette-dot:hover::after {
 	opacity: 1;
 }
-

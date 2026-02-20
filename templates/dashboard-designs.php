@@ -102,26 +102,24 @@ $nav_base = trailingslashit( wc_get_account_endpoint_url( 'thread-desk' ) );
 					<?php $design_svg_url = get_post_meta( $design->ID, 'design_svg_file_url', true ); ?>
 					<?php $design_svg_name = get_post_meta( $design->ID, 'design_svg_file_name', true ); ?>
 					<div class="threaddesk__card threaddesk__card--design">
-						<div class="threaddesk__card-header threaddesk__card-header--design">
-							<form class="threaddesk__card-title-form" method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
-								<input type="hidden" name="action" value="tta_threaddesk_rename_design" />
-								<input type="hidden" name="design_id" value="<?php echo esc_attr( $design->ID ); ?>" />
-								<?php wp_nonce_field( 'tta_threaddesk_rename_design' ); ?>
-								<input class="threaddesk__card-title-input" type="text" name="design_title" value="<?php echo esc_attr( $design->post_title ); ?>" maxlength="120" data-threaddesk-design-title-card-input aria-label="<?php echo esc_attr__( 'Design title', 'threaddesk' ); ?>" />
-							</form>
-							<form class="threaddesk__card-delete" method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
-								<input type="hidden" name="action" value="tta_threaddesk_delete_design" />
-								<input type="hidden" name="design_id" value="<?php echo esc_attr( $design->ID ); ?>" />
-								<?php wp_nonce_field( 'tta_threaddesk_delete_design' ); ?>
-								<button type="submit" class="threaddesk__card-delete-button" aria-label="<?php echo esc_attr__( 'Delete design', 'threaddesk' ); ?>">&times;</button>
-							</form>
-						</div>
+						<form class="threaddesk__card-delete" method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
+							<input type="hidden" name="action" value="tta_threaddesk_delete_design" />
+							<input type="hidden" name="design_id" value="<?php echo esc_attr( $design->ID ); ?>" />
+							<?php wp_nonce_field( 'tta_threaddesk_delete_design' ); ?>
+							<button type="submit" class="threaddesk__card-delete-button" aria-label="<?php echo esc_attr__( 'Delete design', 'threaddesk' ); ?>">&times;</button>
+						</form>
 						<?php if ( $design_preview ) : ?>
 							<div class="threaddesk__card-design-preview">
 								<img class="threaddesk__card-design-preview-svg" src="<?php echo esc_url( $design_preview ); ?>" alt="<?php echo esc_attr( $design->post_title ); ?>" />
 								<img class="threaddesk__card-design-preview-original" src="<?php echo esc_url( $design_preview ); ?>" alt="" aria-hidden="true" />
 							</div>
 						<?php endif; ?>
+						<form class="threaddesk__card-title-form" method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
+							<input type="hidden" name="action" value="tta_threaddesk_rename_design" />
+							<input type="hidden" name="design_id" value="<?php echo esc_attr( $design->ID ); ?>" />
+							<?php wp_nonce_field( 'tta_threaddesk_rename_design' ); ?>
+							<h5 class="threaddesk__card-title"><input class="threaddesk__card-title-input" type="text" name="design_title" value="<?php echo esc_attr( $design->post_title ); ?>" maxlength="120" data-threaddesk-design-title-card-input aria-label="<?php echo esc_attr__( 'Design title', 'threaddesk' ); ?>" /></h5>
+						</form>
 						<div class="threaddesk__card-design-actions">
 							<button
 								type="button"
