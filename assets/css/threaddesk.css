@@ -657,9 +657,9 @@ body.threaddesk-modal-open {
 	width: 18px;
 	height: 18px;
 	line-height: 18px;
-	font-size: 16px;
+	font-size: 20px;
 	cursor: pointer;
-	color: #8b1f1f;
+	color: #000;
 	transition: transform 0.18s ease;
 }
 
