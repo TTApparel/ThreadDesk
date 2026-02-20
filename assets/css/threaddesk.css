@@ -606,9 +606,64 @@ body.threaddesk-modal-open {
 .threaddesk__card {
 	background: #fff;
 	padding: 16px;
-	border-radius: 12px;
+	border-radius: 0;
 	box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
 	margin-bottom: 16px;
+}
+
+.threaddesk__card--design {
+	position: relative;
+	padding-top: 10px;
+}
+
+.threaddesk__card-title-form {
+	margin: 0;
+	margin-bottom: 10px;
+}
+
+.threaddesk__card-title {
+	margin: 0;
+}
+
+.threaddesk__card-title-input {
+	width: 100%;
+	font-family: inherit;
+	font-size: 0.83em;
+	font-weight: 700;
+	line-height: 1.67;
+	border: 0;
+	padding: 0;
+	background: transparent;
+	color: #111;
+}
+
+.threaddesk__card-title-input:focus {
+	outline: 1px solid #b9b9b9;
+	outline-offset: 3px;
+}
+
+.threaddesk__card-delete {
+	margin: 0;
+	position: absolute;
+	top: 6px;
+	right: 8px;
+}
+
+.threaddesk__card-delete-button {
+	border: none;
+	background: transparent;
+	padding: 0;
+	width: 18px;
+	height: 18px;
+	line-height: 18px;
+	font-size: 16px;
+	cursor: pointer;
+	color: #8b1f1f;
+	transition: transform 0.18s ease;
+}
+
+.threaddesk__card-delete-button:hover {
+	transform: rotate(190deg);
 }
 
 .threaddesk__card-header {
@@ -623,11 +678,15 @@ body.threaddesk-modal-open {
 	border-radius: 10px;
 	overflow: hidden;
 	background: #f3f3f3;
+	margin-top: 12px;
 	margin-bottom: 10px;
 	aspect-ratio: 4 / 3;
 	display: flex;
 	align-items: center;
 	justify-content: center;
+	position: relative;
+	padding: 5px;
+	box-sizing: border-box;
 }
 
 .threaddesk__card-design-preview img {
@@ -637,16 +696,12 @@ body.threaddesk-modal-open {
 	object-fit: contain;
 }
 
-.threaddesk__card-design-preview {
-	position: relative;
-}
-
 .threaddesk__card-design-preview-svg,
 .threaddesk__card-design-preview-original {
 	position: absolute;
-	inset: 0;
-	width: 100%;
-	height: 100%;
+	inset: 5px;
+	width: calc(100% - 10px);
+	height: calc(100% - 10px);
 	object-fit: contain;
 }
 
@@ -663,13 +718,6 @@ body.threaddesk-modal-open {
 
 .threaddesk__card-design-preview:hover .threaddesk__card-design-preview-original {
 	opacity: 1;
-}
-
-.threaddesk__card-design-file {
-	margin-top: 6px;
-	font-size: 12px;
-	color: #666;
-	word-break: break-word;
 }
 
 
@@ -790,10 +838,16 @@ body.threaddesk-modal-open {
 	margin-bottom: 8px;
 }
 
+/* Legacy modal title controls are intentionally hidden (title is edited on saved cards only). */
+.threaddesk-designer__title-field,
+#threaddesk_design_title,
+[data-threaddesk-design-title-input] {
+	display: none !important;
+}
+
 .threaddesk-designer .threaddesk-auth-modal__form-inner {
 	padding: 24px;
 }
-
 
 
 .threaddesk-designer__design-image {
@@ -1011,5 +1065,3 @@ body.threaddesk-modal-open {
 .threaddesk-designer__palette-dot:hover::after {
 	opacity: 1;
 }
-
-
