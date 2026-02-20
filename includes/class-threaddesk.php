@@ -649,13 +649,40 @@ class TTA_ThreadDesk {
 			update_post_meta( $design_id, 'design_original_file_path', $target_path );
 			update_post_meta( $design_id, 'design_original_file_url', esc_url_raw( $target_url ) );
 
-			$updated_title = sanitize_text_field( preg_replace( '/\.[^.]+$/', '', $file_name ) );
+			$updated_title = '' !== $title_input ? $title_input : sanitize_text_field( preg_replace( '/\.[^.]+$/', '', $file_name ) );
 			if ( '' !== $updated_title ) {
 				wp_update_post( array( 'ID' => $design_id, 'post_title' => $updated_title ) );
 			}
 
 			if ( $old_original_path && $old_original_path !== $target_path ) {
 				$this->maybe_delete_design_file( $old_original_path );
+			}
+		}
+
+		if ( ! $upload && '' !== $title_input ) {
+			wp_update_post( array( 'ID' => $design_id, 'post_title' => $title_input ) );
+			$current_original_path = (string) get_post_meta( $design_id, 'design_original_file_path', true );
+			$current_original_url  = (string) get_post_meta( $design_id, 'design_original_file_url', true );
+			$current_svg_path      = (string) get_post_meta( $design_id, 'design_svg_file_path', true );
+			$current_svg_url       = (string) get_post_meta( $design_id, 'design_svg_file_url', true );
+			$original_extension    = strtolower( pathinfo( (string) $file_name, PATHINFO_EXTENSION ) );
+			$rename_base           = sanitize_file_name( $title_input );
+
+			if ( '' !== $rename_base && '' !== $original_extension ) {
+				$renamed_original = $this->rename_design_file( $current_original_path, $current_original_url, $rename_base, $original_extension, $storage );
+				if ( ! empty( $renamed_original['name'] ) ) {
+					$file_name = (string) $renamed_original['name'];
+					update_post_meta( $design_id, 'design_preview_url', esc_url_raw( (string) $renamed_original['url'] ) );
+					update_post_meta( $design_id, 'design_original_file_path', (string) $renamed_original['path'] );
+					update_post_meta( $design_id, 'design_original_file_url', esc_url_raw( (string) $renamed_original['url'] ) );
+				}
+
+				$renamed_svg = $this->rename_design_file( $current_svg_path, $current_svg_url, $rename_base, 'svg', $storage );
+				if ( ! empty( $renamed_svg['name'] ) ) {
+					update_post_meta( $design_id, 'design_svg_file_path', (string) $renamed_svg['path'] );
+					update_post_meta( $design_id, 'design_svg_file_url', esc_url_raw( (string) $renamed_svg['url'] ) );
+					update_post_meta( $design_id, 'design_svg_file_name', (string) $renamed_svg['name'] );
+				}
 			}
 		}
 
