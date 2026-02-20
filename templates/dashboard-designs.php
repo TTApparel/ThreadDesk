@@ -175,6 +175,8 @@ $nav_base = trailingslashit( wc_get_account_endpoint_url( 'thread-desk' ) );
 				<input type="hidden" name="action" value="tta_threaddesk_save_design" />
 				<?php wp_nonce_field( 'tta_threaddesk_save_design' ); ?>
 				<input type="hidden" name="threaddesk_design_id" value="0" data-threaddesk-design-id-field />
+				<label class="threaddesk-designer__title-field" for="threaddesk_design_title"><?php echo esc_html__( 'Title', 'threaddesk' ); ?></label>
+				<input type="text" id="threaddesk_design_title" name="threaddesk_design_title" data-threaddesk-design-title-input maxlength="120" value="" />
 				<div class="threaddesk-designer__design-image" data-threaddesk-design-preview>
 					<img class="threaddesk-designer__design-image-upload" data-threaddesk-design-upload-preview alt="<?php echo esc_attr__( 'Uploaded design preview', 'threaddesk' ); ?>" />
 					<canvas class="threaddesk-designer__design-canvas" data-threaddesk-design-canvas aria-hidden="true"></canvas>
