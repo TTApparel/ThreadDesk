@@ -534,6 +534,9 @@ class TTA_ThreadDesk {
 				array_map(
 					function ( $color ) {
 						$color = strtoupper( sanitize_text_field( (string) $color ) );
+						if ( 'TRANSPARENT' === $color ) {
+							return 'transparent';
+						}
 						return preg_match( '/^#[0-9A-F]{6}$/', $color ) ? $color : '';
 					},
 					$palette

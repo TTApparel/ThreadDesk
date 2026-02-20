@@ -129,6 +129,7 @@ jQuery(function ($) {
 
 		const defaultPalette = ['#111111', '#ffffff', '#1f1f1f', '#3a3a3a', '#f24c3d', '#3366ff', '#21b573', '#f6b200'];
 		const allowedSwatchPalette = [
+			{ name: 'Transparent', hex: 'transparent' },
 			{ name: 'White', hex: '#FFFFFF' },
 			{ name: 'Black', hex: '#000000' },
 			{ name: 'Lemon Yellow', hex: '#FEDB00' },
@@ -166,7 +167,7 @@ jQuery(function ($) {
 			{ name: 'Light Brown', hex: '#7B4D35' },
 			{ name: 'Khaki', hex: '#D3BC8D' },
 			{ name: 'Vegas Gold', hex: '#D5CB9F' },
-			{ name: 'Dolphin Grey', hex: '#A7A8AA' },
+			{ name: 'Dolphin Grey', hex: '#B1B3B3' },
 			{ name: 'Shark Grey', hex: '#A7A8AA' },
 			{ name: 'Bora Bora Sand', hex: '#F2E9DB' },
 		];
@@ -255,7 +256,14 @@ jQuery(function ($) {
 			};
 		};
 
+		const isTransparentColor = function (value) {
+			return String(value || '').toLowerCase() === 'transparent';
+		};
+
 		const hexToRgb = function (hex) {
+			if (isTransparentColor(hex)) {
+				return [255, 255, 255];
+			}
 			const normalized = (hex || '').replace('#', '');
 			if (!/^[0-9a-fA-F]{6}$/.test(normalized)) {
 				return [17, 17, 17];
@@ -289,6 +297,11 @@ jQuery(function ($) {
 			];
 		};
 		const findClosestAllowedColor = function (hex) {
+			if (isTransparentColor(hex)) {
+				return allowedSwatchPalette.find(function (option) {
+					return isTransparentColor(option.hex);
+				}) || { hex: 'transparent', name: 'Transparent' };
+			}
 			const rgb = hexToRgb(hex);
 			let best = allowedSwatchPalette[0] || { hex: '#111111', name: 'Black' };
 			let bestDist = Number.POSITIVE_INFINITY;
@@ -348,7 +361,8 @@ jQuery(function ($) {
 		const renderVectorFallback = function () {
 			const colors = state.palette.length ? state.palette : [defaultPalette[0]];
 			designModal.find('[data-threaddesk-preview-layer]').each(function (index) {
-				$(this).attr('fill', colors[index] || colors[0]);
+				const color = colors[index] || colors[0];
+				$(this).attr('fill', isTransparentColor(color) ? 'none' : color);
 			});
 			previewContainer.css('--threaddesk-preview-accent', colors[0] || defaultPalette[0]);
 			syncPreviewBackgroundColor();
@@ -492,7 +506,8 @@ jQuery(function ($) {
 					continue;
 				}
 				const fillColor = palette[colorIndex] || palette[palette.length - 1] || '#111111';
-				layerMarkup.push('<path fill="' + fillColor + '" d="' + d + '"/>');
+				const svgFill = isTransparentColor(fillColor) ? 'none' : fillColor;
+				layerMarkup.push('<path fill="' + svgFill + '" d="' + d + '"/>');
 			}
 
 			if (!layerMarkup.length) {
@@ -518,6 +533,11 @@ jQuery(function ($) {
 				const label = state.labels[i];
 				const alpha = state.sourcePixels[px + 3];
 				if (!alpha) {
+					output.data[px + 3] = 0;
+					continue;
+				}
+				const sourceColor = state.palette[label] || state.palette[0] || '#000000';
+				if (isTransparentColor(sourceColor)) {
 					output.data[px + 3] = 0;
 					continue;
 				}
@@ -582,10 +602,17 @@ jQuery(function ($) {
 				const currentAllowed = findClosestAllowedColor(hex);
 				const btn = $('<button type="button" class="threaddesk-designer__palette-dot" data-threaddesk-inuse-color></button>')
 					.attr('data-threaddesk-swatch-index', index)
-					.attr('title', currentAllowed.name + ' ' + currentAllowed.hex)
+					.attr('title', currentAllowed.name + (isTransparentColor(currentAllowed.hex) ? '' : (' ' + currentAllowed.hex)))
 					.attr('aria-label', 'Color ' + (index + 1) + ' ' + currentAllowed.name)
-					.attr('data-color-name', currentAllowed.name)
-					.css('background', currentAllowed.hex);
+					.attr('data-color-name', currentAllowed.name);
+				if (isTransparentColor(currentAllowed.hex)) {
+					btn.css('background-image', 'linear-gradient(45deg, #d7d7d7 25%, transparent 25%, transparent 75%, #d7d7d7 75%, #d7d7d7), linear-gradient(45deg, #d7d7d7 25%, transparent 25%, transparent 75%, #d7d7d7 75%, #d7d7d7)')
+						.css('background-size', '10px 10px')
+						.css('background-position', '0 0, 5px 5px')
+						.css('background-color', '#ffffff');
+				} else {
+					btn.css('background', currentAllowed.hex);
+				}
 				if (index === activeIndex) {
 					btn.addClass('is-active');
 				}
@@ -604,9 +631,16 @@ jQuery(function ($) {
 				const opt = $('<button type="button" class="threaddesk-designer__palette-dot" data-threaddesk-palette-option></button>')
 					.attr('data-color-hex', option.hex)
 					.attr('title', option.name)
-					.attr('aria-label', option.name + ' ' + option.hex)
-					.attr('data-color-name', option.name)
-					.css('background', option.hex);
+					.attr('aria-label', option.name + (isTransparentColor(option.hex) ? '' : (' ' + option.hex)))
+					.attr('data-color-name', option.name);
+				if (isTransparentColor(option.hex)) {
+					opt.css('background-image', 'linear-gradient(45deg, #d7d7d7 25%, transparent 25%, transparent 75%, #d7d7d7 75%, #d7d7d7), linear-gradient(45deg, #d7d7d7 25%, transparent 25%, transparent 75%, #d7d7d7 75%, #d7d7d7)')
+						.css('background-size', '10px 10px')
+						.css('background-position', '0 0, 5px 5px')
+						.css('background-color', '#ffffff');
+				} else {
+					opt.css('background', option.hex);
+				}
 				if (option.hex.toLowerCase() === findClosestAllowedColor(palette[activeIndex]).hex.toLowerCase()) {
 					opt.addClass('is-active');
 				}
@@ -1070,6 +1104,11 @@ jQuery(function ($) {
 					continue;
 				}
 				const label = quantized.labels[pixelIndex] || 0;
+				const sourceColor = normalizedPalette[label] || normalizedPalette[0] || '#000000';
+				if (isTransparentColor(sourceColor)) {
+					output[offset + 3] = 0;
+					continue;
+				}
 				const color = paletteRgb[label] || paletteRgb[0] || [0, 0, 0];
 				output[offset] = color[0];
 				output[offset + 1] = color[1];
