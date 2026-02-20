@@ -189,6 +189,7 @@ jQuery(function ($) {
 		let uploadedPreviewUrl = null;
 		let recolorTimer = null;
 		let reanalyzeTimer = null;
+		let shouldOpenModalAfterChoose = false;
 		const state = {
 			palette: [],
 			percentages: [],
@@ -507,10 +508,11 @@ jQuery(function ($) {
 					continue;
 				}
 				const fillColor = palette[colorIndex] || palette[palette.length - 1] || '#111111';
-				if (isTransparentColor(fillColor)) {
+				const transparentAsWhite = vectorSettings && vectorSettings.transparentAsWhite === true;
+				if (isTransparentColor(fillColor) && !transparentAsWhite) {
 					continue;
 				}
-				layerMarkup.push('<path fill="' + fillColor + '" d="' + d + '"/>');
+				layerMarkup.push('<path fill="' + (isTransparentColor(fillColor) ? '#FFFFFF' : fillColor) + '" d="' + d + '"/>');
 			}
 
 			if (!layerMarkup.length) {
@@ -1028,11 +1030,12 @@ jQuery(function ($) {
 				if (!quantized || !quantized.labels) {
 					return '';
 				}
-				const smoothSvg = buildSmoothExportSvgMarkup(quantized.labels, analysis.imageData.data, analysis.width, analysis.height, normalizedPalette, highResVectorMaxPixels, traceSettings);
+				const exportSettings = $.extend({}, traceSettings, { transparentAsWhite: true });
+				const smoothSvg = buildSmoothExportSvgMarkup(quantized.labels, analysis.imageData.data, analysis.width, analysis.height, normalizedPalette, highResVectorMaxPixels, exportSettings);
 				if (smoothSvg) {
 					return smoothSvg;
 				}
-				return buildRectVectorSvgMarkup(quantized.labels, analysis.imageData.data, analysis.width, analysis.height, normalizedPalette, highResVectorMaxPixels * 2, traceSettings);
+				return buildRectVectorSvgMarkup(quantized.labels, analysis.imageData.data, analysis.width, analysis.height, normalizedPalette, highResVectorMaxPixels * 2, exportSettings);
 			} catch (error) {
 				return '';
 			}
@@ -1172,12 +1175,10 @@ jQuery(function ($) {
 		};
 
 		const openAndPromptDesignUpload = function () {
-			openDesignModal(document.activeElement);
-			designIdField.val('0');
-			designTitleInput.val('');
-			state.hasUserAdjustedMax = false;
+			shouldOpenModalAfterChoose = true;
 			const designFileInput = designModal.find('[data-threaddesk-design-file]').get(0);
 			if (!designFileInput) {
+				shouldOpenModalAfterChoose = false;
 				return;
 			}
 			try {
@@ -1215,6 +1216,7 @@ jQuery(function ($) {
 
 		$(document).on('click', '[data-threaddesk-design-edit]', async function (event) {
 			event.preventDefault();
+			shouldOpenModalAfterChoose = false;
 			openDesignModal(this);
 			const designId = parseInt($(this).attr('data-threaddesk-design-id'), 10) || 0;
 			const title = $(this).attr('data-threaddesk-design-title') || '';
@@ -1260,6 +1262,7 @@ jQuery(function ($) {
 			setStatus('Editing saved design');
 		});
 		$(document).on('click', '[data-threaddesk-design-close]', function () {
+			shouldOpenModalAfterChoose = false;
 			closeDesignModal();
 		});
 
@@ -1294,6 +1297,7 @@ jQuery(function ($) {
 			}
 
 			if (!file) {
+				shouldOpenModalAfterChoose = false;
 				previewImage.attr('src', '');
 				previewContainer.removeClass('has-upload');
 				previewSvg.removeAttr('aria-hidden');
@@ -1313,8 +1317,16 @@ jQuery(function ($) {
 
 			const supported = /image\/(png|jpeg)/i.test(file.type) || /\.(png|jpe?g)$/i.test(file.name || '');
 			if (!supported) {
+				shouldOpenModalAfterChoose = false;
 				setStatus('Unsupported file type. Please upload PNG or JPG.');
 				return;
+			}
+
+			if (shouldOpenModalAfterChoose) {
+				openDesignModal(document.activeElement);
+				designIdField.val('0');
+				state.hasUserAdjustedMax = false;
+				shouldOpenModalAfterChoose = false;
 			}
 
 			try {
@@ -1433,10 +1445,11 @@ jQuery(function ($) {
 				const submitButton = designForm.find('[type="submit"]').first();
 				submitButton.prop('disabled', true);
 				let svgMarkup = '';
+				const saveVectorSettings = $.extend({}, state.analysisSettings || {}, { transparentAsWhite: true });
 				if (state.labels && state.sourcePixels && state.palette.length && state.width && state.height) {
-					svgMarkup = buildSmoothExportSvgMarkup(state.labels, state.sourcePixels, state.width, state.height, state.palette, exportVectorMaxPixels, state.analysisSettings);
+					svgMarkup = buildSmoothExportSvgMarkup(state.labels, state.sourcePixels, state.width, state.height, state.palette, exportVectorMaxPixels, saveVectorSettings);
 					if (!svgMarkup) {
-						svgMarkup = buildRectVectorSvgMarkup(state.labels, state.sourcePixels, state.width, state.height, state.palette, exportVectorMaxPixels * 2, state.analysisSettings);
+						svgMarkup = buildRectVectorSvgMarkup(state.labels, state.sourcePixels, state.width, state.height, state.palette, exportVectorMaxPixels * 2, saveVectorSettings);
 					}
 				}
 				if (!svgMarkup) {
