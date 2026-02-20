@@ -241,13 +241,17 @@ jQuery(function ($) {
 
 		const resolveTraceSettings = function (settings) {
 			const raw = settings || {};
+			const maximumColorCount = clamp(parseInt(raw.maximumColorCount, 10) || 8, 1, maxSwatches);
 			return {
+				MS_scans: maximumColorCount,
+				maximumColorCount: maximumColorCount,
 				potraceTurdsize: potraceTurdsize,
 				potraceAlphamax: potraceAlphamax,
 				potraceOpticurve: potraceOpticurve,
 				potraceOpttolerance: potraceOpttolerance,
 				multiScanSmooth: raw.multiScanSmooth !== false,
 				multiScanStack: true,
+				exportReverseOrder: raw.exportReverseOrder === true,
 			};
 		};
 
@@ -329,6 +333,7 @@ jQuery(function ($) {
 		const persistDesignMetadata = function () {
 			designModal.find('[data-threaddesk-design-palette]').val(JSON.stringify(state.palette));
 			designModal.find('[data-threaddesk-design-color-count]').val(String(state.palette.length || 0));
+			state.analysisSettings.MS_scans = clamp(parseInt(state.analysisSettings.maximumColorCount, 10) || 1, 1, maxSwatches);
 			designModal.find('[data-threaddesk-design-settings]').val(JSON.stringify(state.analysisSettings));
 		};
 
@@ -350,7 +355,7 @@ jQuery(function ($) {
 		};
 
 
-		const buildBitmapMaskSvgMarkup = function (labels, sourcePixels, width, height, palette, maxPixels) {
+		const buildTraceBitmapSvgMarkup = function (labels, sourcePixels, width, height, palette, maxPixels, vectorSettings) {
 			const safeWidth = Math.max(1, parseInt(width, 10) || 1);
 			const safeHeight = Math.max(1, parseInt(height, 10) || 1);
 			const pixelLimit = Math.max(1, parseInt(maxPixels, 10) || exportVectorMaxPixels);
@@ -358,52 +363,143 @@ jQuery(function ($) {
 				return '';
 			}
 
-			const defs = [];
-			const layers = [];
+			const traceSettings = resolveTraceSettings(vectorSettings || {});
+			const scans = clamp(parseInt(traceSettings.MS_scans, 10) || palette.length || 1, 1, Math.min(maxSwatches, palette.length));
 			const totalPixels = safeWidth * safeHeight;
-			const maskCanvas = document.createElement('canvas');
-			maskCanvas.width = safeWidth;
-			maskCanvas.height = safeHeight;
-			const maskCtx = maskCanvas.getContext('2d', { willReadFrequently: true });
-			if (!maskCtx) {
-				return '';
-			}
+			const cumulativeMask = new Uint8Array(totalPixels);
+			const layerMarkup = [];
+			const speckleThreshold = Math.max(2, parseInt(traceSettings.potraceTurdsize, 10) || 2);
+			const smoothPasses = traceSettings.multiScanSmooth === true ? 1 : 0;
 
-			const baseColor = palette[0] || '#111111';
-			layers.push('<rect x="0" y="0" width="' + safeWidth + '" height="' + safeHeight + '" fill="' + baseColor + '"/>');
-
-			for (let labelIndex = 1; labelIndex < palette.length; labelIndex += 1) {
-				const imageData = maskCtx.createImageData(safeWidth, safeHeight);
-				let hasPixels = false;
-				for (let pixelIndex = 0; pixelIndex < totalPixels; pixelIndex += 1) {
-					if ((labels[pixelIndex] || 0) !== labelIndex) {
+			const removeSmallConnectedComponents = function (mask, minArea) {
+				if (!mask || minArea <= 1) {
+					return;
+				}
+				const visited = new Uint8Array(mask.length);
+				const neighbors = [-1, 1, -safeWidth, safeWidth];
+				for (let i = 0; i < mask.length; i += 1) {
+					if (mask[i] !== 1 || visited[i] === 1) {
 						continue;
 					}
-					const srcOffset = pixelIndex * 4;
-					const alpha = sourcePixels[srcOffset + 3] || 0;
+					const stack = [i];
+					const component = [];
+					visited[i] = 1;
+					while (stack.length) {
+						const current = stack.pop();
+						component.push(current);
+						const x = current % safeWidth;
+						for (let n = 0; n < neighbors.length; n += 1) {
+							const next = current + neighbors[n];
+							if (next < 0 || next >= mask.length || visited[next] === 1 || mask[next] !== 1) {
+								continue;
+							}
+							if ((neighbors[n] === -1 && x === 0) || (neighbors[n] === 1 && x === safeWidth - 1)) {
+								continue;
+							}
+							visited[next] = 1;
+							stack.push(next);
+						}
+					}
+					if (component.length <= minArea) {
+						for (let c = 0; c < component.length; c += 1) {
+							mask[component[c]] = 0;
+						}
+					}
+				}
+			};
+
+			const smoothMaskEdges = function (mask) {
+				if (!mask || smoothPasses <= 0) {
+					return mask;
+				}
+				let working = mask.slice();
+				for (let pass = 0; pass < smoothPasses; pass += 1) {
+					const next = working.slice();
+					for (let y = 1; y < safeHeight - 1; y += 1) {
+						for (let x = 1; x < safeWidth - 1; x += 1) {
+							const index = (y * safeWidth) + x;
+							let count = 0;
+							for (let oy = -1; oy <= 1; oy += 1) {
+								for (let ox = -1; ox <= 1; ox += 1) {
+									if (ox === 0 && oy === 0) {
+										continue;
+									}
+									const nidx = ((y + oy) * safeWidth) + (x + ox);
+									count += working[nidx] === 1 ? 1 : 0;
+								}
+							}
+							const left = working[index - 1] === 1;
+							const right = working[index + 1] === 1;
+							const up = working[index - safeWidth] === 1;
+							const down = working[index + safeWidth] === 1;
+							const isLikelyTextStroke = (left && right && !up && !down) || (!left && !right && up && down);
+							if (working[index] === 1) {
+								if (!isLikelyTextStroke && count <= 2) {
+									next[index] = 0;
+								}
+							} else if (count >= 6) {
+								next[index] = 1;
+							}
+						}
+					}
+					working = next;
+				}
+				return working;
+			};
+
+			const maskToPath = function (mask) {
+				const segments = [];
+				for (let y = 0; y < safeHeight; y += 1) {
+					const rowOffset = y * safeWidth;
+					let x = 0;
+					while (x < safeWidth) {
+						if (mask[rowOffset + x] !== 1) {
+							x += 1;
+							continue;
+						}
+						const runStart = x;
+						x += 1;
+						while (x < safeWidth && mask[rowOffset + x] === 1) {
+							x += 1;
+						}
+						segments.push('M' + runStart + ' ' + y + 'H' + x + 'V' + (y + 1) + 'H' + runStart + 'Z');
+					}
+				}
+				return segments.join('');
+			};
+
+			for (let colorIndex = 0; colorIndex < scans; colorIndex += 1) {
+				const currentLayerMask = new Uint8Array(totalPixels);
+				for (let pixelIndex = 0; pixelIndex < totalPixels; pixelIndex += 1) {
+					if ((labels[pixelIndex] || 0) !== colorIndex) {
+						continue;
+					}
+					const alpha = sourcePixels[(pixelIndex * 4) + 3] || 0;
 					if (alpha < 8) {
 						continue;
 					}
-					const outOffset = srcOffset;
-					imageData.data[outOffset] = 255;
-					imageData.data[outOffset + 1] = 255;
-					imageData.data[outOffset + 2] = 255;
-					imageData.data[outOffset + 3] = alpha;
-					hasPixels = true;
+					currentLayerMask[pixelIndex] = 1;
 				}
-				if (!hasPixels) {
+				removeSmallConnectedComponents(currentLayerMask, speckleThreshold);
+				for (let pixelIndex = 0; pixelIndex < totalPixels; pixelIndex += 1) {
+					if (currentLayerMask[pixelIndex] === 1) {
+						cumulativeMask[pixelIndex] = 1;
+					}
+				}
+				const smoothedMask = smoothMaskEdges(cumulativeMask);
+				const d = maskToPath(smoothedMask);
+				if (!d) {
 					continue;
 				}
-				maskCtx.putImageData(imageData, 0, 0);
-				const maskId = 'td-mask-' + labelIndex + '-' + safeWidth + '-' + safeHeight;
-				const maskPng = maskCanvas.toDataURL('image/png');
-				defs.push('<mask id="' + maskId + '" maskUnits="userSpaceOnUse" x="0" y="0" width="' + safeWidth + '" height="' + safeHeight + '"><image x="0" y="0" width="' + safeWidth + '" height="' + safeHeight + '" href="' + maskPng + '"/></mask>');
-				const fillColor = palette[labelIndex] || baseColor;
-				layers.push('<rect x="0" y="0" width="' + safeWidth + '" height="' + safeHeight + '" fill="' + fillColor + '" mask="url(#' + maskId + ')"/>');
+				const fillColor = palette[colorIndex] || palette[palette.length - 1] || '#111111';
+				layerMarkup.push('<path fill="' + fillColor + '" d="' + d + '"/>');
 			}
 
-			const defsMarkup = defs.length ? ('<defs>' + defs.join('') + '</defs>') : '';
-			return '<svg xmlns="http://www.w3.org/2000/svg" width="' + safeWidth + '" height="' + safeHeight + '" viewBox="0 0 ' + safeWidth + ' ' + safeHeight + '" shape-rendering="geometricPrecision">' + defsMarkup + layers.join('') + '</svg>';
+			if (!layerMarkup.length) {
+				return '';
+			}
+			const orderedLayerMarkup = traceSettings.exportReverseOrder === true ? layerMarkup.slice().reverse() : layerMarkup;
+			return '<svg xmlns="http://www.w3.org/2000/svg" width="' + safeWidth + '" height="' + safeHeight + '" viewBox="0 0 ' + safeWidth + ' ' + safeHeight + '" shape-rendering="geometricPrecision">' + orderedLayerMarkup.join('') + '</svg>';
 		};
 
 
@@ -836,7 +932,7 @@ jQuery(function ($) {
 
 
 		const labelsToVectorSvgDataUrl = function (labels, sourcePixels, width, height, paletteHex) {
-			const svgMarkup = buildBitmapMaskSvgMarkup(labels, sourcePixels, width, height, paletteHex, 160000);
+			const svgMarkup = buildTraceBitmapSvgMarkup(labels, sourcePixels, width, height, paletteHex, 160000, state.analysisSettings);
 			if (!svgMarkup) {
 				return '';
 			}
@@ -844,21 +940,17 @@ jQuery(function ($) {
 		};
 
 		const buildVectorSvgMarkup = function (labels, sourcePixels, width, height, palette, maxPixels, vectorSettings) {
-			return buildBitmapMaskSvgMarkup(labels, sourcePixels, width, height, palette, maxPixels);
+			return buildTraceBitmapSvgMarkup(labels, sourcePixels, width, height, palette, maxPixels, vectorSettings);
 		};
 
 		const buildSmoothExportSvgMarkup = function (labels, sourcePixels, width, height, palette, maxPixels, vectorSettings) {
-			const smoothSettings = $.extend({}, vectorSettings || {}, {
-				multiScanStack: false,
-				potraceOpticurve: false,
-				potraceAlphamax: 0.0,
-				potraceOpttolerance: 0.0,
-			});
-			return buildVectorSvgMarkup(labels, sourcePixels, width, height, palette, maxPixels, smoothSettings);
+			const exportSettings = $.extend({}, vectorSettings || {}, { exportReverseOrder: true });
+			return buildVectorSvgMarkup(labels, sourcePixels, width, height, palette, maxPixels, exportSettings);
 		};
 
-		const buildRectVectorSvgMarkup = function (labels, sourcePixels, width, height, palette, maxPixels) {
-			return buildBitmapMaskSvgMarkup(labels, sourcePixels, width, height, palette, maxPixels);
+		const buildRectVectorSvgMarkup = function (labels, sourcePixels, width, height, palette, maxPixels, vectorSettings) {
+			const exportSettings = $.extend({}, vectorSettings || {}, { exportReverseOrder: true });
+			return buildTraceBitmapSvgMarkup(labels, sourcePixels, width, height, palette, maxPixels, exportSettings);
 		};
 
 
@@ -872,7 +964,8 @@ jQuery(function ($) {
 			try { settings = JSON.parse(settingsRaw || '{}'); } catch (e) {}
 			const normalizedPalette = normalizePaletteToAllowed(Array.isArray(palette) && palette.length ? palette : defaultPalette.slice(0, 4));
 			try {
-				const maxColors = clamp(parseInt(settings.maximumColorCount, 10) || normalizedPalette.length || 4, 1, maxSwatches);
+				const traceSettings = resolveTraceSettings(settings);
+				const maxColors = clamp(parseInt(traceSettings.MS_scans, 10) || normalizedPalette.length || 4, 1, maxSwatches);
 				const image = new Image();
 				image.crossOrigin = 'anonymous';
 				const svgDimensions = await getSvgDimensionsFromUrl(previewUrl);
@@ -885,7 +978,6 @@ jQuery(function ($) {
 					return '';
 				}
 				const analysis = createAnalysisBuffer(image, svgDimensions, { maxDimension: savedVectorMatchPreviewMaxDimension });
-				const traceSettings = resolveTraceSettings(settings);
 				const quantSource = createQuantizationPixels(
 					analysis.imageData.data,
 					analysis.width,
@@ -903,7 +995,7 @@ jQuery(function ($) {
 				if (smoothSvg) {
 					return smoothSvg;
 				}
-				return buildRectVectorSvgMarkup(quantized.labels, analysis.imageData.data, analysis.width, analysis.height, normalizedPalette, highResVectorMaxPixels * 2);
+				return buildRectVectorSvgMarkup(quantized.labels, analysis.imageData.data, analysis.width, analysis.height, normalizedPalette, highResVectorMaxPixels * 2, traceSettings);
 			} catch (error) {
 				return '';
 			}
@@ -920,7 +1012,8 @@ jQuery(function ($) {
 			try { settings = JSON.parse(settingsRaw || '{}'); } catch (e) {}
 
 			const normalizedPalette = normalizePaletteToAllowed(Array.isArray(palette) && palette.length ? palette : defaultPalette.slice(0, 4));
-			const maxColors = clamp(parseInt(settings.maximumColorCount, 10) || normalizedPalette.length || 4, 1, maxSwatches);
+			const traceSettings = resolveTraceSettings(settings);
+			const maxColors = clamp(parseInt(traceSettings.MS_scans, 10) || normalizedPalette.length || 4, 1, maxSwatches);
 			const image = new Image();
 			image.crossOrigin = 'anonymous';
 			const svgDimensions = await getSvgDimensionsFromUrl(previewUrl);
@@ -935,7 +1028,6 @@ jQuery(function ($) {
 			}
 
 			const analysis = createAnalysisBuffer(image, svgDimensions, { maxDimension: savedVectorMatchPreviewMaxDimension });
-			const traceSettings = resolveTraceSettings(settings);
 			const quantSource = createQuantizationPixels(
 				analysis.imageData.data,
 				analysis.width,
@@ -1012,6 +1104,7 @@ jQuery(function ($) {
 
 			const maxColors = clamp(parseInt(maxColorInput.val(), 10) || 4, 1, maxSwatches);
 			state.analysisSettings.maximumColorCount = maxColors;
+			state.analysisSettings.MS_scans = maxColors;
 			const quantized = quantizeColors(quantSource.pixels, quantSource.opaqueIndices, state.width * state.height, maxColors);
 			if (!quantized || !quantized.palette.length) {
 				state.palette = [];
@@ -1025,6 +1118,7 @@ jQuery(function ($) {
 			if (forceDetectedMax || !state.hasUserAdjustedMax) {
 				const recommended = clamp(quantized.palette.length || 4, 1, maxSwatches);
 				state.analysisSettings.maximumColorCount = recommended;
+				state.analysisSettings.MS_scans = recommended;
 				maxColorInput.val(String(recommended));
 			}
 			state.palette = normalizePaletteToAllowed(quantized.palette);
@@ -1099,6 +1193,7 @@ jQuery(function ($) {
 			try { settings = JSON.parse(settingsRaw); } catch (e) {}
 			state.palette = normalizePaletteToAllowed(Array.isArray(palette) && palette.length ? palette : defaultPalette.slice(0, 4));
 			state.analysisSettings.maximumColorCount = clamp(parseInt(settings.maximumColorCount, 10) || state.palette.length || 4, 1, maxSwatches);
+			state.analysisSettings.MS_scans = state.analysisSettings.maximumColorCount;
 			const traceSettings = resolveTraceSettings(settings);
 			state.analysisSettings.potraceTurdsize = traceSettings.potraceTurdsize;
 			state.analysisSettings.potraceAlphamax = traceSettings.potraceAlphamax;
@@ -1127,6 +1222,7 @@ jQuery(function ($) {
 			const value = clamp(parseInt($(this).val(), 10) || 4, 1, maxSwatches);
 			colorCountOutput.text(String(value));
 			state.analysisSettings.maximumColorCount = value;
+			state.analysisSettings.MS_scans = value;
 			state.hasUserAdjustedMax = true;
 			persistDesignMetadata();
 			if (!state.sourcePixels) {
@@ -1290,7 +1386,7 @@ jQuery(function ($) {
 				if (state.labels && state.sourcePixels && state.palette.length && state.width && state.height) {
 					svgMarkup = buildSmoothExportSvgMarkup(state.labels, state.sourcePixels, state.width, state.height, state.palette, exportVectorMaxPixels, state.analysisSettings);
 					if (!svgMarkup) {
-						svgMarkup = buildRectVectorSvgMarkup(state.labels, state.sourcePixels, state.width, state.height, state.palette, exportVectorMaxPixels * 2);
+						svgMarkup = buildRectVectorSvgMarkup(state.labels, state.sourcePixels, state.width, state.height, state.palette, exportVectorMaxPixels * 2, state.analysisSettings);
 					}
 				}
 				if (!svgMarkup) {
