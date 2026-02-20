@@ -224,6 +224,7 @@ jQuery(function ($) {
 		const statusEl = designModal.find('[data-threaddesk-design-status]');
 		const designIdField = designModal.find('[data-threaddesk-design-id-field]');
 		const designForm = designModal.find('form.threaddesk-auth-modal__form-inner').first();
+		const designTitleInput = designModal.find('[data-threaddesk-design-title-input]');
 		const updatePreviewMaxHeight = function () {
 			const panelHeight = Math.round(designModal.find('.threaddesk-auth-modal__panel').innerHeight() || 0);
 			if (panelHeight <= 0) {
@@ -506,8 +507,10 @@ jQuery(function ($) {
 					continue;
 				}
 				const fillColor = palette[colorIndex] || palette[palette.length - 1] || '#111111';
-				const svgFill = isTransparentColor(fillColor) ? 'none' : fillColor;
-				layerMarkup.push('<path fill="' + svgFill + '" d="' + d + '"/>');
+				if (isTransparentColor(fillColor)) {
+					continue;
+				}
+				layerMarkup.push('<path fill="' + fillColor + '" d="' + d + '"/>');
 			}
 
 			if (!layerMarkup.length) {
@@ -1171,6 +1174,7 @@ jQuery(function ($) {
 		const openAndPromptDesignUpload = function () {
 			openDesignModal(document.activeElement);
 			designIdField.val('0');
+			designTitleInput.val('');
 			state.hasUserAdjustedMax = false;
 			const designFileInput = designModal.find('[data-threaddesk-design-file]').get(0);
 			if (!designFileInput) {
@@ -1213,11 +1217,13 @@ jQuery(function ($) {
 			event.preventDefault();
 			openDesignModal(this);
 			const designId = parseInt($(this).attr('data-threaddesk-design-id'), 10) || 0;
+			const title = $(this).attr('data-threaddesk-design-title') || '';
 			const previewUrl = $(this).attr('data-threaddesk-design-preview-url') || '';
 			const fileName = $(this).attr('data-threaddesk-design-file-name') || 'No file selected';
 			const paletteRaw = $(this).attr('data-threaddesk-design-palette') || '[]';
 			const settingsRaw = $(this).attr('data-threaddesk-design-settings') || '{}';
 			designIdField.val(String(designId));
+			designTitleInput.val(title);
 			designModal.find('[data-threaddesk-design-file-name]').text(fileName);
 			previewContainer.removeAttr('data-threaddesk-preview-mode');
 			if (previewUrl) {
@@ -1277,6 +1283,9 @@ jQuery(function ($) {
 			const file = this.files && this.files.length ? this.files[0] : null;
 			const fileName = file ? file.name : 'No file selected';
 			designModal.find('[data-threaddesk-design-file-name]').text(fileName);
+			if (file && (parseInt(designIdField.val(), 10) || 0) === 0) {
+				designTitleInput.val((file.name || '').replace(/\.[^.]+$/, ''));
+			}
 			previewContainer.removeAttr('data-threaddesk-preview-mode');
 
 			if (uploadedPreviewUrl) {
@@ -1458,6 +1467,7 @@ jQuery(function ($) {
 		state.showPaletteOptions = false;
 		designModal.removeClass('is-palette-selecting');
 		designIdField.val('0');
+		designTitleInput.val('');
 		renderColorSwatches();
 		renderVectorFallback();
 		persistDesignMetadata();
