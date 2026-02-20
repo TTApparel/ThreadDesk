@@ -1194,6 +1194,14 @@ jQuery(function ($) {
 			return '<svg xmlns="http://www.w3.org/2000/svg" width="' + width + '" height="' + height + '" viewBox="0 0 ' + width + ' ' + height + '" shape-rendering="geometricPrecision">' + vectorPaths + '</svg>';
 		};
 
+		const buildSmoothExportSvgMarkup = function (labels, sourcePixels, width, height, palette, maxPixels, vectorSettings) {
+			const smoothSettings = $.extend({}, vectorSettings || {}, {
+				multiScanStack: false,
+				potraceOpticurve: true,
+			});
+			return buildVectorSvgMarkup(labels, sourcePixels, width, height, palette, maxPixels, smoothSettings);
+		};
+
 		const buildRectVectorSvgMarkup = function (labels, sourcePixels, width, height, palette, maxPixels) {
 			const safeWidth = Math.max(1, parseInt(width, 10) || 1);
 			const safeHeight = Math.max(1, parseInt(height, 10) || 1);
@@ -1277,6 +1285,10 @@ jQuery(function ($) {
 				const quantized = quantizeColors(quantSource.pixels, quantSource.opaqueIndices, analysis.width * analysis.height, maxColors);
 				if (!quantized || !quantized.labels) {
 					return '';
+				}
+				const smoothSvg = buildSmoothExportSvgMarkup(quantized.labels, analysis.imageData.data, analysis.width, analysis.height, normalizedPalette, highResVectorMaxPixels, traceSettings);
+				if (smoothSvg) {
+					return smoothSvg;
 				}
 				return buildRectVectorSvgMarkup(quantized.labels, analysis.imageData.data, analysis.width, analysis.height, normalizedPalette, highResVectorMaxPixels * 2);
 			} catch (error) {
@@ -1643,7 +1655,10 @@ jQuery(function ($) {
 				submitButton.prop('disabled', true);
 				let svgMarkup = '';
 				if (state.labels && state.sourcePixels && state.palette.length && state.width && state.height) {
-					svgMarkup = buildRectVectorSvgMarkup(state.labels, state.sourcePixels, state.width, state.height, state.palette, exportVectorMaxPixels * 2);
+					svgMarkup = buildSmoothExportSvgMarkup(state.labels, state.sourcePixels, state.width, state.height, state.palette, exportVectorMaxPixels, state.analysisSettings);
+					if (!svgMarkup) {
+						svgMarkup = buildRectVectorSvgMarkup(state.labels, state.sourcePixels, state.width, state.height, state.palette, exportVectorMaxPixels * 2);
+					}
 				}
 				if (!svgMarkup) {
 					const currentPreviewUrl = (previewImage.attr('src') || '').trim();
