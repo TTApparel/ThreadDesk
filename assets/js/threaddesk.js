@@ -857,16 +857,6 @@ jQuery(function ($) {
 			return buildVectorSvgMarkup(labels, sourcePixels, width, height, palette, maxPixels, smoothSettings);
 		};
 
-		const buildSmoothExportSvgMarkup = function (labels, sourcePixels, width, height, palette, maxPixels, vectorSettings) {
-			const smoothSettings = $.extend({}, vectorSettings || {}, {
-				multiScanStack: false,
-				potraceOpticurve: false,
-				potraceAlphamax: 0.0,
-				potraceOpttolerance: 0.0,
-			});
-			return buildVectorSvgMarkup(labels, sourcePixels, width, height, palette, maxPixels, smoothSettings);
-		};
-
 		const buildRectVectorSvgMarkup = function (labels, sourcePixels, width, height, palette, maxPixels) {
 			return buildBitmapMaskSvgMarkup(labels, sourcePixels, width, height, palette, maxPixels);
 		};
@@ -1054,13 +1044,33 @@ jQuery(function ($) {
 				return;
 			}
 			try {
+				if (typeof designFileInput.showPicker === 'function') {
+					designFileInput.showPicker();
+					return;
+				}
+				const hadHiddenAttr = designFileInput.hasAttribute('hidden');
+				const previousStyle = designFileInput.getAttribute('style') || '';
+				if (hadHiddenAttr) {
+					designFileInput.removeAttribute('hidden');
+				}
+				designFileInput.setAttribute('style', 'position:fixed;left:-9999px;top:0;opacity:0;pointer-events:none;');
 				designFileInput.click();
+				window.setTimeout(function () {
+					if (hadHiddenAttr) {
+						designFileInput.setAttribute('hidden', 'hidden');
+					}
+					if (previousStyle) {
+						designFileInput.setAttribute('style', previousStyle);
+					} else {
+						designFileInput.removeAttribute('style');
+					}
+				}, 0);
 			} catch (error) {
 				setStatus('Unable to open file picker. Please click the chooser again.');
 			}
 		};
 
-		$('[data-threaddesk-design-open]').on('click', function (event) {
+		$(document).on('click', '[data-threaddesk-design-open]', function (event) {
 			event.preventDefault();
 			openAndPromptDesignUpload();
 		});
