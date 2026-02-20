@@ -40,6 +40,7 @@ class TTA_ThreadDesk {
 		add_action( 'admin_post_tta_threaddesk_avatar_upload', array( $this, 'handle_avatar_upload' ) );
 		add_action( 'admin_post_tta_threaddesk_update_address', array( $this, 'handle_update_address' ) );
 		add_action( 'admin_post_tta_threaddesk_save_design', array( $this, 'handle_save_design' ) );
+		add_action( 'admin_post_tta_threaddesk_rename_design', array( $this, 'handle_rename_design' ) );
 		add_action( 'admin_post_tta_threaddesk_delete_design', array( $this, 'handle_delete_design' ) );
 		add_action( 'user_register', array( $this, 'handle_user_register' ) );
 		add_action( 'init', array( $this, 'handle_auth_login' ) );
@@ -429,6 +430,61 @@ class TTA_ThreadDesk {
 		update_post_meta( $design_id, 'design_svg_file_name', $svg_filename );
 	}
 
+	private function rename_design_file( $current_path, $current_url, $target_base_name, $extension, $storage ) {
+		$current_path = is_string( $current_path ) ? trim( $current_path ) : '';
+		$current_url  = is_string( $current_url ) ? trim( $current_url ) : '';
+		$extension    = sanitize_file_name( ltrim( (string) $extension, '.' ) );
+		$target_base_name = sanitize_file_name( (string) $target_base_name );
+
+		if ( '' === $current_path || '' === $extension || '' === $target_base_name || ! is_array( $storage ) || empty( $storage['dir'] ) || empty( $storage['url'] ) ) {
+			return array(
+				'path' => $current_path,
+				'url'  => $current_url,
+				'name' => $current_path ? sanitize_file_name( wp_basename( $current_path ) ) : '',
+			);
+		}
+
+		if ( ! file_exists( $current_path ) || ! is_file( $current_path ) ) {
+			return array(
+				'path' => $current_path,
+				'url'  => $current_url,
+				'name' => $current_path ? sanitize_file_name( wp_basename( $current_path ) ) : '',
+			);
+		}
+
+		$target_file_name = wp_unique_filename( $storage['dir'], $target_base_name . '.' . $extension );
+		$target_path      = trailingslashit( $storage['dir'] ) . $target_file_name;
+		if ( $target_path === $current_path ) {
+			return array(
+				'path' => $current_path,
+				'url'  => trailingslashit( $storage['url'] ) . rawurlencode( $target_file_name ),
+				'name' => $target_file_name,
+			);
+		}
+
+		$renamed = @rename( $current_path, $target_path );
+		if ( ! $renamed ) {
+			$renamed = @copy( $current_path, $target_path );
+			if ( $renamed ) {
+				@unlink( $current_path );
+			}
+		}
+
+		if ( ! $renamed ) {
+			return array(
+				'path' => $current_path,
+				'url'  => $current_url,
+				'name' => sanitize_file_name( wp_basename( $current_path ) ),
+			);
+		}
+
+		return array(
+			'path' => $target_path,
+			'url'  => trailingslashit( $storage['url'] ) . rawurlencode( $target_file_name ),
+			'name' => $target_file_name,
+		);
+	}
+
 	private function maybe_delete_design_file( $path ) {
 		$path = is_string( $path ) ? trim( $path ) : '';
 		if ( '' === $path || ! file_exists( $path ) || ! is_file( $path ) ) {
@@ -564,10 +620,11 @@ class TTA_ThreadDesk {
 
 		$color_count = isset( $_POST['threaddesk_design_color_count'] ) ? absint( $_POST['threaddesk_design_color_count'] ) : count( $palette );
 		$svg_markup  = isset( $_POST['threaddesk_design_svg_markup'] ) ? wp_unslash( $_POST['threaddesk_design_svg_markup'] ) : '';
-
 		if ( $upload && isset( $upload['file'] ) ) {
 			$incoming_name      = sanitize_file_name( wp_basename( $upload['file'] ) );
-			$target_name        = wp_unique_filename( $storage['dir'], $incoming_name );
+			$incoming_extension = strtolower( pathinfo( $incoming_name, PATHINFO_EXTENSION ) );
+			$target_seed_name   = $incoming_name;
+			$target_name        = wp_unique_filename( $storage['dir'], $target_seed_name );
 			$target_path        = trailingslashit( $storage['dir'] ) . $target_name;
 			$target_url         = trailingslashit( $storage['url'] ) . rawurlencode( $target_name );
 			$move_succeeded     = @rename( $upload['file'], $target_path );
@@ -604,11 +661,23 @@ class TTA_ThreadDesk {
 
 		if ( '' !== $file_name ) {
 			update_post_meta( $design_id, 'design_file_name', $file_name );
+			$default_title = sanitize_text_field( preg_replace( '/\.[^.]+$/', '', (string) $file_name ) );
+			if ( '' !== $default_title ) {
+				wp_update_post(
+					array(
+						'ID'         => $design_id,
+						'post_title' => $default_title,
+					)
+				);
+			}
 		}
 
 		$svg_base_name = sanitize_file_name( preg_replace( '/\.[^.]+$/', '', (string) $file_name ) );
 		if ( '' === $svg_base_name ) {
-			$svg_base_name = sanitize_file_name( get_the_title( $design_id ) );
+			$svg_base_name = sanitize_file_name( (string) get_the_title( $design_id ) );
+		}
+		if ( '' === $svg_base_name ) {
+			$svg_base_name = 'design-' . (string) $design_id;
 		}
 		$this->persist_design_svg_file( $design_id, $svg_markup, $svg_base_name, $storage );
 
@@ -624,6 +693,77 @@ class TTA_ThreadDesk {
 
 		if ( function_exists( 'wc_add_notice' ) ) {
 			wc_add_notice( __( 'Design saved successfully.', 'threaddesk' ), 'success' );
+		}
+
+		wp_safe_redirect( $this->get_designs_redirect_url() );
+		exit;
+	}
+
+	public function handle_rename_design() {
+		if ( ! is_user_logged_in() ) {
+			wp_die( esc_html__( 'Unauthorized.', 'threaddesk' ) );
+		}
+
+		check_admin_referer( 'tta_threaddesk_rename_design' );
+
+		$design_id = isset( $_POST['design_id'] ) ? absint( $_POST['design_id'] ) : 0;
+		$title     = isset( $_POST['design_title'] ) ? sanitize_text_field( wp_unslash( $_POST['design_title'] ) ) : '';
+		$title     = trim( (string) $title );
+		$design    = get_post( $design_id );
+
+		if ( ! $design || 'tta_design' !== $design->post_type || (int) $design->post_author !== get_current_user_id() ) {
+			if ( function_exists( 'wc_add_notice' ) ) {
+				wc_add_notice( __( 'Invalid design.', 'threaddesk' ), 'error' );
+			}
+			wp_safe_redirect( $this->get_designs_redirect_url() );
+			exit;
+		}
+
+		if ( '' === $title ) {
+			if ( function_exists( 'wc_add_notice' ) ) {
+				wc_add_notice( __( 'Please enter a design title.', 'threaddesk' ), 'error' );
+			}
+			wp_safe_redirect( $this->get_designs_redirect_url() );
+			exit;
+		}
+
+		$storage = $this->get_user_design_storage( get_current_user_id() );
+		if ( ! $storage ) {
+			if ( function_exists( 'wc_add_notice' ) ) {
+				wc_add_notice( __( 'Unable to access your design storage directory.', 'threaddesk' ), 'error' );
+			}
+			wp_safe_redirect( $this->get_designs_redirect_url() );
+			exit;
+		}
+
+		wp_update_post( array( 'ID' => $design_id, 'post_title' => $title ) );
+		$current_file_name     = (string) get_post_meta( $design_id, 'design_file_name', true );
+		$current_original_path = (string) get_post_meta( $design_id, 'design_original_file_path', true );
+		$current_original_url  = (string) get_post_meta( $design_id, 'design_original_file_url', true );
+		$current_svg_path      = (string) get_post_meta( $design_id, 'design_svg_file_path', true );
+		$current_svg_url       = (string) get_post_meta( $design_id, 'design_svg_file_url', true );
+		$original_extension    = strtolower( pathinfo( $current_file_name, PATHINFO_EXTENSION ) );
+		$rename_base           = sanitize_file_name( $title );
+
+		if ( '' !== $rename_base && '' !== $original_extension ) {
+			$renamed_original = $this->rename_design_file( $current_original_path, $current_original_url, $rename_base, $original_extension, $storage );
+			if ( ! empty( $renamed_original['name'] ) ) {
+				update_post_meta( $design_id, 'design_file_name', (string) $renamed_original['name'] );
+				update_post_meta( $design_id, 'design_preview_url', esc_url_raw( (string) $renamed_original['url'] ) );
+				update_post_meta( $design_id, 'design_original_file_path', (string) $renamed_original['path'] );
+				update_post_meta( $design_id, 'design_original_file_url', esc_url_raw( (string) $renamed_original['url'] ) );
+			}
+
+			$renamed_svg = $this->rename_design_file( $current_svg_path, $current_svg_url, $rename_base, 'svg', $storage );
+			if ( ! empty( $renamed_svg['name'] ) ) {
+				update_post_meta( $design_id, 'design_svg_file_path', (string) $renamed_svg['path'] );
+				update_post_meta( $design_id, 'design_svg_file_url', esc_url_raw( (string) $renamed_svg['url'] ) );
+				update_post_meta( $design_id, 'design_svg_file_name', (string) $renamed_svg['name'] );
+			}
+		}
+
+		if ( function_exists( 'wc_add_notice' ) ) {
+			wc_add_notice( __( 'Design title updated.', 'threaddesk' ), 'success' );
 		}
 
 		wp_safe_redirect( $this->get_designs_redirect_url() );
