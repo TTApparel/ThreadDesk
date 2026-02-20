@@ -692,7 +692,10 @@ class TTA_ThreadDesk {
 
 		$svg_base_name = sanitize_file_name( preg_replace( '/\.[^.]+$/', '', (string) $file_name ) );
 		if ( '' === $svg_base_name ) {
-			$svg_base_name = sanitize_file_name( get_the_title( $design_id ) );
+			$svg_base_name = sanitize_file_name( (string) get_the_title( $design_id ) );
+		}
+		if ( '' === $svg_base_name ) {
+			$svg_base_name = 'design-' . (string) $design_id;
 		}
 		$this->persist_design_svg_file( $design_id, $svg_markup, $svg_base_name, $storage );
 
@@ -723,7 +726,7 @@ class TTA_ThreadDesk {
 
 		$design_id = isset( $_POST['design_id'] ) ? absint( $_POST['design_id'] ) : 0;
 		$title     = isset( $_POST['design_title'] ) ? sanitize_text_field( wp_unslash( $_POST['design_title'] ) ) : '';
-		$title     = trim( $title );
+		$title     = trim( (string) $title );
 		$design    = get_post( $design_id );
 
 		if ( ! $design || 'tta_design' !== $design->post_type || (int) $design->post_author !== get_current_user_id() ) {
