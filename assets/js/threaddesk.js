@@ -180,7 +180,6 @@ jQuery(function ($) {
 		const multiScanSmooth = true;
 		const multiScanStack = true;
 		const designPreviewMaxDimension = 960;
-		const designCardMaxDimension = 420;
 		const exportVectorMaxDimension = 2400;
 		const savedVectorMatchPreviewMaxDimension = designPreviewMaxDimension;
 		const previewVectorMaxPixels = 260000;
@@ -351,358 +350,62 @@ jQuery(function ($) {
 		};
 
 
-		const buildVectorPathByColor = function (labels, sourcePixels, width, height, palette, maxPixels, vectorSettings) {
-			if (!labels || !sourcePixels || !palette || !palette.length || !width || !height) {
-				return '';
-			}
-			const pixelLimit = Math.max(1, parseInt(maxPixels, 10) || previewVectorMaxPixels);
-			const traceSettings = resolveTraceSettings(vectorSettings);
-			const useStack = traceSettings.multiScanStack === true;
-			const layerAlphamax = clamp(Number(traceSettings.potraceAlphamax), 0, 1.334);
-			const layerOpttolerance = Math.max(0, Number(traceSettings.potraceOpttolerance));
-			const layerTurdsize = Math.max(0, parseInt(traceSettings.potraceTurdsize, 10) || potraceTurdsize);
-			const layerOpticurve = traceSettings.potraceOpticurve !== false;
-			if ((width * height) > pixelLimit) {
+		const buildBitmapMaskSvgMarkup = function (labels, sourcePixels, width, height, palette, maxPixels) {
+			const safeWidth = Math.max(1, parseInt(width, 10) || 1);
+			const safeHeight = Math.max(1, parseInt(height, 10) || 1);
+			const pixelLimit = Math.max(1, parseInt(maxPixels, 10) || exportVectorMaxPixels);
+			if (!labels || !sourcePixels || !palette || !palette.length || (safeWidth * safeHeight) > pixelLimit) {
 				return '';
 			}
 
-			const toKey = function (x, y) {
-				return String(x) + ',' + String(y);
-			};
-
-			const parseKey = function (key) {
-				const parts = key.split(',');
-				return [parseInt(parts[0], 10) || 0, parseInt(parts[1], 10) || 0];
-			};
-
-			const isOpaquePixel = function (pixelIndex) {
-				return (sourcePixels[(pixelIndex * 4) + 3] || 0) >= 8;
-			};
-
-			const gm = new Uint8Array(width * height);
-			gm.fill(0);
-			const colorOrder = Array.from({ length: palette.length }, function (_, index) {
-				return (palette.length - 1) - index;
-			});
-			const diagnosticsEnabled = !!(window && window.THREADDESK_TRACE_DIAGNOSTICS);
-			const diagnostics = diagnosticsEnabled
-				? { blackCounts: [], appendedIndices: [], styleMismatch: false, hasPathTransform: false }
-				: null;
-			const createBinaryMaskForLabel = function (targetLabel) {
-				for (let pixelIndex = 0; pixelIndex < labels.length; pixelIndex += 1) {
-					if (!isOpaquePixel(pixelIndex)) {
-						gm[pixelIndex] = 0;
-						continue;
-					}
-					if ((labels[pixelIndex] || 0) === targetLabel) {
-						gm[pixelIndex] = 1;
-					} else if (!useStack) {
-						gm[pixelIndex] = 0;
-					}
-				}
-				return gm;
-			};
-
-			const hasMaskPixel = function (x, y, mask) {
-				if (x < 0 || y < 0 || x >= width || y >= height) {
-					return false;
-				}
-				return !!mask[(y * width) + x];
-			};
-
-			const polygonArea = function (points) {
-				if (!points || points.length < 3) {
-					return 0;
-				}
-				let area = 0;
-				for (let i = 0; i < points.length; i += 1) {
-					const current = points[i];
-					const next = points[(i + 1) % points.length];
-					area += (current[0] * next[1]) - (next[0] * current[1]);
-				}
-				return Math.abs(area) / 2;
-			};
-
-			const removeCollinearPoints = function (points, epsilon) {
-				const workingPoints = points || [];
-				if (workingPoints.length < 3) {
-					return workingPoints;
-				}
-				const tolerance = Math.max(0, Number(epsilon) || 0);
-				const cleaned = [];
-				for (let i = 0; i < workingPoints.length; i += 1) {
-					const prev = workingPoints[(i - 1 + workingPoints.length) % workingPoints.length];
-					const current = workingPoints[i];
-					const next = workingPoints[(i + 1) % workingPoints.length];
-					const dx1 = current[0] - prev[0];
-					const dy1 = current[1] - prev[1];
-					const dx2 = next[0] - current[0];
-					const dy2 = next[1] - current[1];
-					const cross = Math.abs((dx1 * dy2) - (dy1 * dx2));
-					if (cross <= tolerance) {
-						continue;
-					}
-					cleaned.push(current);
-				}
-				return cleaned.length >= 3 ? cleaned : workingPoints;
-			};
-
-			const pointToSegmentDistance = function (point, start, end) {
-				const vx = end[0] - start[0];
-				const vy = end[1] - start[1];
-				const wx = point[0] - start[0];
-				const wy = point[1] - start[1];
-				const c1 = (vx * wx) + (vy * wy);
-				if (c1 <= 0) {
-					return Math.hypot(point[0] - start[0], point[1] - start[1]);
-				}
-				const c2 = (vx * vx) + (vy * vy);
-				if (c2 <= c1) {
-					return Math.hypot(point[0] - end[0], point[1] - end[1]);
-				}
-				const t = c1 / c2;
-				const projX = start[0] + (t * vx);
-				const projY = start[1] + (t * vy);
-				return Math.hypot(point[0] - projX, point[1] - projY);
-			};
-
-			const simplifyOpenPolyline = function (points, epsilon) {
-				if (!points || points.length < 3) {
-					return points || [];
-				}
-				const tolerance = Math.max(0, Number(epsilon) || 0);
-				if (!tolerance) {
-					return points.slice(0);
-				}
-				const first = points[0];
-				const last = points[points.length - 1];
-				let maxDist = -1;
-				let idx = -1;
-				for (let i = 1; i < points.length - 1; i += 1) {
-					const dist = pointToSegmentDistance(points[i], first, last);
-					if (dist > maxDist) {
-						maxDist = dist;
-						idx = i;
-					}
-				}
-				if (maxDist <= tolerance || idx < 0) {
-					return [first, last];
-				}
-				const left = simplifyOpenPolyline(points.slice(0, idx + 1), tolerance);
-				const right = simplifyOpenPolyline(points.slice(idx), tolerance);
-				return left.slice(0, -1).concat(right);
-			};
-
-			const simplifyClosedLoop = function (points, epsilon) {
-				if (!points || points.length < 4) {
-					return points || [];
-				}
-				const tolerance = Math.max(0, Number(epsilon) || 0);
-				if (!tolerance) {
-					return points.slice(0);
-				}
-				const polyline = points.concat([points[0]]);
-				const simplified = simplifyOpenPolyline(polyline, tolerance);
-				const reopened = simplified.slice(0, -1);
-				return reopened.length >= 3 ? reopened : points;
-			};
-
-			const smoothClosedLoopPath = function (points) {
-				if (!points || points.length < 3) {
-					return '';
-				}
-				const cornerScale = layerAlphamax * 0.65;
-				const maxRadius = 1.15;
-
-				const relaxationPasses = clamp(Math.round(layerOpttolerance * 4), 0, 2);
-				let workingPoints = points.slice(0);
-				for (let pass = 0; pass < relaxationPasses; pass += 1) {
-					workingPoints = workingPoints.map(function (point, pointIndex) {
-						const prev = workingPoints[(pointIndex - 1 + workingPoints.length) % workingPoints.length];
-						const next = workingPoints[(pointIndex + 1) % workingPoints.length];
-						return [
-							(point[0] * 0.6) + ((prev[0] + next[0]) * 0.2),
-							(point[1] * 0.6) + ((prev[1] + next[1]) * 0.2),
-						];
-					});
-				}
-				const entries = [];
-				const exits = [];
-				for (let i = 0; i < workingPoints.length; i += 1) {
-					const prev = workingPoints[(i - 1 + workingPoints.length) % workingPoints.length];
-					const current = workingPoints[i];
-					const next = workingPoints[(i + 1) % workingPoints.length];
-					const inDx = current[0] - prev[0];
-					const inDy = current[1] - prev[1];
-					const outDx = next[0] - current[0];
-					const outDy = next[1] - current[1];
-					const inLen = Math.hypot(inDx, inDy);
-					const outLen = Math.hypot(outDx, outDy);
-					if (!inLen || !outLen) {
-						entries.push([current[0], current[1]]);
-						exits.push([current[0], current[1]]);
-						continue;
-					}
-					const radius = Math.min(maxRadius, inLen * cornerScale, outLen * cornerScale);
-					entries.push([
-						current[0] - ((inDx / inLen) * radius),
-						current[1] - ((inDy / inLen) * radius),
-					]);
-					exits.push([
-						current[0] + ((outDx / outLen) * radius),
-						current[1] + ((outDy / outLen) * radius),
-					]);
-				}
-
-				const commands = [];
-				commands.push('M' + entries[0][0].toFixed(3) + ' ' + entries[0][1].toFixed(3));
-				for (let i = 0; i < workingPoints.length; i += 1) {
-					const corner = workingPoints[i];
-					const exit = exits[i];
-					const nextEntry = entries[(i + 1) % workingPoints.length];
-					commands.push('Q' + corner[0].toFixed(3) + ' ' + corner[1].toFixed(3) + ' ' + exit[0].toFixed(3) + ' ' + exit[1].toFixed(3));
-					commands.push('L' + nextEntry[0].toFixed(3) + ' ' + nextEntry[1].toFixed(3));
-				}
-				commands.push('Z');
-				return commands.join('');
-			};
-
-			const buildLoopsForLabel = function (mask) {
-				const outgoing = new Map();
-				const edges = [];
-				const speckleThreshold = layerTurdsize;
-				const optimizeTolerance = layerOpttolerance;
-				const simplifyTolerance = optimizeTolerance;
-				const addEdge = function (x1, y1, x2, y2) {
-					const edge = { start: toKey(x1, y1), end: toKey(x2, y2), used: false };
-					edges.push(edge);
-					if (!outgoing.has(edge.start)) {
-						outgoing.set(edge.start, []);
-					}
-					outgoing.get(edge.start).push(edge);
-				};
-
-				for (let y = 0; y < height; y += 1) {
-					for (let x = 0; x < width; x += 1) {
-						if (!hasMaskPixel(x, y, mask)) {
-							continue;
-						}
-						if (!hasMaskPixel(x, y - 1, mask)) {
-							addEdge(x, y, x + 1, y);
-						}
-						if (!hasMaskPixel(x + 1, y, mask)) {
-							addEdge(x + 1, y, x + 1, y + 1);
-						}
-						if (!hasMaskPixel(x, y + 1, mask)) {
-							addEdge(x + 1, y + 1, x, y + 1);
-						}
-						if (!hasMaskPixel(x - 1, y, mask)) {
-							addEdge(x, y + 1, x, y);
-						}
-					}
-				}
-
-				const loops = [];
-				edges.forEach(function (edge) {
-					if (edge.used) {
-						return;
-					}
-					const loop = [];
-					let current = edge;
-					const loopStart = edge.start;
-					while (current && !current.used) {
-						current.used = true;
-						loop.push(parseKey(current.start));
-						if (current.end === loopStart) {
-							break;
-						}
-						const nextCandidates = outgoing.get(current.end) || [];
-						let nextEdge = null;
-						for (let i = 0; i < nextCandidates.length; i += 1) {
-							if (!nextCandidates[i].used) {
-								nextEdge = nextCandidates[i];
-								break;
-							}
-						}
-						current = nextEdge;
-					}
-					if (loop.length >= 3) {
-						const simplified = simplifyClosedLoop(removeCollinearPoints(loop, optimizeTolerance), simplifyTolerance);
-						if (polygonArea(simplified) >= speckleThreshold) {
-							loops.push(simplified);
-						}
-					}
-				});
-				return loops;
-			};
-
-			const countBlackPixels = function (mask) {
-				let count = 0;
-				for (let i = 0; i < mask.length; i += 1) {
-					if (mask[i]) {
-						count += 1;
-					}
-				}
-				return count;
-			};
-
-			const paths = [];
-			for (let orderIndex = 0; orderIndex < colorOrder.length; orderIndex += 1) {
-				const colorIndex = colorOrder[orderIndex];
-				const binaryMask = createBinaryMaskForLabel(colorIndex);
-				if (diagnostics) {
-					diagnostics.blackCounts.push(countBlackPixels(binaryMask));
-				}
-				const loops = buildLoopsForLabel(binaryMask);
-				if (!loops.length) {
-					continue;
-				}
-				const useOpticurve = layerOpticurve;
-				const loopPaths = loops.map(function (loop) {
-					if (useOpticurve) {
-						return smoothClosedLoopPath(loop);
-					}
-					return 'M' + loop.map(function (point, pointIndex) {
-						return (pointIndex ? 'L' : '') + point[0].toFixed(3) + ' ' + point[1].toFixed(3);
-					}).join('') + 'Z';
-				}).filter(Boolean);
-				if (!loopPaths.length) {
-					continue;
-				}
-				const fillColor = palette[colorIndex] || palette[0] || '#111111';
-				if (diagnostics && fillColor !== palette[colorIndex]) {
-					diagnostics.styleMismatch = true;
-				}
-				const layerPathMarkup = '<path fill="' + fillColor + '" d="' + loopPaths.join('') + '" fill-rule="evenodd"/>';
-				if (diagnostics && /\stransform\s*=/.test(layerPathMarkup)) {
-					diagnostics.hasPathTransform = true;
-				}
-				paths.push(layerPathMarkup);
-				if (diagnostics) {
-					diagnostics.appendedIndices.push(colorIndex);
-				}
+			const defs = [];
+			const layers = [];
+			const totalPixels = safeWidth * safeHeight;
+			const maskCanvas = document.createElement('canvas');
+			maskCanvas.width = safeWidth;
+			maskCanvas.height = safeHeight;
+			const maskCtx = maskCanvas.getContext('2d', { willReadFrequently: true });
+			if (!maskCtx) {
+				return '';
 			}
 
-			if (diagnostics) {
-				const monotonic = diagnostics.blackCounts.every(function (count, index) {
-					return index === 0 || count >= diagnostics.blackCounts[index - 1];
-				});
-				const appendOrderValid = diagnostics.appendedIndices.every(function (indexValue, index) {
-					return indexValue === index || indexValue > diagnostics.appendedIndices[index - 1];
-				});
-				if (!monotonic || !appendOrderValid || diagnostics.styleMismatch || diagnostics.hasPathTransform) {
-					console.warn('[ThreadDesk trace diagnostics]', {
-						monotonic: monotonic,
-						appendOrderValid: appendOrderValid,
-						styleMismatch: diagnostics.styleMismatch,
-						hasPathTransform: diagnostics.hasPathTransform,
-						appendedIndices: diagnostics.appendedIndices,
-						blackCounts: diagnostics.blackCounts,
-					});
+			const baseColor = palette[0] || '#111111';
+			layers.push('<rect x="0" y="0" width="' + safeWidth + '" height="' + safeHeight + '" fill="' + baseColor + '"/>');
+
+			for (let labelIndex = 1; labelIndex < palette.length; labelIndex += 1) {
+				const imageData = maskCtx.createImageData(safeWidth, safeHeight);
+				let hasPixels = false;
+				for (let pixelIndex = 0; pixelIndex < totalPixels; pixelIndex += 1) {
+					if ((labels[pixelIndex] || 0) !== labelIndex) {
+						continue;
+					}
+					const srcOffset = pixelIndex * 4;
+					const alpha = sourcePixels[srcOffset + 3] || 0;
+					if (alpha < 8) {
+						continue;
+					}
+					const outOffset = srcOffset;
+					imageData.data[outOffset] = 255;
+					imageData.data[outOffset + 1] = 255;
+					imageData.data[outOffset + 2] = 255;
+					imageData.data[outOffset + 3] = alpha;
+					hasPixels = true;
 				}
+				if (!hasPixels) {
+					continue;
+				}
+				maskCtx.putImageData(imageData, 0, 0);
+				const maskId = 'td-mask-' + labelIndex + '-' + safeWidth + '-' + safeHeight;
+				const maskPng = maskCanvas.toDataURL('image/png');
+				defs.push('<mask id="' + maskId + '" maskUnits="userSpaceOnUse" x="0" y="0" width="' + safeWidth + '" height="' + safeHeight + '"><image x="0" y="0" width="' + safeWidth + '" height="' + safeHeight + '" href="' + maskPng + '"/></mask>');
+				const fillColor = palette[labelIndex] || baseColor;
+				layers.push('<rect x="0" y="0" width="' + safeWidth + '" height="' + safeHeight + '" fill="' + fillColor + '" mask="url(#' + maskId + ')"/>');
 			}
-			return paths.join('');
+
+			const defsMarkup = defs.length ? ('<defs>' + defs.join('') + '</defs>') : '';
+			return '<svg xmlns="http://www.w3.org/2000/svg" width="' + safeWidth + '" height="' + safeHeight + '" viewBox="0 0 ' + safeWidth + ' ' + safeHeight + '" shape-rendering="geometricPrecision">' + defsMarkup + layers.join('') + '</svg>';
 		};
+
 
 		const renderQuantizedPreview = function () {
 			if (!state.labels || !state.sourcePixels || !state.palette.length || !previewCanvas.length) {
@@ -730,14 +433,10 @@ jQuery(function ($) {
 			}
 			ctx.putImageData(output, 0, 0);
 
-			const vectorPaths = buildVectorPathByColor(state.labels, state.sourcePixels, state.width, state.height, state.palette, previewVectorMaxPixels, state.analysisSettings);
-			if (vectorPaths && previewVector.length) {
-				previewVector.attr('viewBox', '0 0 ' + state.width + ' ' + state.height);
-				previewVector.html(vectorPaths);
-				previewContainer.attr('data-threaddesk-preview-mode', 'quantized-vector');
-			} else {
-				previewContainer.attr('data-threaddesk-preview-mode', 'quantized');
+			if (previewVector.length) {
+				previewVector.empty();
 			}
+			previewContainer.attr('data-threaddesk-preview-mode', 'quantized');
 			previewContainer.css('--threaddesk-preview-accent', state.palette[0] || defaultPalette[0]);
 			syncPreviewBackgroundColor();
 		};
@@ -1137,110 +836,31 @@ jQuery(function ($) {
 
 
 		const labelsToVectorSvgDataUrl = function (labels, sourcePixels, width, height, paletteHex) {
-			const safeWidth = Math.max(1, parseInt(width, 10) || 1);
-			const safeHeight = Math.max(1, parseInt(height, 10) || 1);
-			if (!labels || !sourcePixels || !paletteHex || !paletteHex.length) {
+			const svgMarkup = buildBitmapMaskSvgMarkup(labels, sourcePixels, width, height, paletteHex, 160000);
+			if (!svgMarkup) {
 				return '';
 			}
-			if ((safeWidth * safeHeight) > 160000) {
-				return '';
-			}
-
-			const rects = [];
-			for (let y = 0; y < safeHeight; y += 1) {
-				let runStart = 0;
-				let runLabel = -1;
-				let runAlpha = -1;
-				for (let x = 0; x <= safeWidth; x += 1) {
-					let label = -1;
-					let alpha = 0;
-					if (x < safeWidth) {
-						const pixelIndex = (y * safeWidth) + x;
-						const offset = pixelIndex * 4;
-						alpha = sourcePixels[offset + 3] || 0;
-						if (alpha >= 8) {
-							label = labels[pixelIndex] || 0;
-						}
-					}
-					const shouldFlush = x === safeWidth || label !== runLabel || alpha !== runAlpha;
-					if (!shouldFlush) {
-						continue;
-					}
-					if (runLabel >= 0 && runAlpha >= 8) {
-						const color = paletteHex[runLabel] || paletteHex[0] || '#111111';
-						const runWidth = x - runStart;
-						if (runAlpha >= 254) {
-							rects.push('<rect x="' + runStart + '" y="' + y + '" width="' + runWidth + '" height="1" fill="' + color + '"/>');
-						} else {
-							rects.push('<rect x="' + runStart + '" y="' + y + '" width="' + runWidth + '" height="1" fill="' + color + '" fill-opacity="' + (runAlpha / 255).toFixed(3) + '"/>');
-						}
-					}
-					runStart = x;
-					runLabel = label;
-					runAlpha = alpha;
-				}
-			}
-			if (!rects.length) {
-				return '';
-			}
-			const svgMarkup = '<svg xmlns="http://www.w3.org/2000/svg" width="' + safeWidth + '" height="' + safeHeight + '" viewBox="0 0 ' + safeWidth + ' ' + safeHeight + '" shape-rendering="crispEdges">' + rects.join('') + '</svg>';
 			return 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(svgMarkup);
 		};
 
 		const buildVectorSvgMarkup = function (labels, sourcePixels, width, height, palette, maxPixels, vectorSettings) {
-			const vectorPaths = buildVectorPathByColor(labels, sourcePixels, width, height, palette, maxPixels, vectorSettings);
-			if (!vectorPaths) {
-				return '';
-			}
-			return '<svg xmlns="http://www.w3.org/2000/svg" width="' + width + '" height="' + height + '" viewBox="0 0 ' + width + ' ' + height + '" shape-rendering="geometricPrecision">' + vectorPaths + '</svg>';
+			return buildBitmapMaskSvgMarkup(labels, sourcePixels, width, height, palette, maxPixels);
+		};
+
+		const buildSmoothExportSvgMarkup = function (labels, sourcePixels, width, height, palette, maxPixels, vectorSettings) {
+			const smoothSettings = $.extend({}, vectorSettings || {}, {
+				multiScanStack: false,
+				potraceOpticurve: false,
+				potraceAlphamax: 0.0,
+				potraceOpttolerance: 0.0,
+			});
+			return buildVectorSvgMarkup(labels, sourcePixels, width, height, palette, maxPixels, smoothSettings);
 		};
 
 		const buildRectVectorSvgMarkup = function (labels, sourcePixels, width, height, palette, maxPixels) {
-			const safeWidth = Math.max(1, parseInt(width, 10) || 1);
-			const safeHeight = Math.max(1, parseInt(height, 10) || 1);
-			const pixelLimit = Math.max(1, parseInt(maxPixels, 10) || exportVectorMaxPixels);
-			if (!labels || !sourcePixels || !palette || !palette.length || (safeWidth * safeHeight) > pixelLimit) {
-				return '';
-			}
-			const rects = [];
-			for (let y = 0; y < safeHeight; y += 1) {
-				let runStart = 0;
-				let runLabel = -1;
-				let runAlpha = -1;
-				for (let x = 0; x <= safeWidth; x += 1) {
-					let label = -1;
-					let alpha = 0;
-					if (x < safeWidth) {
-						const pixelIndex = (y * safeWidth) + x;
-						const offset = pixelIndex * 4;
-						alpha = sourcePixels[offset + 3] || 0;
-						if (alpha >= 8) {
-							label = labels[pixelIndex] || 0;
-						}
-					}
-					const flush = x === safeWidth || label !== runLabel || alpha !== runAlpha;
-					if (!flush) {
-						continue;
-					}
-					if (runLabel >= 0 && runAlpha >= 8) {
-						const color = palette[runLabel] || palette[0] || '#111111';
-						const runWidth = x - runStart;
-						if (runAlpha >= 254) {
-							rects.push('<rect x="' + runStart + '" y="' + y + '" width="' + runWidth + '" height="1" fill="' + color + '"/>');
-						} else {
-							rects.push('<rect x="' + runStart + '" y="' + y + '" width="' + runWidth + '" height="1" fill="' + color + '" fill-opacity="' + (runAlpha / 255).toFixed(3) + '"/>');
-						}
-					}
-					runStart = x;
-					runLabel = label;
-					runAlpha = alpha;
-				}
-			}
-			if (!rects.length) {
-				return '';
-			}
-			return '<svg xmlns="http://www.w3.org/2000/svg" width="' + safeWidth + '" height="' + safeHeight + '" viewBox="0 0 ' + safeWidth + ' ' + safeHeight + '" shape-rendering="crispEdges">' + rects.join('') + '</svg>';
+			return buildBitmapMaskSvgMarkup(labels, sourcePixels, width, height, palette, maxPixels);
 		};
+
 
 		const createSavedDesignVectorMarkup = async function (previewUrl, paletteRaw, settingsRaw) {
 			if (!previewUrl) {
@@ -1264,7 +884,7 @@ jQuery(function ($) {
 				if (!loaded) {
 					return '';
 				}
-				const analysis = createAnalysisBuffer(image, svgDimensions, { maxDimension: Math.max(image.naturalWidth || 1, image.naturalHeight || 1) });
+				const analysis = createAnalysisBuffer(image, svgDimensions, { maxDimension: savedVectorMatchPreviewMaxDimension });
 				const traceSettings = resolveTraceSettings(settings);
 				const quantSource = createQuantizationPixels(
 					analysis.imageData.data,
@@ -1279,9 +899,9 @@ jQuery(function ($) {
 				if (!quantized || !quantized.labels) {
 					return '';
 				}
-				const pathSvg = buildVectorSvgMarkup(quantized.labels, analysis.imageData.data, analysis.width, analysis.height, normalizedPalette, highResVectorMaxPixels, traceSettings);
-				if (pathSvg) {
-					return pathSvg;
+				const smoothSvg = buildSmoothExportSvgMarkup(quantized.labels, analysis.imageData.data, analysis.width, analysis.height, normalizedPalette, highResVectorMaxPixels, traceSettings);
+				if (smoothSvg) {
+					return smoothSvg;
 				}
 				return buildRectVectorSvgMarkup(quantized.labels, analysis.imageData.data, analysis.width, analysis.height, normalizedPalette, highResVectorMaxPixels * 2);
 			} catch (error) {
@@ -1314,7 +934,7 @@ jQuery(function ($) {
 				return;
 			}
 
-			const analysis = createAnalysisBuffer(image, svgDimensions, { maxDimension: designCardMaxDimension });
+			const analysis = createAnalysisBuffer(image, svgDimensions, { maxDimension: savedVectorMatchPreviewMaxDimension });
 			const traceSettings = resolveTraceSettings(settings);
 			const quantSource = createQuantizationPixels(
 				analysis.imageData.data,
@@ -1648,7 +1268,7 @@ jQuery(function ($) {
 				submitButton.prop('disabled', true);
 				let svgMarkup = '';
 				if (state.labels && state.sourcePixels && state.palette.length && state.width && state.height) {
-					svgMarkup = buildVectorSvgMarkup(state.labels, state.sourcePixels, state.width, state.height, state.palette, exportVectorMaxPixels, state.analysisSettings);
+					svgMarkup = buildSmoothExportSvgMarkup(state.labels, state.sourcePixels, state.width, state.height, state.palette, exportVectorMaxPixels, state.analysisSettings);
 					if (!svgMarkup) {
 						svgMarkup = buildRectVectorSvgMarkup(state.labels, state.sourcePixels, state.width, state.height, state.palette, exportVectorMaxPixels * 2);
 					}
