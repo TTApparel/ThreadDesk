@@ -1471,5 +1471,34 @@ jQuery(function ($) {
 		renderColorSwatches();
 		renderVectorFallback();
 		persistDesignMetadata();
+
+		const submitCardTitleForm = function (input) {
+			const field = $(input);
+			const form = field.closest('form');
+			if (!form.length) {
+				return;
+			}
+			const value = (field.val() || '').trim();
+			if (!value) {
+				const fallback = (field.attr('value') || '').trim() || 'Design';
+				field.val(fallback);
+				return;
+			}
+			if (value === (field.attr('value') || '').trim()) {
+				return;
+			}
+			form.trigger('submit');
+		};
+
+		$(document).on('keydown', '[data-threaddesk-design-title-card-input]', function (event) {
+			if (event.key === 'Enter') {
+				event.preventDefault();
+				submitCardTitleForm(this);
+			}
+		});
+
+		$(document).on('blur', '[data-threaddesk-design-title-card-input]', function () {
+			submitCardTitleForm(this);
+		});
 	}
 });
