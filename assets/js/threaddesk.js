@@ -857,6 +857,16 @@ jQuery(function ($) {
 			return buildVectorSvgMarkup(labels, sourcePixels, width, height, palette, maxPixels, smoothSettings);
 		};
 
+		const buildSmoothExportSvgMarkup = function (labels, sourcePixels, width, height, palette, maxPixels, vectorSettings) {
+			const smoothSettings = $.extend({}, vectorSettings || {}, {
+				multiScanStack: false,
+				potraceOpticurve: false,
+				potraceAlphamax: 0.0,
+				potraceOpttolerance: 0.0,
+			});
+			return buildVectorSvgMarkup(labels, sourcePixels, width, height, palette, maxPixels, smoothSettings);
+		};
+
 		const buildRectVectorSvgMarkup = function (labels, sourcePixels, width, height, palette, maxPixels) {
 			return buildBitmapMaskSvgMarkup(labels, sourcePixels, width, height, palette, maxPixels);
 		};
