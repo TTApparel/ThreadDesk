@@ -180,7 +180,6 @@ jQuery(function ($) {
 		const multiScanSmooth = true;
 		const multiScanStack = true;
 		const designPreviewMaxDimension = 960;
-		const designCardMaxDimension = 420;
 		const exportVectorMaxDimension = 2400;
 		const savedVectorMatchPreviewMaxDimension = designPreviewMaxDimension;
 		const previewVectorMaxPixels = 260000;
@@ -381,9 +380,9 @@ jQuery(function ($) {
 
 			const gm = new Uint8Array(width * height);
 			gm.fill(0);
-			const colorOrder = Array.from({ length: palette.length }, function (_, index) {
-				return (palette.length - 1) - index;
-			});
+			const colorOrder = useStack
+				? Array.from({ length: palette.length }, function (_, index) { return (palette.length - 1) - index; })
+				: Array.from({ length: palette.length }, function (_, index) { return index; });
 			const diagnosticsEnabled = !!(window && window.THREADDESK_TRACE_DIAGNOSTICS);
 			const diagnostics = diagnosticsEnabled
 				? { blackCounts: [], appendedIndices: [], styleMismatch: false, hasPathTransform: false }
@@ -574,12 +573,55 @@ jQuery(function ($) {
 				const optimizeTolerance = layerOpttolerance;
 				const simplifyTolerance = optimizeTolerance;
 				const addEdge = function (x1, y1, x2, y2) {
-					const edge = { start: toKey(x1, y1), end: toKey(x2, y2), used: false };
+					const edge = {
+						start: toKey(x1, y1),
+						end: toKey(x2, y2),
+						x1: x1,
+						y1: y1,
+						x2: x2,
+						y2: y2,
+						used: false,
+					};
 					edges.push(edge);
 					if (!outgoing.has(edge.start)) {
 						outgoing.set(edge.start, []);
 					}
 					outgoing.get(edge.start).push(edge);
+				};
+
+				const directionKey = function (edge) {
+					const dx = edge.x2 - edge.x1;
+					const dy = edge.y2 - edge.y1;
+					if (dx === 1 && dy === 0) { return 'R'; }
+					if (dx === -1 && dy === 0) { return 'L'; }
+					if (dx === 0 && dy === 1) { return 'D'; }
+					if (dx === 0 && dy === -1) { return 'U'; }
+					return '';
+				};
+
+				const turnPreference = {
+					R: ['D', 'R', 'U', 'L'],
+					D: ['L', 'D', 'R', 'U'],
+					L: ['U', 'L', 'D', 'R'],
+					U: ['R', 'U', 'L', 'D'],
+				};
+
+				const pickNextEdge = function (currentEdge, candidates) {
+					const available = (candidates || []).filter(function (candidate) { return !candidate.used; });
+					if (!available.length) {
+						return null;
+					}
+					const incomingDirection = directionKey(currentEdge);
+					const preferredDirections = turnPreference[incomingDirection] || ['R', 'D', 'L', 'U'];
+					for (let i = 0; i < preferredDirections.length; i += 1) {
+						const targetDirection = preferredDirections[i];
+						for (let j = 0; j < available.length; j += 1) {
+							if (directionKey(available[j]) === targetDirection) {
+								return available[j];
+							}
+						}
+					}
+					return available[0];
 				};
 
 				for (let y = 0; y < height; y += 1) {
@@ -617,14 +659,7 @@ jQuery(function ($) {
 							break;
 						}
 						const nextCandidates = outgoing.get(current.end) || [];
-						let nextEdge = null;
-						for (let i = 0; i < nextCandidates.length; i += 1) {
-							if (!nextCandidates[i].used) {
-								nextEdge = nextCandidates[i];
-								break;
-							}
-						}
-						current = nextEdge;
+						current = pickNextEdge(current, nextCandidates);
 					}
 					if (loop.length >= 3) {
 						const simplified = simplifyClosedLoop(removeCollinearPoints(loop, optimizeTolerance), simplifyTolerance);
@@ -647,8 +682,15 @@ jQuery(function ($) {
 			};
 
 			const paths = [];
+			if (!useStack && palette.length) {
+				const baseColor = palette[0] || '#111111';
+				paths.push('<rect x="0" y="0" width="' + width + '" height="' + height + '" fill="' + baseColor + '"/>');
+			}
 			for (let orderIndex = 0; orderIndex < colorOrder.length; orderIndex += 1) {
 				const colorIndex = colorOrder[orderIndex];
+				if (!useStack && colorIndex === 0) {
+					continue;
+				}
 				const binaryMask = createBinaryMaskForLabel(colorIndex);
 				if (diagnostics) {
 					diagnostics.blackCounts.push(countBlackPixels(binaryMask));
@@ -1195,6 +1237,16 @@ jQuery(function ($) {
 			return '<svg xmlns="http://www.w3.org/2000/svg" width="' + width + '" height="' + height + '" viewBox="0 0 ' + width + ' ' + height + '" shape-rendering="geometricPrecision">' + vectorPaths + '</svg>';
 		};
 
+		const buildSmoothExportSvgMarkup = function (labels, sourcePixels, width, height, palette, maxPixels, vectorSettings) {
+			const smoothSettings = $.extend({}, vectorSettings || {}, {
+				multiScanStack: false,
+				potraceOpticurve: false,
+				potraceAlphamax: 0.0,
+				potraceOpttolerance: 0.0,
+			});
+			return buildVectorSvgMarkup(labels, sourcePixels, width, height, palette, maxPixels, smoothSettings);
+		};
+
 		const buildRectVectorSvgMarkup = function (labels, sourcePixels, width, height, palette, maxPixels) {
 			const safeWidth = Math.max(1, parseInt(width, 10) || 1);
 			const safeHeight = Math.max(1, parseInt(height, 10) || 1);
@@ -1264,7 +1316,7 @@ jQuery(function ($) {
 				if (!loaded) {
 					return '';
 				}
-				const analysis = createAnalysisBuffer(image, svgDimensions, { maxDimension: Math.max(image.naturalWidth || 1, image.naturalHeight || 1) });
+				const analysis = createAnalysisBuffer(image, svgDimensions, { maxDimension: savedVectorMatchPreviewMaxDimension });
 				const traceSettings = resolveTraceSettings(settings);
 				const quantSource = createQuantizationPixels(
 					analysis.imageData.data,
@@ -1279,9 +1331,9 @@ jQuery(function ($) {
 				if (!quantized || !quantized.labels) {
 					return '';
 				}
-				const pathSvg = buildVectorSvgMarkup(quantized.labels, analysis.imageData.data, analysis.width, analysis.height, normalizedPalette, highResVectorMaxPixels, traceSettings);
-				if (pathSvg) {
-					return pathSvg;
+				const smoothSvg = buildSmoothExportSvgMarkup(quantized.labels, analysis.imageData.data, analysis.width, analysis.height, normalizedPalette, highResVectorMaxPixels, traceSettings);
+				if (smoothSvg) {
+					return smoothSvg;
 				}
 				return buildRectVectorSvgMarkup(quantized.labels, analysis.imageData.data, analysis.width, analysis.height, normalizedPalette, highResVectorMaxPixels * 2);
 			} catch (error) {
@@ -1314,7 +1366,7 @@ jQuery(function ($) {
 				return;
 			}
 
-			const analysis = createAnalysisBuffer(image, svgDimensions, { maxDimension: designCardMaxDimension });
+			const analysis = createAnalysisBuffer(image, svgDimensions, { maxDimension: savedVectorMatchPreviewMaxDimension });
 			const traceSettings = resolveTraceSettings(settings);
 			const quantSource = createQuantizationPixels(
 				analysis.imageData.data,
@@ -1648,7 +1700,7 @@ jQuery(function ($) {
 				submitButton.prop('disabled', true);
 				let svgMarkup = '';
 				if (state.labels && state.sourcePixels && state.palette.length && state.width && state.height) {
-					svgMarkup = buildVectorSvgMarkup(state.labels, state.sourcePixels, state.width, state.height, state.palette, exportVectorMaxPixels, state.analysisSettings);
+					svgMarkup = buildSmoothExportSvgMarkup(state.labels, state.sourcePixels, state.width, state.height, state.palette, exportVectorMaxPixels, state.analysisSettings);
 					if (!svgMarkup) {
 						svgMarkup = buildRectVectorSvgMarkup(state.labels, state.sourcePixels, state.width, state.height, state.palette, exportVectorMaxPixels * 2);
 					}
