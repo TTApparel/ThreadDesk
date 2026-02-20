@@ -678,6 +678,7 @@ body.threaddesk-modal-open {
 	border-radius: 10px;
 	overflow: hidden;
 	background: #f3f3f3;
+	margin-top: 12px;
 	margin-bottom: 10px;
 	aspect-ratio: 4 / 3;
 	display: flex;
@@ -835,6 +836,13 @@ body.threaddesk-modal-open {
 
 .threaddesk-designer__heading {
 	margin-bottom: 8px;
+}
+
+/* Legacy modal title controls are intentionally hidden (title is edited on saved cards only). */
+.threaddesk-designer__title-field,
+#threaddesk_design_title,
+[data-threaddesk-design-title-input] {
+	display: none !important;
 }
 
 .threaddesk-designer .threaddesk-auth-modal__form-inner {
