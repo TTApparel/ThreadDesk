@@ -682,8 +682,15 @@ jQuery(function ($) {
 			};
 
 			const paths = [];
+			if (!useStack && palette.length) {
+				const baseColor = palette[0] || '#111111';
+				paths.push('<rect x="0" y="0" width="' + width + '" height="' + height + '" fill="' + baseColor + '"/>');
+			}
 			for (let orderIndex = 0; orderIndex < colorOrder.length; orderIndex += 1) {
 				const colorIndex = colorOrder[orderIndex];
+				if (!useStack && colorIndex === 0) {
+					continue;
+				}
 				const binaryMask = createBinaryMaskForLabel(colorIndex);
 				if (diagnostics) {
 					diagnostics.blackCounts.push(countBlackPixels(binaryMask));
@@ -1234,8 +1241,8 @@ jQuery(function ($) {
 			const smoothSettings = $.extend({}, vectorSettings || {}, {
 				multiScanStack: false,
 				potraceOpticurve: false,
-				potraceAlphamax: 0.35,
-				potraceOpttolerance: 0.05,
+				potraceAlphamax: 0.0,
+				potraceOpttolerance: 0.0,
 			});
 			return buildVectorSvgMarkup(labels, sourcePixels, width, height, palette, maxPixels, smoothSettings);
 		};
