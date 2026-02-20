@@ -573,12 +573,55 @@ jQuery(function ($) {
 				const optimizeTolerance = layerOpttolerance;
 				const simplifyTolerance = optimizeTolerance;
 				const addEdge = function (x1, y1, x2, y2) {
-					const edge = { start: toKey(x1, y1), end: toKey(x2, y2), used: false };
+					const edge = {
+						start: toKey(x1, y1),
+						end: toKey(x2, y2),
+						x1: x1,
+						y1: y1,
+						x2: x2,
+						y2: y2,
+						used: false,
+					};
 					edges.push(edge);
 					if (!outgoing.has(edge.start)) {
 						outgoing.set(edge.start, []);
 					}
 					outgoing.get(edge.start).push(edge);
+				};
+
+				const directionKey = function (edge) {
+					const dx = edge.x2 - edge.x1;
+					const dy = edge.y2 - edge.y1;
+					if (dx === 1 && dy === 0) { return 'R'; }
+					if (dx === -1 && dy === 0) { return 'L'; }
+					if (dx === 0 && dy === 1) { return 'D'; }
+					if (dx === 0 && dy === -1) { return 'U'; }
+					return '';
+				};
+
+				const turnPreference = {
+					R: ['D', 'R', 'U', 'L'],
+					D: ['L', 'D', 'R', 'U'],
+					L: ['U', 'L', 'D', 'R'],
+					U: ['R', 'U', 'L', 'D'],
+				};
+
+				const pickNextEdge = function (currentEdge, candidates) {
+					const available = (candidates || []).filter(function (candidate) { return !candidate.used; });
+					if (!available.length) {
+						return null;
+					}
+					const incomingDirection = directionKey(currentEdge);
+					const preferredDirections = turnPreference[incomingDirection] || ['R', 'D', 'L', 'U'];
+					for (let i = 0; i < preferredDirections.length; i += 1) {
+						const targetDirection = preferredDirections[i];
+						for (let j = 0; j < available.length; j += 1) {
+							if (directionKey(available[j]) === targetDirection) {
+								return available[j];
+							}
+						}
+					}
+					return available[0];
 				};
 
 				for (let y = 0; y < height; y += 1) {
@@ -616,14 +659,7 @@ jQuery(function ($) {
 							break;
 						}
 						const nextCandidates = outgoing.get(current.end) || [];
-						let nextEdge = null;
-						for (let i = 0; i < nextCandidates.length; i += 1) {
-							if (!nextCandidates[i].used) {
-								nextEdge = nextCandidates[i];
-								break;
-							}
-						}
-						current = nextEdge;
+						current = pickNextEdge(current, nextCandidates);
 					}
 					if (loop.length >= 3) {
 						const simplified = simplifyClosedLoop(removeCollinearPoints(loop, optimizeTolerance), simplifyTolerance);
