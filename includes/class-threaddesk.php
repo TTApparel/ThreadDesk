@@ -688,6 +688,15 @@ class TTA_ThreadDesk {
 
 		if ( '' !== $file_name ) {
 			update_post_meta( $design_id, 'design_file_name', $file_name );
+			$default_title = sanitize_text_field( preg_replace( '/\.[^.]+$/', '', (string) $file_name ) );
+			if ( '' !== $default_title ) {
+				wp_update_post(
+					array(
+						'ID'         => $design_id,
+						'post_title' => $default_title,
+					)
+				);
+			}
 		}
 
 		$svg_base_name = sanitize_file_name( preg_replace( '/\.[^.]+$/', '', (string) $file_name ) );
