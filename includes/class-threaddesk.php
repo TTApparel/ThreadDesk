@@ -534,6 +534,9 @@ class TTA_ThreadDesk {
 				array_map(
 					function ( $color ) {
 						$color = strtoupper( sanitize_text_field( (string) $color ) );
+						if ( 'TRANSPARENT' === $color ) {
+							return 'transparent';
+						}
 						return preg_match( '/^#[0-9A-F]{6}$/', $color ) ? $color : '';
 					},
 					$palette
@@ -544,10 +547,13 @@ class TTA_ThreadDesk {
 		$settings_raw = isset( $_POST['threaddesk_design_analysis_settings'] ) ? wp_unslash( $_POST['threaddesk_design_analysis_settings'] ) : '{}';
 		$settings     = json_decode( $settings_raw, true );
 		$settings     = is_array( $settings ) ? $settings : array();
+		$maximum_color_count = isset( $settings['maximumColorCount'] ) ? (int) $settings['maximumColorCount'] : 4;
+		$maximum_color_count = max( 1, min( 8, $maximum_color_count ) );
 		$settings_clean = array(
 			'minimumPercent'      => isset( $settings['minimumPercent'] ) ? (float) $settings['minimumPercent'] : 0.5,
 			'mergeThreshold'      => isset( $settings['mergeThreshold'] ) ? (int) $settings['mergeThreshold'] : 22,
-			'maximumColorCount'   => isset( $settings['maximumColorCount'] ) ? (int) $settings['maximumColorCount'] : 4,
+			'maximumColorCount'   => $maximum_color_count,
+			'MS_scans'            => $maximum_color_count,
 			'potraceTurdsize'     => isset( $settings['potraceTurdsize'] ) ? (int) $settings['potraceTurdsize'] : 2,
 			'potraceAlphamax'     => isset( $settings['potraceAlphamax'] ) ? (float) $settings['potraceAlphamax'] : 1.0,
 			'potraceOpticurve'    => isset( $settings['potraceOpticurve'] ) ? (bool) $settings['potraceOpticurve'] : true,

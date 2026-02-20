@@ -104,7 +104,8 @@ $nav_base = trailingslashit( wc_get_account_endpoint_url( 'thread-desk' ) );
 					<div class="threaddesk__card">
 						<?php if ( $design_preview ) : ?>
 							<div class="threaddesk__card-design-preview">
-								<img src="<?php echo esc_url( $design_preview ); ?>" alt="<?php echo esc_attr( $design->post_title ); ?>" />
+								<img class="threaddesk__card-design-preview-svg" src="<?php echo esc_url( $design_preview ); ?>" alt="<?php echo esc_attr( $design->post_title ); ?>" />
+								<img class="threaddesk__card-design-preview-original" src="<?php echo esc_url( $design_preview ); ?>" alt="" aria-hidden="true" />
 							</div>
 						<?php endif; ?>
 						<h4><?php echo esc_html( $design->post_title ); ?></h4>
