@@ -180,7 +180,6 @@ jQuery(function ($) {
 		const multiScanSmooth = true;
 		const multiScanStack = true;
 		const designPreviewMaxDimension = 960;
-		const designCardMaxDimension = 420;
 		const exportVectorMaxDimension = 2400;
 		const savedVectorMatchPreviewMaxDimension = designPreviewMaxDimension;
 		const previewVectorMaxPixels = 260000;
@@ -1264,7 +1263,7 @@ jQuery(function ($) {
 				if (!loaded) {
 					return '';
 				}
-				const analysis = createAnalysisBuffer(image, svgDimensions, { maxDimension: Math.max(image.naturalWidth || 1, image.naturalHeight || 1) });
+				const analysis = createAnalysisBuffer(image, svgDimensions, { maxDimension: savedVectorMatchPreviewMaxDimension });
 				const traceSettings = resolveTraceSettings(settings);
 				const quantSource = createQuantizationPixels(
 					analysis.imageData.data,
@@ -1278,10 +1277,6 @@ jQuery(function ($) {
 				const quantized = quantizeColors(quantSource.pixels, quantSource.opaqueIndices, analysis.width * analysis.height, maxColors);
 				if (!quantized || !quantized.labels) {
 					return '';
-				}
-				const pathSvg = buildVectorSvgMarkup(quantized.labels, analysis.imageData.data, analysis.width, analysis.height, normalizedPalette, highResVectorMaxPixels, traceSettings);
-				if (pathSvg) {
-					return pathSvg;
 				}
 				return buildRectVectorSvgMarkup(quantized.labels, analysis.imageData.data, analysis.width, analysis.height, normalizedPalette, highResVectorMaxPixels * 2);
 			} catch (error) {
@@ -1314,7 +1309,7 @@ jQuery(function ($) {
 				return;
 			}
 
-			const analysis = createAnalysisBuffer(image, svgDimensions, { maxDimension: designCardMaxDimension });
+			const analysis = createAnalysisBuffer(image, svgDimensions, { maxDimension: savedVectorMatchPreviewMaxDimension });
 			const traceSettings = resolveTraceSettings(settings);
 			const quantSource = createQuantizationPixels(
 				analysis.imageData.data,
@@ -1648,10 +1643,7 @@ jQuery(function ($) {
 				submitButton.prop('disabled', true);
 				let svgMarkup = '';
 				if (state.labels && state.sourcePixels && state.palette.length && state.width && state.height) {
-					svgMarkup = buildVectorSvgMarkup(state.labels, state.sourcePixels, state.width, state.height, state.palette, exportVectorMaxPixels, state.analysisSettings);
-					if (!svgMarkup) {
-						svgMarkup = buildRectVectorSvgMarkup(state.labels, state.sourcePixels, state.width, state.height, state.palette, exportVectorMaxPixels * 2);
-					}
+					svgMarkup = buildRectVectorSvgMarkup(state.labels, state.sourcePixels, state.width, state.height, state.palette, exportVectorMaxPixels * 2);
 				}
 				if (!svgMarkup) {
 					const currentPreviewUrl = (previewImage.attr('src') || '').trim();
