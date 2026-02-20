@@ -429,6 +429,61 @@ class TTA_ThreadDesk {
 		update_post_meta( $design_id, 'design_svg_file_name', $svg_filename );
 	}
 
+	private function rename_design_file( $current_path, $current_url, $target_base_name, $extension, $storage ) {
+		$current_path = is_string( $current_path ) ? trim( $current_path ) : '';
+		$current_url  = is_string( $current_url ) ? trim( $current_url ) : '';
+		$extension    = sanitize_file_name( ltrim( (string) $extension, '.' ) );
+		$target_base_name = sanitize_file_name( (string) $target_base_name );
+
+		if ( '' === $current_path || '' === $extension || '' === $target_base_name || ! is_array( $storage ) || empty( $storage['dir'] ) || empty( $storage['url'] ) ) {
+			return array(
+				'path' => $current_path,
+				'url'  => $current_url,
+				'name' => $current_path ? sanitize_file_name( wp_basename( $current_path ) ) : '',
+			);
+		}
+
+		if ( ! file_exists( $current_path ) || ! is_file( $current_path ) ) {
+			return array(
+				'path' => $current_path,
+				'url'  => $current_url,
+				'name' => $current_path ? sanitize_file_name( wp_basename( $current_path ) ) : '',
+			);
+		}
+
+		$target_file_name = wp_unique_filename( $storage['dir'], $target_base_name . '.' . $extension );
+		$target_path      = trailingslashit( $storage['dir'] ) . $target_file_name;
+		if ( $target_path === $current_path ) {
+			return array(
+				'path' => $current_path,
+				'url'  => trailingslashit( $storage['url'] ) . rawurlencode( $target_file_name ),
+				'name' => $target_file_name,
+			);
+		}
+
+		$renamed = @rename( $current_path, $target_path );
+		if ( ! $renamed ) {
+			$renamed = @copy( $current_path, $target_path );
+			if ( $renamed ) {
+				@unlink( $current_path );
+			}
+		}
+
+		if ( ! $renamed ) {
+			return array(
+				'path' => $current_path,
+				'url'  => $current_url,
+				'name' => sanitize_file_name( wp_basename( $current_path ) ),
+			);
+		}
+
+		return array(
+			'path' => $target_path,
+			'url'  => trailingslashit( $storage['url'] ) . rawurlencode( $target_file_name ),
+			'name' => $target_file_name,
+		);
+	}
+
 	private function maybe_delete_design_file( $path ) {
 		$path = is_string( $path ) ? trim( $path ) : '';
 		if ( '' === $path || ! file_exists( $path ) || ! is_file( $path ) ) {
@@ -564,10 +619,18 @@ class TTA_ThreadDesk {
 
 		$color_count = isset( $_POST['threaddesk_design_color_count'] ) ? absint( $_POST['threaddesk_design_color_count'] ) : count( $palette );
 		$svg_markup  = isset( $_POST['threaddesk_design_svg_markup'] ) ? wp_unslash( $_POST['threaddesk_design_svg_markup'] ) : '';
+		$title_input = isset( $_POST['threaddesk_design_title'] ) ? sanitize_text_field( wp_unslash( $_POST['threaddesk_design_title'] ) ) : '';
+		$title_input = trim( $title_input );
 
 		if ( $upload && isset( $upload['file'] ) ) {
 			$incoming_name      = sanitize_file_name( wp_basename( $upload['file'] ) );
-			$target_name        = wp_unique_filename( $storage['dir'], $incoming_name );
+			$incoming_extension = strtolower( pathinfo( $incoming_name, PATHINFO_EXTENSION ) );
+			$preferred_base     = sanitize_file_name( $title_input );
+			$target_seed_name   = $incoming_name;
+			if ( '' !== $preferred_base && '' !== $incoming_extension ) {
+				$target_seed_name = $preferred_base . '.' . $incoming_extension;
+			}
+			$target_name        = wp_unique_filename( $storage['dir'], $target_seed_name );
 			$target_path        = trailingslashit( $storage['dir'] ) . $target_name;
 			$target_url         = trailingslashit( $storage['url'] ) . rawurlencode( $target_name );
 			$move_succeeded     = @rename( $upload['file'], $target_path );
@@ -592,13 +655,40 @@ class TTA_ThreadDesk {
 			update_post_meta( $design_id, 'design_original_file_path', $target_path );
 			update_post_meta( $design_id, 'design_original_file_url', esc_url_raw( $target_url ) );
 
-			$updated_title = sanitize_text_field( preg_replace( '/\.[^.]+$/', '', $file_name ) );
+			$updated_title = '' !== $title_input ? $title_input : sanitize_text_field( preg_replace( '/\.[^.]+$/', '', $file_name ) );
 			if ( '' !== $updated_title ) {
 				wp_update_post( array( 'ID' => $design_id, 'post_title' => $updated_title ) );
 			}
 
 			if ( $old_original_path && $old_original_path !== $target_path ) {
 				$this->maybe_delete_design_file( $old_original_path );
+			}
+		}
+
+		if ( ! $upload && '' !== $title_input ) {
+			wp_update_post( array( 'ID' => $design_id, 'post_title' => $title_input ) );
+			$current_original_path = (string) get_post_meta( $design_id, 'design_original_file_path', true );
+			$current_original_url  = (string) get_post_meta( $design_id, 'design_original_file_url', true );
+			$current_svg_path      = (string) get_post_meta( $design_id, 'design_svg_file_path', true );
+			$current_svg_url       = (string) get_post_meta( $design_id, 'design_svg_file_url', true );
+			$original_extension    = strtolower( pathinfo( (string) $file_name, PATHINFO_EXTENSION ) );
+			$rename_base           = sanitize_file_name( $title_input );
+
+			if ( '' !== $rename_base && '' !== $original_extension ) {
+				$renamed_original = $this->rename_design_file( $current_original_path, $current_original_url, $rename_base, $original_extension, $storage );
+				if ( ! empty( $renamed_original['name'] ) ) {
+					$file_name = (string) $renamed_original['name'];
+					update_post_meta( $design_id, 'design_preview_url', esc_url_raw( (string) $renamed_original['url'] ) );
+					update_post_meta( $design_id, 'design_original_file_path', (string) $renamed_original['path'] );
+					update_post_meta( $design_id, 'design_original_file_url', esc_url_raw( (string) $renamed_original['url'] ) );
+				}
+
+				$renamed_svg = $this->rename_design_file( $current_svg_path, $current_svg_url, $rename_base, 'svg', $storage );
+				if ( ! empty( $renamed_svg['name'] ) ) {
+					update_post_meta( $design_id, 'design_svg_file_path', (string) $renamed_svg['path'] );
+					update_post_meta( $design_id, 'design_svg_file_url', esc_url_raw( (string) $renamed_svg['url'] ) );
+					update_post_meta( $design_id, 'design_svg_file_name', (string) $renamed_svg['name'] );
+				}
 			}
 		}
 
