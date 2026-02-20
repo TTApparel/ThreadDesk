@@ -368,19 +368,98 @@ jQuery(function ($) {
 			const totalPixels = safeWidth * safeHeight;
 			const cumulativeMask = new Uint8Array(totalPixels);
 			const layerMarkup = [];
-			const maskToPath = function () {
+			const speckleThreshold = Math.max(2, parseInt(traceSettings.potraceTurdsize, 10) || 2);
+			const smoothPasses = traceSettings.multiScanSmooth === true ? 1 : 0;
+
+			const removeSmallConnectedComponents = function (mask, minArea) {
+				if (!mask || minArea <= 1) {
+					return;
+				}
+				const visited = new Uint8Array(mask.length);
+				const neighbors = [-1, 1, -safeWidth, safeWidth];
+				for (let i = 0; i < mask.length; i += 1) {
+					if (mask[i] !== 1 || visited[i] === 1) {
+						continue;
+					}
+					const stack = [i];
+					const component = [];
+					visited[i] = 1;
+					while (stack.length) {
+						const current = stack.pop();
+						component.push(current);
+						const x = current % safeWidth;
+						for (let n = 0; n < neighbors.length; n += 1) {
+							const next = current + neighbors[n];
+							if (next < 0 || next >= mask.length || visited[next] === 1 || mask[next] !== 1) {
+								continue;
+							}
+							if ((neighbors[n] === -1 && x === 0) || (neighbors[n] === 1 && x === safeWidth - 1)) {
+								continue;
+							}
+							visited[next] = 1;
+							stack.push(next);
+						}
+					}
+					if (component.length <= minArea) {
+						for (let c = 0; c < component.length; c += 1) {
+							mask[component[c]] = 0;
+						}
+					}
+				}
+			};
+
+			const smoothMaskEdges = function (mask) {
+				if (!mask || smoothPasses <= 0) {
+					return mask;
+				}
+				let working = mask.slice();
+				for (let pass = 0; pass < smoothPasses; pass += 1) {
+					const next = working.slice();
+					for (let y = 1; y < safeHeight - 1; y += 1) {
+						for (let x = 1; x < safeWidth - 1; x += 1) {
+							const index = (y * safeWidth) + x;
+							let count = 0;
+							for (let oy = -1; oy <= 1; oy += 1) {
+								for (let ox = -1; ox <= 1; ox += 1) {
+									if (ox === 0 && oy === 0) {
+										continue;
+									}
+									const nidx = ((y + oy) * safeWidth) + (x + ox);
+									count += working[nidx] === 1 ? 1 : 0;
+								}
+							}
+							const left = working[index - 1] === 1;
+							const right = working[index + 1] === 1;
+							const up = working[index - safeWidth] === 1;
+							const down = working[index + safeWidth] === 1;
+							const isLikelyTextStroke = (left && right && !up && !down) || (!left && !right && up && down);
+							if (working[index] === 1) {
+								if (!isLikelyTextStroke && count <= 2) {
+									next[index] = 0;
+								}
+							} else if (count >= 6) {
+								next[index] = 1;
+							}
+						}
+					}
+					working = next;
+				}
+				return working;
+			};
+
+			const maskToPath = function (mask) {
 				const segments = [];
 				for (let y = 0; y < safeHeight; y += 1) {
 					const rowOffset = y * safeWidth;
 					let x = 0;
 					while (x < safeWidth) {
-						if (cumulativeMask[rowOffset + x] !== 1) {
+						if (mask[rowOffset + x] !== 1) {
 							x += 1;
 							continue;
 						}
 						const runStart = x;
 						x += 1;
-						while (x < safeWidth && cumulativeMask[rowOffset + x] === 1) {
+						while (x < safeWidth && mask[rowOffset + x] === 1) {
 							x += 1;
 						}
 						segments.push('M' + runStart + ' ' + y + 'H' + x + 'V' + (y + 1) + 'H' + runStart + 'Z');
@@ -390,6 +469,7 @@ jQuery(function ($) {
 			};
 
 			for (let colorIndex = 0; colorIndex < scans; colorIndex += 1) {
+				const currentLayerMask = new Uint8Array(totalPixels);
 				for (let pixelIndex = 0; pixelIndex < totalPixels; pixelIndex += 1) {
 					if ((labels[pixelIndex] || 0) !== colorIndex) {
 						continue;
@@ -398,9 +478,16 @@ jQuery(function ($) {
 					if (alpha < 8) {
 						continue;
 					}
-					cumulativeMask[pixelIndex] = 1;
+					currentLayerMask[pixelIndex] = 1;
 				}
-				const d = maskToPath();
+				removeSmallConnectedComponents(currentLayerMask, speckleThreshold);
+				for (let pixelIndex = 0; pixelIndex < totalPixels; pixelIndex += 1) {
+					if (currentLayerMask[pixelIndex] === 1) {
+						cumulativeMask[pixelIndex] = 1;
+					}
+				}
+				const smoothedMask = smoothMaskEdges(cumulativeMask);
+				const d = maskToPath(smoothedMask);
 				if (!d) {
 					continue;
 				}
