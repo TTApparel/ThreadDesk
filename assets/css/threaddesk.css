@@ -637,6 +637,34 @@ body.threaddesk-modal-open {
 	object-fit: contain;
 }
 
+.threaddesk__card-design-preview {
+	position: relative;
+}
+
+.threaddesk__card-design-preview-svg,
+.threaddesk__card-design-preview-original {
+	position: absolute;
+	inset: 0;
+	width: 100%;
+	height: 100%;
+	object-fit: contain;
+}
+
+.threaddesk__card-design-preview-svg {
+	z-index: 1;
+}
+
+.threaddesk__card-design-preview-original {
+	z-index: 2;
+	opacity: 0;
+	transition: opacity 0.18s ease;
+	pointer-events: none;
+}
+
+.threaddesk__card-design-preview:hover .threaddesk__card-design-preview-original {
+	opacity: 1;
+}
+
 .threaddesk__card-design-file {
 	margin-top: 6px;
 	font-size: 12px;

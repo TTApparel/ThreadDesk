@@ -1337,7 +1337,7 @@ jQuery(function ($) {
 			const previewUrl = trigger.attr('data-threaddesk-design-preview-url') || '';
 			const paletteRaw = trigger.attr('data-threaddesk-design-palette') || '[]';
 			const settingsRaw = trigger.attr('data-threaddesk-design-settings') || '{}';
-			const cardImage = trigger.closest('.threaddesk__card').find('.threaddesk__card-design-preview img').get(0);
+			const cardImage = trigger.closest('.threaddesk__card').find('.threaddesk__card-design-preview-svg').get(0);
 			recolorCardPreview(cardImage, previewUrl, paletteRaw, settingsRaw).catch(function () {});
 		});
 
@@ -1355,8 +1355,10 @@ jQuery(function ($) {
 		$(document).on('click', '[data-threaddesk-palette-option]', function (event) {
 			event.preventDefault();
 			const index = Math.max(0, state.activeSwatchIndex || 0);
-			const hex = ($(this).attr('data-color-hex') || '').toUpperCase();
-			if (Number.isNaN(index) || index < 0 || !/^#[0-9A-F]{6}$/.test(hex)) {
+			const rawColor = ($(this).attr('data-color-hex') || '');
+			const isTransparent = rawColor.toLowerCase() === 'transparent';
+			const hex = isTransparent ? 'transparent' : rawColor.toUpperCase();
+			if (Number.isNaN(index) || index < 0 || (!isTransparent && !/^#[0-9A-F]{6}$/.test(hex))) {
 				return;
 			}
 			state.palette[index] = hex;
