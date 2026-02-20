@@ -678,6 +678,7 @@ body.threaddesk-modal-open {
 	border-radius: 10px;
 	overflow: hidden;
 	background: #f3f3f3;
+	margin-top: 12px;
 	margin-bottom: 10px;
 	aspect-ratio: 4 / 3;
 	display: flex;
