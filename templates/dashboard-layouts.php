@@ -40,57 +40,42 @@ $profile_username = $user ? $user->user_login : __( 'Username', 'threaddesk' );
 
 $nav_base = trailingslashit( wc_get_account_endpoint_url( 'thread-desk' ) );
 
-$placement_category_names = array( 'Tshirts', 'Long Sleeves', 'Hoodies', 'Tank Tops', 'Jackets', 'Hats', 'Bags' );
-$placement_categories     = array();
+$layout_category_settings = get_option( 'tta_threaddesk_layout_categories', array() );
+$placement_categories    = array();
 
-if ( taxonomy_exists( 'product_cat' ) ) {
-	$category_terms = get_terms(
-		array(
-			'taxonomy'   => 'product_cat',
-			'hide_empty' => false,
-		)
-	);
-
-	if ( ! is_wp_error( $category_terms ) ) {
-		$indexed_categories = array();
-
-		foreach ( $category_terms as $term ) {
-			$indexed_categories[ sanitize_title( $term->name ) ] = $term;
-			$indexed_categories[ sanitize_title( $term->slug ) ] = $term;
+if ( taxonomy_exists( 'product_cat' ) && is_array( $layout_category_settings ) ) {
+	foreach ( $layout_category_settings as $term_id => $settings ) {
+		$term_id   = absint( $term_id );
+		$settings  = is_array( $settings ) ? $settings : array();
+		if ( ! $term_id || empty( $settings['enabled'] ) ) {
+			continue;
 		}
 
-		foreach ( $placement_category_names as $category_name ) {
-			$key  = sanitize_title( $category_name );
-			$term = isset( $indexed_categories[ $key ] ) ? $indexed_categories[ $key ] : null;
-
-			$image_url = '';
-			if ( $term ) {
-				$thumbnail_id = (int) get_term_meta( $term->term_id, 'thumbnail_id', true );
-				if ( $thumbnail_id ) {
-					$image_url = wp_get_attachment_image_url( $thumbnail_id, 'medium' );
-				}
-			}
-
-			$placement_categories[] = array(
-				'label'     => $category_name,
-				'image_url' => $image_url,
-				'term_id'   => $term ? (int) $term->term_id : 0,
-				'term_slug' => $term ? $term->slug : '',
-			);
+		$term = get_term( $term_id, 'product_cat' );
+		if ( ! $term || is_wp_error( $term ) ) {
+			continue;
 		}
-	}
-}
 
-if ( empty( $placement_categories ) ) {
-	foreach ( $placement_category_names as $category_name ) {
+		$thumbnail_id = (int) get_term_meta( $term_id, 'thumbnail_id', true );
+		$term_thumb   = $thumbnail_id ? wp_get_attachment_image_url( $thumbnail_id, 'medium' ) : '';
+		$front_image  = ! empty( $settings['front_image'] ) ? esc_url_raw( $settings['front_image'] ) : '';
+		$back_image   = ! empty( $settings['back_image'] ) ? esc_url_raw( $settings['back_image'] ) : '';
+		$side_image   = ! empty( $settings['side_image'] ) ? esc_url_raw( $settings['side_image'] ) : '';
+		$side_label   = isset( $settings['side_label'] ) && 'right' === $settings['side_label'] ? 'right' : 'left';
+
 		$placement_categories[] = array(
-			'label'     => $category_name,
-			'image_url' => '',
-			'term_id'   => 0,
-			'term_slug' => '',
+			'label'       => $term->name,
+			'image_url'   => $front_image ? $front_image : $term_thumb,
+			'front_image' => $front_image,
+			'back_image'  => $back_image,
+			'side_image'  => $side_image,
+			'side_label'  => $side_label,
+			'term_id'     => (int) $term->term_id,
+			'term_slug'   => $term->slug,
 		);
 	}
 }
+
 ?>
 <div class="threaddesk">
 	<div class="threaddesk__sidebar">
@@ -103,15 +88,6 @@ if ( empty( $placement_categories ) ) {
 
 	<div class="threaddesk__content">
 		<div class="threaddesk__header" style="background-image: url('<?php echo esc_url( $cover ); ?>');">
-			<?php if ( $map_url ) : ?>
-				<div class="threaddesk__header-map" aria-hidden="true">
-					<iframe
-						title="<?php echo esc_attr__( 'Shipping address map', 'threaddesk' ); ?>"
-						src="<?php echo esc_url( $map_url ); ?>"
-						loading="lazy"
-						referrerpolicy="no-referrer-when-downgrade"></iframe>
-				</div>
-			<?php endif; ?>
 			<form class="threaddesk__profile" method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" enctype="multipart/form-data">
 				<input type="hidden" name="action" value="tta_threaddesk_avatar_upload" />
 				<?php wp_nonce_field( 'tta_threaddesk_avatar_upload' ); ?>
@@ -168,18 +144,28 @@ if ( empty( $placement_categories ) ) {
 				<h3><?php echo esc_html__( 'Create a placement layout', 'threaddesk' ); ?></h3>
 				<p><?php echo esc_html__( 'Choose a product category to start your layout.', 'threaddesk' ); ?></p>
 				<div class="threaddesk-layout-modal__grid">
-					<?php foreach ( $placement_categories as $placement_category ) : ?>
-						<button type="button" class="threaddesk-layout-modal__option" data-threaddesk-layout-category="<?php echo esc_attr( $placement_category['term_slug'] ); ?>" data-threaddesk-layout-category-id="<?php echo esc_attr( $placement_category['term_id'] ); ?>">
-							<span class="threaddesk-layout-modal__image-wrap">
-								<?php if ( ! empty( $placement_category['image_url'] ) ) : ?>
-									<img src="<?php echo esc_url( $placement_category['image_url'] ); ?>" alt="<?php echo esc_attr( $placement_category['label'] ); ?>" class="threaddesk-layout-modal__image" />
-								<?php else : ?>
-									<span class="threaddesk-layout-modal__image-fallback"><?php echo esc_html__( 'No image', 'threaddesk' ); ?></span>
-								<?php endif; ?>
-							</span>
-							<span class="threaddesk-layout-modal__label"><?php echo esc_html( $placement_category['label'] ); ?></span>
-						</button>
-					<?php endforeach; ?>
+					<?php if ( ! empty( $placement_categories ) ) : ?>
+						<?php foreach ( $placement_categories as $placement_category ) : ?>
+							<button type="button" class="threaddesk-layout-modal__option"
+								data-threaddesk-layout-category="<?php echo esc_attr( $placement_category['term_slug'] ); ?>"
+								data-threaddesk-layout-category-id="<?php echo esc_attr( $placement_category['term_id'] ); ?>"
+								data-threaddesk-layout-front-image="<?php echo esc_url( $placement_category['front_image'] ); ?>"
+								data-threaddesk-layout-back-image="<?php echo esc_url( $placement_category['back_image'] ); ?>"
+								data-threaddesk-layout-side-image="<?php echo esc_url( $placement_category['side_image'] ); ?>"
+								data-threaddesk-layout-side-label="<?php echo esc_attr( $placement_category['side_label'] ); ?>">
+								<span class="threaddesk-layout-modal__image-wrap">
+									<?php if ( ! empty( $placement_category['image_url'] ) ) : ?>
+										<img src="<?php echo esc_url( $placement_category['image_url'] ); ?>" alt="<?php echo esc_attr( $placement_category['label'] ); ?>" class="threaddesk-layout-modal__image" />
+									<?php else : ?>
+										<span class="threaddesk-layout-modal__image-fallback"><?php echo esc_html__( 'No image', 'threaddesk' ); ?></span>
+									<?php endif; ?>
+								</span>
+								<span class="threaddesk-layout-modal__label"><?php echo esc_html( $placement_category['label'] ); ?></span>
+							</button>
+						<?php endforeach; ?>
+					<?php else : ?>
+						<p class="threaddesk-layout-modal__empty"><?php echo esc_html__( 'No placement categories configured yet. Ask your administrator to configure categories in WooCommerce → ThreadDesk.', 'threaddesk' ); ?></p>
+					<?php endif; ?>
 				</div>
 			</div>
 		</div>

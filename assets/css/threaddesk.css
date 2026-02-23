@@ -1170,3 +1170,10 @@ body.threaddesk-modal-open {
 	font-weight: 600;
 	color: #1f1f1f;
 }
+
+
+.threaddesk-layout-modal__empty {
+	margin: 0;
+	font-size: 14px;
+	color: #666;
+}
