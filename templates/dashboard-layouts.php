@@ -39,6 +39,52 @@ $profile_name = $profile_name ? $profile_name : $client_name;
 $profile_username = $user ? $user->user_login : __( 'Username', 'threaddesk' );
 
 $nav_base = trailingslashit( wc_get_account_endpoint_url( 'thread-desk' ) );
+
+$layout_category_settings = get_option( 'tta_threaddesk_layout_categories', array() );
+$placement_categories    = array();
+
+if ( taxonomy_exists( 'product_cat' ) && is_array( $layout_category_settings ) ) {
+	uasort(
+		$layout_category_settings,
+		function ( $a, $b ) {
+			$a_order = isset( $a['order'] ) ? absint( $a['order'] ) : 9999;
+			$b_order = isset( $b['order'] ) ? absint( $b['order'] ) : 9999;
+			return $a_order - $b_order;
+		}
+	);
+
+	foreach ( $layout_category_settings as $term_id => $settings ) {
+		$term_id   = absint( $term_id );
+		$settings  = is_array( $settings ) ? $settings : array();
+		if ( ! $term_id || empty( $settings['enabled'] ) ) {
+			continue;
+		}
+
+		$term = get_term( $term_id, 'product_cat' );
+		if ( ! $term || is_wp_error( $term ) ) {
+			continue;
+		}
+
+		$thumbnail_id = (int) get_term_meta( $term_id, 'thumbnail_id', true );
+		$term_thumb   = $thumbnail_id ? wp_get_attachment_image_url( $thumbnail_id, 'medium' ) : '';
+		$front_image  = ! empty( $settings['front_image'] ) ? esc_url_raw( $settings['front_image'] ) : '';
+		$back_image   = ! empty( $settings['back_image'] ) ? esc_url_raw( $settings['back_image'] ) : '';
+		$side_image   = ! empty( $settings['side_image'] ) ? esc_url_raw( $settings['side_image'] ) : '';
+		$side_label   = isset( $settings['side_label'] ) && 'right' === $settings['side_label'] ? 'right' : 'left';
+
+		$placement_categories[] = array(
+			'label'       => $term->name,
+			'image_url'   => $front_image ? $front_image : $term_thumb,
+			'front_image' => $front_image,
+			'back_image'  => $back_image,
+			'side_image'  => $side_image,
+			'side_label'  => $side_label,
+			'term_id'     => (int) $term->term_id,
+			'term_slug'   => $term->slug,
+		);
+	}
+}
+
 ?>
 <div class="threaddesk">
 	<div class="threaddesk__sidebar">
@@ -51,15 +97,6 @@ $nav_base = trailingslashit( wc_get_account_endpoint_url( 'thread-desk' ) );
 
 	<div class="threaddesk__content">
 		<div class="threaddesk__header" style="background-image: url('<?php echo esc_url( $cover ); ?>');">
-			<?php if ( $map_url ) : ?>
-				<div class="threaddesk__header-map" aria-hidden="true">
-					<iframe
-						title="<?php echo esc_attr__( 'Shipping address map', 'threaddesk' ); ?>"
-						src="<?php echo esc_url( $map_url ); ?>"
-						loading="lazy"
-						referrerpolicy="no-referrer-when-downgrade"></iframe>
-				</div>
-			<?php endif; ?>
 			<form class="threaddesk__profile" method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" enctype="multipart/form-data">
 				<input type="hidden" name="action" value="tta_threaddesk_avatar_upload" />
 				<?php wp_nonce_field( 'tta_threaddesk_avatar_upload' ); ?>
@@ -80,7 +117,7 @@ $nav_base = trailingslashit( wc_get_account_endpoint_url( 'thread-desk' ) );
 		<div class="threaddesk__section">
 			<div class="threaddesk__card-header threaddesk-designer__heading">
 				<h3><?php echo esc_html__( 'Saved Placements', 'threaddesk' ); ?></h3>
-				<button type="button" class="threaddesk__button"><?php echo esc_html__( 'Add Placement', 'threaddesk' ); ?></button>
+				<button type="button" class="threaddesk__button" data-threaddesk-layout-open><?php echo esc_html__( 'Add Placement', 'threaddesk' ); ?></button>
 			</div>
 			<p><?php echo esc_html__( 'Placements are placeholders for now. This area will list approved placements for reuse.', 'threaddesk' ); ?></p>
 			<div class="threaddesk__cards">
@@ -96,6 +133,81 @@ $nav_base = trailingslashit( wc_get_account_endpoint_url( 'thread-desk' ) );
 						<p><?php echo esc_html__( 'No placements found yet.', 'threaddesk' ); ?></p>
 					</div>
 				<?php endif; ?>
+			</div>
+
+		<div class="threaddesk__section threaddesk-layout-viewer" data-threaddesk-layout-viewer hidden>
+			<div class="threaddesk-layout-viewer__stage">
+				<img src="" alt="" class="threaddesk-layout-viewer__main-image" data-threaddesk-layout-main-image />
+			</div>
+			<div class="threaddesk-layout-viewer__controls">
+				<div class="threaddesk-layout-viewer__design-panel">
+					<h4><?php echo esc_html__( 'Choose Design', 'threaddesk' ); ?></h4>
+					<button type="button" class="threaddesk-layout-viewer__choose-button"><?php echo esc_html__( 'Choose image', 'threaddesk' ); ?></button>
+					<p><?php echo esc_html__( 'No saved placements yet.', 'threaddesk' ); ?></p>
+				</div>
+				<div class="threaddesk-layout-viewer__angles">
+					<button type="button" class="threaddesk-layout-viewer__angle is-active" data-threaddesk-layout-angle="front">
+						<img src="" alt="" data-threaddesk-layout-angle-image="front" />
+						<span><?php echo esc_html__( 'Front', 'threaddesk' ); ?></span>
+					</button>
+					<button type="button" class="threaddesk-layout-viewer__angle" data-threaddesk-layout-angle="left">
+						<img src="" alt="" data-threaddesk-layout-angle-image="left" />
+						<span><?php echo esc_html__( 'Left', 'threaddesk' ); ?></span>
+					</button>
+					<button type="button" class="threaddesk-layout-viewer__angle" data-threaddesk-layout-angle="back">
+						<img src="" alt="" data-threaddesk-layout-angle-image="back" />
+						<span><?php echo esc_html__( 'Back', 'threaddesk' ); ?></span>
+					</button>
+					<button type="button" class="threaddesk-layout-viewer__angle" data-threaddesk-layout-angle="right">
+						<img src="" alt="" data-threaddesk-layout-angle-image="right" />
+						<span><?php echo esc_html__( 'Right', 'threaddesk' ); ?></span>
+					</button>
+				</div>
+			</div>
+		</div>
+
+		</div>
+	</div>
+</div>
+
+<div class="threaddesk-layout-modal" aria-hidden="true">
+	<div class="threaddesk-auth-modal__overlay" data-threaddesk-layout-close></div>
+	<div class="threaddesk-auth-modal__panel" role="dialog" aria-label="<?php echo esc_attr__( 'Choose a placement category', 'threaddesk' ); ?>" aria-modal="true">
+		<div class="threaddesk-auth-modal__actions">
+			<button type="button" class="threaddesk-auth-modal__close" data-threaddesk-layout-close aria-label="<?php echo esc_attr__( 'Close placement modal', 'threaddesk' ); ?>">
+				<svg class="threaddesk-auth-modal__close-icon" width="12" height="12" viewBox="0 0 15 15" aria-hidden="true" focusable="false">
+					<path d="M1 15a1 1 0 01-.71-.29 1 1 0 010-1.41l5.8-5.8-5.8-5.8A1 1 0 011.7.29l5.8 5.8 5.8-5.8a1 1 0 011.41 1.41l-5.8 5.8 5.8 5.8a1 1 0 01-1.41 1.41l-5.8-5.8-5.8 5.8A1 1 0 011 15z"></path>
+				</svg>
+			</button>
+		</div>
+		<div class="threaddesk-auth-modal__content">
+			<div class="threaddesk-layout-modal__content">
+				<h3><?php echo esc_html__( 'Create a placement layout', 'threaddesk' ); ?></h3>
+				<p><?php echo esc_html__( 'Choose a product category to start your layout.', 'threaddesk' ); ?></p>
+				<div class="threaddesk-layout-modal__grid">
+					<?php if ( ! empty( $placement_categories ) ) : ?>
+						<?php foreach ( $placement_categories as $placement_category ) : ?>
+							<button type="button" class="threaddesk-layout-modal__option"
+								data-threaddesk-layout-category="<?php echo esc_attr( $placement_category['term_slug'] ); ?>"
+								data-threaddesk-layout-category-id="<?php echo esc_attr( $placement_category['term_id'] ); ?>"
+								data-threaddesk-layout-front-image="<?php echo esc_url( $placement_category['front_image'] ); ?>"
+								data-threaddesk-layout-back-image="<?php echo esc_url( $placement_category['back_image'] ); ?>"
+								data-threaddesk-layout-side-image="<?php echo esc_url( $placement_category['side_image'] ); ?>"
+								data-threaddesk-layout-side-label="<?php echo esc_attr( $placement_category['side_label'] ); ?>">
+								<span class="threaddesk-layout-modal__image-wrap">
+									<?php if ( ! empty( $placement_category['image_url'] ) ) : ?>
+										<img src="<?php echo esc_url( $placement_category['image_url'] ); ?>" alt="<?php echo esc_attr( $placement_category['label'] ); ?>" class="threaddesk-layout-modal__image" />
+									<?php else : ?>
+										<span class="threaddesk-layout-modal__image-fallback"><?php echo esc_html__( 'No image', 'threaddesk' ); ?></span>
+									<?php endif; ?>
+								</span>
+								<span class="threaddesk-layout-modal__label"><?php echo esc_html( $placement_category['label'] ); ?></span>
+							</button>
+						<?php endforeach; ?>
+					<?php else : ?>
+						<p class="threaddesk-layout-modal__empty"><?php echo esc_html__( 'No placement categories configured yet. Ask your administrator to configure categories in WooCommerce → ThreadDesk.', 'threaddesk' ); ?></p>
+					<?php endif; ?>
+				</div>
 			</div>
 		</div>
 	</div>
