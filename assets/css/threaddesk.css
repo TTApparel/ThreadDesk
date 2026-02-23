@@ -645,9 +645,9 @@ body.threaddesk-modal-open {
 
 .threaddesk__card-delete {
 	margin: 0;
-	position: absolute;
-	top: 6px;
-	right: 8px;
+	display: flex;
+	justify-content: flex-end;
+	margin-bottom: 8px;
 }
 
 .threaddesk__card-delete-button {
@@ -701,10 +701,14 @@ body.threaddesk-modal-open {
 .threaddesk__card-design-preview-svg,
 .threaddesk__card-design-preview-original {
 	position: absolute;
-	inset: 5px;
-	width: calc(100% - 10px);
-	height: calc(100% - 10px);
+	top: 50%;
+	left: 50%;
+	max-width: calc(100% - 10px);
+	max-height: calc(100% - 10px);
+	width: auto;
+	height: auto;
 	object-fit: contain;
+	transform: translate(-50%, -50%);
 }
 
 .threaddesk__card-design-preview-svg {

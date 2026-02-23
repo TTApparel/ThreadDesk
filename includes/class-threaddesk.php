@@ -516,6 +516,7 @@ class TTA_ThreadDesk {
 		$design_id         = 0;
 		$upload            = null;
 		$file_name         = '';
+		$title_input       = isset( $_POST['threaddesk_design_title'] ) ? sanitize_text_field( wp_unslash( $_POST['threaddesk_design_title'] ) ) : '';
 		$storage           = $this->get_user_design_storage( $current_user_id );
 
 		if ( ! $storage ) {
@@ -688,14 +689,16 @@ class TTA_ThreadDesk {
 
 		if ( '' !== $file_name ) {
 			update_post_meta( $design_id, 'design_file_name', $file_name );
-			$default_title = sanitize_text_field( preg_replace( '/\.[^.]+$/', '', (string) $file_name ) );
-			if ( '' !== $default_title ) {
-				wp_update_post(
-					array(
-						'ID'         => $design_id,
-						'post_title' => $default_title,
-					)
-				);
+			if ( '' === $title_input ) {
+				$default_title = sanitize_text_field( preg_replace( '/\.[^.]+$/', '', (string) $file_name ) );
+				if ( '' !== $default_title ) {
+					wp_update_post(
+						array(
+							'ID'         => $design_id,
+							'post_title' => $default_title,
+						)
+					);
+				}
 			}
 		}
 
