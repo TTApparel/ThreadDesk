@@ -104,6 +104,44 @@ jQuery(function ($) {
 		});
 	}
 
+
+	const layoutModal = $('.threaddesk-layout-modal');
+
+	if (layoutModal.length) {
+		let lastLayoutTrigger = null;
+		const openLayoutModal = function (triggerEl) {
+			lastLayoutTrigger = triggerEl || document.activeElement || lastLayoutTrigger;
+			layoutModal.addClass('is-active').attr('aria-hidden', 'false');
+			$('body').addClass('threaddesk-modal-open');
+		};
+
+		const closeLayoutModal = function () {
+			layoutModal.removeClass('is-active').attr('aria-hidden', 'true');
+			$('body').removeClass('threaddesk-modal-open');
+			if (lastLayoutTrigger && typeof lastLayoutTrigger.focus === 'function') {
+				try { lastLayoutTrigger.focus(); } catch (e) {}
+			}
+		};
+
+		$(document).on('click', '[data-threaddesk-layout-open]', function () {
+			openLayoutModal(this);
+		});
+
+		$(document).on('click', '[data-threaddesk-layout-close]', function () {
+			closeLayoutModal();
+		});
+
+		$(document).on('click', '[data-threaddesk-layout-category]', function () {
+			closeLayoutModal();
+		});
+
+		$(document).on('keyup', function (event) {
+			if (event.key === 'Escape' && layoutModal.hasClass('is-active')) {
+				closeLayoutModal();
+			}
+		});
+	}
+
 	const designModal = $('.threaddesk-design-modal');
 
 	if (designModal.length) {

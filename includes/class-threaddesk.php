@@ -129,6 +129,31 @@ class TTA_ThreadDesk {
 	public function register_settings() {
 		register_setting( 'tta_threaddesk_settings', 'tta_threaddesk_cover_image_url', array( 'sanitize_callback' => 'esc_url_raw' ) );
 		register_setting( 'tta_threaddesk_settings', 'tta_threaddesk_default_company', array( 'sanitize_callback' => 'sanitize_text_field' ) );
+		register_setting( 'tta_threaddesk_settings', 'tta_threaddesk_layout_categories', array( 'sanitize_callback' => array( $this, 'sanitize_layout_categories' ) ) );
+	}
+
+	public function sanitize_layout_categories( $value ) {
+		$sanitized = array();
+		if ( ! is_array( $value ) ) {
+			return $sanitized;
+		}
+
+		foreach ( $value as $term_id => $row ) {
+			$term_id = absint( $term_id );
+			if ( ! $term_id || empty( $row['enabled'] ) ) {
+				continue;
+			}
+
+			$sanitized[ $term_id ] = array(
+				'enabled'    => 1,
+				'front_image' => isset( $row['front_image'] ) ? esc_url_raw( $row['front_image'] ) : '',
+				'back_image'  => isset( $row['back_image'] ) ? esc_url_raw( $row['back_image'] ) : '',
+				'side_image'  => isset( $row['side_image'] ) ? esc_url_raw( $row['side_image'] ) : '',
+				'side_label'  => isset( $row['side_label'] ) && 'right' === sanitize_key( $row['side_label'] ) ? 'right' : 'left',
+			);
+		}
+
+		return $sanitized;
 	}
 
 	public function render_settings_page() {
@@ -136,9 +161,17 @@ class TTA_ThreadDesk {
 			return;
 		}
 
-		$cover_image = get_option( 'tta_threaddesk_cover_image_url', '' );
-		$company     = get_option( 'tta_threaddesk_default_company', '' );
-		$nonce       = wp_create_nonce( 'tta_threaddesk_generate_demo' );
+		$cover_image        = get_option( 'tta_threaddesk_cover_image_url', '' );
+		$company            = get_option( 'tta_threaddesk_default_company', '' );
+		$layout_categories  = get_option( 'tta_threaddesk_layout_categories', array() );
+		$placement_terms    = taxonomy_exists( 'product_cat' ) ? get_terms(
+			array(
+				'taxonomy'   => 'product_cat',
+				'hide_empty' => false,
+			)
+		) : array();
+		$placement_terms    = is_wp_error( $placement_terms ) ? array() : $placement_terms;
+		$nonce              = wp_create_nonce( 'tta_threaddesk_generate_demo' );
 		?>
 		<div class="wrap">
 			<h1><?php echo esc_html__( 'ThreadDesk Settings', 'threaddesk' ); ?></h1>
@@ -159,6 +192,46 @@ class TTA_ThreadDesk {
 						</th>
 						<td>
 							<input type="text" class="regular-text" id="tta_threaddesk_default_company" name="tta_threaddesk_default_company" value="<?php echo esc_attr( $company ); ?>" />
+						</td>
+					</tr>
+					<tr>
+						<th scope="row"><?php echo esc_html__( 'Placement Categories', 'threaddesk' ); ?></th>
+						<td>
+							<p class="description"><?php echo esc_html__( 'Choose which WooCommerce product categories appear under Placements. Configure Front, Back, and Side (default Left) images for each enabled category.', 'threaddesk' ); ?></p>
+							<?php if ( ! empty( $placement_terms ) ) : ?>
+								<table class="widefat striped" style="margin-top:10px;">
+									<thead>
+										<tr>
+											<th><?php echo esc_html__( 'Use', 'threaddesk' ); ?></th>
+											<th><?php echo esc_html__( 'Category', 'threaddesk' ); ?></th>
+											<th><?php echo esc_html__( 'Front Image URL', 'threaddesk' ); ?></th>
+											<th><?php echo esc_html__( 'Back Image URL', 'threaddesk' ); ?></th>
+											<th><?php echo esc_html__( 'Side Image URL', 'threaddesk' ); ?></th>
+											<th><?php echo esc_html__( 'Side', 'threaddesk' ); ?></th>
+										</tr>
+									</thead>
+									<tbody>
+										<?php foreach ( $placement_terms as $term ) : ?>
+											<?php $configured = isset( $layout_categories[ $term->term_id ] ) && is_array( $layout_categories[ $term->term_id ] ) ? $layout_categories[ $term->term_id ] : array(); ?>
+											<tr>
+												<td><label><input type="checkbox" name="tta_threaddesk_layout_categories[<?php echo esc_attr( $term->term_id ); ?>][enabled]" value="1" <?php checked( ! empty( $configured['enabled'] ) ); ?> /> <?php echo esc_html__( 'Show', 'threaddesk' ); ?></label></td>
+												<td><strong><?php echo esc_html( $term->name ); ?></strong><br /><code><?php echo esc_html( $term->slug ); ?></code></td>
+												<td><input type="url" class="regular-text" name="tta_threaddesk_layout_categories[<?php echo esc_attr( $term->term_id ); ?>][front_image]" value="<?php echo esc_url( isset( $configured['front_image'] ) ? $configured['front_image'] : '' ); ?>" placeholder="https://..." /></td>
+												<td><input type="url" class="regular-text" name="tta_threaddesk_layout_categories[<?php echo esc_attr( $term->term_id ); ?>][back_image]" value="<?php echo esc_url( isset( $configured['back_image'] ) ? $configured['back_image'] : '' ); ?>" placeholder="https://..." /></td>
+												<td><input type="url" class="regular-text" name="tta_threaddesk_layout_categories[<?php echo esc_attr( $term->term_id ); ?>][side_image]" value="<?php echo esc_url( isset( $configured['side_image'] ) ? $configured['side_image'] : '' ); ?>" placeholder="https://..." /></td>
+												<td>
+													<select name="tta_threaddesk_layout_categories[<?php echo esc_attr( $term->term_id ); ?>][side_label]">
+														<option value="left" <?php selected( isset( $configured['side_label'] ) ? $configured['side_label'] : 'left', 'left' ); ?>><?php echo esc_html__( 'Left', 'threaddesk' ); ?></option>
+														<option value="right" <?php selected( isset( $configured['side_label'] ) ? $configured['side_label'] : 'left', 'right' ); ?>><?php echo esc_html__( 'Right', 'threaddesk' ); ?></option>
+													</select>
+												</td>
+											</tr>
+										<?php endforeach; ?>
+									</tbody>
+								</table>
+							<?php else : ?>
+								<p><?php echo esc_html__( 'No product categories found. Create WooCommerce product categories first.', 'threaddesk' ); ?></p>
+							<?php endif; ?>
 						</td>
 					</tr>
 				</table>
