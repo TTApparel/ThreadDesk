@@ -41,6 +41,7 @@
 
 .threaddesk__content {
 	flex: 1;
+	padding-bottom: 300px;
 }
 
 .threaddesk__content-inner {
