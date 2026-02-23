@@ -131,7 +131,52 @@ jQuery(function ($) {
 			closeLayoutModal();
 		});
 
+		const layoutViewer = $('[data-threaddesk-layout-viewer]');
+		const mainImage = layoutViewer.find('[data-threaddesk-layout-main-image]');
+		const angleButtons = layoutViewer.find('[data-threaddesk-layout-angle]');
+		const angleImages = {
+			front: layoutViewer.find('[data-threaddesk-layout-angle-image="front"]'),
+			left: layoutViewer.find('[data-threaddesk-layout-angle-image="left"]'),
+			back: layoutViewer.find('[data-threaddesk-layout-angle-image="back"]'),
+			right: layoutViewer.find('[data-threaddesk-layout-angle-image="right"]'),
+		};
+		let currentAngles = { front: '', left: '', back: '', right: '' };
+
+		const setMainImage = function (angle) {
+			const target = angle || 'front';
+			const url = currentAngles[target] || currentAngles.front || '';
+			if (url) {
+				mainImage.attr('src', url).attr('alt', target + ' view').show();
+			}
+			angleButtons.removeClass('is-active');
+			angleButtons.filter('[data-threaddesk-layout-angle="' + target + '"]').addClass('is-active');
+		};
+
+		$(document).on('click', '[data-threaddesk-layout-angle]', function () {
+			setMainImage($(this).data('threaddesk-layout-angle'));
+		});
+
 		$(document).on('click', '[data-threaddesk-layout-category]', function () {
+			const front = $(this).data('threaddesk-layout-front-image') || $(this).find('img').attr('src') || '';
+			const back = $(this).data('threaddesk-layout-back-image') || front;
+			const side = $(this).data('threaddesk-layout-side-image') || front;
+			const sideLabel = String($(this).data('threaddesk-layout-side-label') || 'left').toLowerCase();
+			const sideIsRight = sideLabel === 'right';
+
+			currentAngles = {
+				front: front,
+				left: side,
+				back: back,
+				right: side,
+			};
+
+			angleImages.front.attr('src', currentAngles.front).toggle(!!currentAngles.front).css('transform', 'none');
+			angleImages.back.attr('src', currentAngles.back).toggle(!!currentAngles.back).css('transform', 'none');
+			angleImages.left.attr('src', currentAngles.left).toggle(!!currentAngles.left).css('transform', sideIsRight ? 'scaleX(-1)' : 'none');
+			angleImages.right.attr('src', currentAngles.right).toggle(!!currentAngles.right).css('transform', sideIsRight ? 'none' : 'scaleX(-1)');
+
+			layoutViewer.prop('hidden', false);
+			setMainImage('front');
 			closeLayoutModal();
 		});
 
