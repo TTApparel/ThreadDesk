@@ -41,6 +41,7 @@
 
 .threaddesk__content {
 	flex: 1;
+	padding-bottom: 300px;
 }
 
 .threaddesk__content-inner {
@@ -836,6 +837,13 @@ body.threaddesk-modal-open {
 
 .threaddesk-designer__heading {
 	margin-bottom: 8px;
+}
+
+/* Legacy modal title controls are intentionally hidden (title is edited on saved cards only). */
+.threaddesk-designer__title-field,
+#threaddesk_design_title,
+[data-threaddesk-design-title-input] {
+	display: none !important;
 }
 
 .threaddesk-designer .threaddesk-auth-modal__form-inner {
