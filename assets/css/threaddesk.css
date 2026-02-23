@@ -672,7 +672,7 @@ body.threaddesk-modal-open {
 }
 
 .threaddesk__card-delete-button:hover {
-	transform: rotate(190deg) !important;
+	transform: rotate(90deg) !important;
 	background: transparent !important;
 }
 
