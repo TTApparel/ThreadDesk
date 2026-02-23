@@ -626,6 +626,14 @@ body.threaddesk-modal-open {
 	margin: 0;
 }
 
+.threaddesk__card-design-color-count {
+	display: block;
+	margin: 8px 0 0;
+	font-size: 12px;
+	color: #6d6d6d;
+	line-height: 1.33;
+}
+
 .threaddesk__card-title-input {
 	width: 100%;
 	font-family: inherit;

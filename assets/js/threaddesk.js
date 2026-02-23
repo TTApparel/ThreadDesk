@@ -305,9 +305,14 @@ jQuery(function ($) {
 				}) || { hex: 'transparent', name: 'Transparent' };
 			}
 			const rgb = hexToRgb(hex);
-			let best = allowedSwatchPalette[0] || { hex: '#111111', name: 'Black' };
+			let best = allowedSwatchPalette.find(function (option) {
+				return !isTransparentColor(option.hex);
+			}) || { hex: '#111111', name: 'Black' };
 			let bestDist = Number.POSITIVE_INFINITY;
 			allowedSwatchPalette.forEach(function (option) {
+				if (isTransparentColor(option.hex)) {
+					return;
+				}
 				const dist = colorDistanceSq(rgb, hexToRgb(option.hex));
 				if (dist < bestDist) {
 					bestDist = dist;
