@@ -109,38 +109,43 @@ jQuery(function ($) {
 
 	if (layoutModal.length) {
 		let lastLayoutTrigger = null;
+		const chooserStep = layoutModal.find('[data-threaddesk-layout-step="chooser"]');
+		const viewerStep = layoutModal.find('[data-threaddesk-layout-step="viewer"]');
+		const mainImage = layoutModal.find('[data-threaddesk-layout-main-image]');
+		const angleButtons = layoutModal.find('[data-threaddesk-layout-angle]');
+		const angleImages = {
+			front: layoutModal.find('[data-threaddesk-layout-angle-image="front"]'),
+			left: layoutModal.find('[data-threaddesk-layout-angle-image="left"]'),
+			back: layoutModal.find('[data-threaddesk-layout-angle-image="back"]'),
+			right: layoutModal.find('[data-threaddesk-layout-angle-image="right"]'),
+		};
+		let currentAngles = { front: '', left: '', back: '', right: '' };
+
+		const showChooserStep = function () {
+			viewerStep.prop('hidden', true);
+			chooserStep.prop('hidden', false);
+		};
+
+		const showViewerStep = function () {
+			chooserStep.prop('hidden', true);
+			viewerStep.prop('hidden', false);
+		};
+
 		const openLayoutModal = function (triggerEl) {
 			lastLayoutTrigger = triggerEl || document.activeElement || lastLayoutTrigger;
 			layoutModal.addClass('is-active').attr('aria-hidden', 'false');
 			$('body').addClass('threaddesk-modal-open');
+			showChooserStep();
 		};
 
 		const closeLayoutModal = function () {
 			layoutModal.removeClass('is-active').attr('aria-hidden', 'true');
 			$('body').removeClass('threaddesk-modal-open');
+			showChooserStep();
 			if (lastLayoutTrigger && typeof lastLayoutTrigger.focus === 'function') {
 				try { lastLayoutTrigger.focus(); } catch (e) {}
 			}
 		};
-
-		$(document).on('click', '[data-threaddesk-layout-open]', function () {
-			openLayoutModal(this);
-		});
-
-		$(document).on('click', '[data-threaddesk-layout-close]', function () {
-			closeLayoutModal();
-		});
-
-		const layoutViewer = $('[data-threaddesk-layout-viewer]');
-		const mainImage = layoutViewer.find('[data-threaddesk-layout-main-image]');
-		const angleButtons = layoutViewer.find('[data-threaddesk-layout-angle]');
-		const angleImages = {
-			front: layoutViewer.find('[data-threaddesk-layout-angle-image="front"]'),
-			left: layoutViewer.find('[data-threaddesk-layout-angle-image="left"]'),
-			back: layoutViewer.find('[data-threaddesk-layout-angle-image="back"]'),
-			right: layoutViewer.find('[data-threaddesk-layout-angle-image="right"]'),
-		};
-		let currentAngles = { front: '', left: '', back: '', right: '' };
 
 		const setMainImage = function (angle) {
 			const target = angle || 'front';
@@ -151,6 +156,14 @@ jQuery(function ($) {
 			angleButtons.removeClass('is-active');
 			angleButtons.filter('[data-threaddesk-layout-angle="' + target + '"]').addClass('is-active');
 		};
+
+		$(document).on('click', '[data-threaddesk-layout-open]', function () {
+			openLayoutModal(this);
+		});
+
+		$(document).on('click', '[data-threaddesk-layout-close]', function () {
+			closeLayoutModal();
+		});
 
 		$(document).on('click', '[data-threaddesk-layout-angle]', function () {
 			setMainImage($(this).data('threaddesk-layout-angle'));
@@ -175,9 +188,8 @@ jQuery(function ($) {
 			angleImages.left.attr('src', currentAngles.left).toggle(!!currentAngles.left).css('transform', sideIsRight ? 'scaleX(-1)' : 'none');
 			angleImages.right.attr('src', currentAngles.right).toggle(!!currentAngles.right).css('transform', sideIsRight ? 'none' : 'scaleX(-1)');
 
-			layoutViewer.prop('hidden', false);
+			showViewerStep();
 			setMainImage('front');
-			closeLayoutModal();
 		});
 
 		$(document).on('keyup', function (event) {
