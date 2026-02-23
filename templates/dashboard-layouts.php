@@ -44,6 +44,15 @@ $layout_category_settings = get_option( 'tta_threaddesk_layout_categories', arra
 $placement_categories    = array();
 
 if ( taxonomy_exists( 'product_cat' ) && is_array( $layout_category_settings ) ) {
+	uasort(
+		$layout_category_settings,
+		function ( $a, $b ) {
+			$a_order = isset( $a['order'] ) ? absint( $a['order'] ) : 9999;
+			$b_order = isset( $b['order'] ) ? absint( $b['order'] ) : 9999;
+			return $a_order - $b_order;
+		}
+	);
+
 	foreach ( $layout_category_settings as $term_id => $settings ) {
 		$term_id   = absint( $term_id );
 		$settings  = is_array( $settings ) ? $settings : array();
