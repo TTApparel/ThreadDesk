@@ -78,8 +78,11 @@ $nav_base = trailingslashit( wc_get_account_endpoint_url( 'thread-desk' ) );
 		</div>
 
 		<div class="threaddesk__section">
-			<h3><?php echo esc_html__( 'Saved Layouts', 'threaddesk' ); ?></h3>
-			<p><?php echo esc_html__( 'Layouts are placeholders for now. This area will list approved layouts for reuse.', 'threaddesk' ); ?></p>
+			<div class="threaddesk__card-header threaddesk-designer__heading">
+				<h3><?php echo esc_html__( 'Saved Placements', 'threaddesk' ); ?></h3>
+				<button type="button" class="threaddesk__button"><?php echo esc_html__( 'Add Placement', 'threaddesk' ); ?></button>
+			</div>
+			<p><?php echo esc_html__( 'Placements are placeholders for now. This area will list approved placements for reuse.', 'threaddesk' ); ?></p>
 			<div class="threaddesk__cards">
 				<?php if ( ! empty( $context['layouts'] ) ) : ?>
 					<?php foreach ( $context['layouts'] as $layout ) : ?>
@@ -90,7 +93,7 @@ $nav_base = trailingslashit( wc_get_account_endpoint_url( 'thread-desk' ) );
 					<?php endforeach; ?>
 				<?php else : ?>
 					<div class="threaddesk__card">
-						<p><?php echo esc_html__( 'No layouts found yet.', 'threaddesk' ); ?></p>
+						<p><?php echo esc_html__( 'No placements found yet.', 'threaddesk' ); ?></p>
 					</div>
 				<?php endif; ?>
 			</div>

@@ -90,7 +90,7 @@ $nav_base = trailingslashit( wc_get_account_endpoint_url( 'thread-desk' ) );
 		<div class="threaddesk__section">
 			<div class="threaddesk__card-header threaddesk-designer__heading">
 				<h3><?php echo esc_html__( 'Saved Designs', 'threaddesk' ); ?></h3>
-				<button type="button" class="threaddesk__button" data-threaddesk-design-open><?php echo esc_html__( 'Choose Design', 'threaddesk' ); ?></button>
+				<button type="button" class="threaddesk__button" data-threaddesk-design-open><?php echo esc_html__( 'Add Design', 'threaddesk' ); ?></button>
 			</div>
 						<div class="threaddesk__cards">
 				<?php if ( ! empty( $context['designs'] ) ) : ?>
