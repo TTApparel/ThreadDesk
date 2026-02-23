@@ -1205,13 +1205,17 @@ body.threaddesk-modal-open {
 	display: none;
 }
 
-.threaddesk-layout-viewer__controls {
-	display: flex;
-	justify-content: space-between;
-	align-items: flex-end;
-	gap: 20px;
-	margin-top: 16px;
-	flex-wrap: wrap;
+.threaddesk-layout-viewer {
+	grid-template-columns: minmax(0, 1fr) 240px;
+	align-items: stretch;
+	column-gap: 20px;
+	row-gap: 14px;
+}
+
+.threaddesk-layout-viewer__left-column {
+	display: grid;
+	grid-template-rows: minmax(0, 1fr) auto;
+	row-gap: 14px;
 }
 
 .threaddesk-layout-viewer__design-panel {
@@ -1220,6 +1224,9 @@ body.threaddesk-modal-open {
 	padding: 16px;
 	width: 240px;
 	background: #fff;
+	height: 100%;
+	display: flex;
+	flex-direction: column;
 }
 
 .threaddesk-layout-viewer__design-panel h4 {
@@ -1246,7 +1253,8 @@ body.threaddesk-modal-open {
 .threaddesk-layout-viewer__angles {
 	display: flex;
 	gap: 12px;
-	flex-wrap: wrap;
+	flex-wrap: nowrap;
+	align-items: stretch;
 }
 
 .threaddesk-layout-viewer__angle {
@@ -1292,4 +1300,19 @@ body.threaddesk-modal-open {
 
 .threaddesk-layout-modal [data-threaddesk-layout-step].is-active {
 	display: grid;
+}
+
+
+@media (max-width: 900px) {
+	.threaddesk-layout-viewer {
+		grid-template-columns: 1fr;
+	}
+
+	.threaddesk-layout-viewer__design-panel {
+		width: 100%;
+	}
+
+	.threaddesk-layout-viewer__angles {
+		flex-wrap: wrap;
+	}
 }

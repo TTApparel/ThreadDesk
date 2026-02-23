@@ -180,14 +180,9 @@ if ( taxonomy_exists( 'product_cat' ) && is_array( $layout_category_settings ) )
 			</div>
 
 			<div class="threaddesk-layout-modal__content threaddesk-layout-viewer" data-threaddesk-layout-step="viewer" hidden aria-hidden="true">
-				<div class="threaddesk-layout-viewer__stage">
-					<img src="" alt="" class="threaddesk-layout-viewer__main-image" data-threaddesk-layout-main-image />
-				</div>
-				<div class="threaddesk-layout-viewer__controls">
-					<div class="threaddesk-layout-viewer__design-panel">
-						<h4><?php echo esc_html__( 'Choose Design', 'threaddesk' ); ?></h4>
-						<button type="button" class="threaddesk-layout-viewer__choose-button"><?php echo esc_html__( 'Choose image', 'threaddesk' ); ?></button>
-						<p><?php echo esc_html__( 'No saved placements yet.', 'threaddesk' ); ?></p>
+				<div class="threaddesk-layout-viewer__left-column">
+					<div class="threaddesk-layout-viewer__stage">
+						<img src="" alt="" class="threaddesk-layout-viewer__main-image" data-threaddesk-layout-main-image />
 					</div>
 					<div class="threaddesk-layout-viewer__angles">
 						<button type="button" class="threaddesk-layout-viewer__angle is-active" data-threaddesk-layout-angle="front">
@@ -207,6 +202,11 @@ if ( taxonomy_exists( 'product_cat' ) && is_array( $layout_category_settings ) )
 							<span><?php echo esc_html__( 'Right', 'threaddesk' ); ?></span>
 						</button>
 					</div>
+				</div>
+				<div class="threaddesk-layout-viewer__design-panel">
+					<h4><?php echo esc_html__( 'Choose Design', 'threaddesk' ); ?></h4>
+					<button type="button" class="threaddesk-layout-viewer__choose-button"><?php echo esc_html__( 'Choose image', 'threaddesk' ); ?></button>
+					<p><?php echo esc_html__( 'No saved placements yet.', 'threaddesk' ); ?></p>
 				</div>
 			</div>
 		</div>
