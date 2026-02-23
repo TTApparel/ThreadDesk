@@ -102,10 +102,11 @@ $nav_base = trailingslashit( wc_get_account_endpoint_url( 'thread-desk' ) );
 					<?php $design_svg_url = get_post_meta( $design->ID, 'design_svg_file_url', true ); ?>
 					<?php $design_svg_name = get_post_meta( $design->ID, 'design_svg_file_name', true ); ?>
 					<?php $design_color_count = absint( get_post_meta( $design->ID, 'design_color_count', true ) ); ?>
-					<?php if ( 0 === $design_color_count && ! empty( $design_palette ) ) : ?>
+					<?php if ( ! empty( $design_palette ) ) : ?>
 						<?php $design_palette_values = json_decode( (string) $design_palette, true ); ?>
 						<?php if ( is_array( $design_palette_values ) ) : ?>
-							<?php $design_color_count = count( $design_palette_values ); ?>
+							<?php $design_non_transparent_palette = array_values( array_filter( $design_palette_values, function ( $color ) { return 'transparent' !== strtolower( (string) $color ); } ) ); ?>
+							<?php $design_color_count = count( $design_non_transparent_palette ); ?>
 						<?php endif; ?>
 					<?php endif; ?>
 					<?php $design_title = trim( (string) $design->post_title ); ?>
@@ -133,7 +134,7 @@ $nav_base = trailingslashit( wc_get_account_endpoint_url( 'thread-desk' ) );
 							<input type="hidden" name="design_id" value="<?php echo esc_attr( $design->ID ); ?>" />
 							<?php wp_nonce_field( 'tta_threaddesk_rename_design' ); ?>
 							<h5 class="threaddesk__card-title"><input class="threaddesk__card-title-input" type="text" name="design_title" value="<?php echo esc_attr( $design_title ); ?>" maxlength="120" data-threaddesk-design-title-card-input aria-label="<?php echo esc_attr__( 'Design title', 'threaddesk' ); ?>" /></h5>
-							<p class="threaddesk__card-design-color-count"><?php echo esc_html( sprintf( __( 'Estimated color count: %d', 'threaddesk' ), max( 1, $design_color_count ) ) ); ?></p>
+							<p class="threaddesk__card-design-color-count"><?php echo esc_html( sprintf( __( 'Estimated color count: %d', 'threaddesk' ), $design_color_count ) ); ?></p>
 						</form>
 						<div class="threaddesk__card-design-actions">
 							<button
