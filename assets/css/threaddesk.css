@@ -929,6 +929,20 @@ body.threaddesk-modal-open {
 	border-radius: 8px;
 }
 
+.threaddesk-designer__design-image.has-upload {
+	display: grid;
+	place-items: center;
+	min-height: calc(var(--threaddesk-preview-max-height) - 20px);
+}
+
+.threaddesk-designer__design-image.has-upload .threaddesk-designer__design-image-upload,
+.threaddesk-designer__design-image.has-upload .threaddesk-designer__design-canvas,
+.threaddesk-designer__design-image.has-upload .threaddesk-designer__design-vector-preview {
+	width: auto;
+	max-width: 100%;
+	max-height: calc(var(--threaddesk-preview-max-height) - 20px);
+}
+
 .threaddesk-designer__design-image.has-upload .threaddesk-designer__design-image-upload,
 .threaddesk-designer__design-image.has-upload .threaddesk-designer__design-canvas {
 	display: block;
