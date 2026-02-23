@@ -648,7 +648,6 @@ body.threaddesk-modal-open {
 	position: absolute;
 	top: 6px;
 	right: 8px;
-	z-index: 5;
 }
 
 .threaddesk__card-delete-button {
@@ -658,9 +657,9 @@ body.threaddesk-modal-open {
 	width: 18px;
 	height: 18px;
 	line-height: 18px;
-	font-size: 20px;
+	font-size: 16px;
 	cursor: pointer;
-	color: #000;
+	color: #8b1f1f;
 	transition: transform 0.18s ease;
 }
 
@@ -687,7 +686,6 @@ body.threaddesk-modal-open {
 	align-items: center;
 	justify-content: center;
 	position: relative;
-	z-index: 1;
 	padding: 5px;
 	box-sizing: border-box;
 }
