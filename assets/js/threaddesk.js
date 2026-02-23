@@ -122,13 +122,13 @@ jQuery(function ($) {
 		let currentAngles = { front: '', left: '', back: '', right: '' };
 
 		const showChooserStep = function () {
-			viewerStep.prop('hidden', true);
-			chooserStep.prop('hidden', false);
+			chooserStep.addClass('is-active').prop('hidden', false).attr('aria-hidden', 'false');
+			viewerStep.removeClass('is-active').prop('hidden', true).attr('aria-hidden', 'true');
 		};
 
 		const showViewerStep = function () {
-			chooserStep.prop('hidden', true);
-			viewerStep.prop('hidden', false);
+			chooserStep.removeClass('is-active').prop('hidden', true).attr('aria-hidden', 'true');
+			viewerStep.addClass('is-active').prop('hidden', false).attr('aria-hidden', 'false');
 		};
 
 		const openLayoutModal = function (triggerEl) {
@@ -156,6 +156,8 @@ jQuery(function ($) {
 			angleButtons.removeClass('is-active');
 			angleButtons.filter('[data-threaddesk-layout-angle="' + target + '"]').addClass('is-active');
 		};
+
+		showChooserStep();
 
 		$(document).on('click', '[data-threaddesk-layout-open]', function () {
 			openLayoutModal(this);

@@ -150,7 +150,7 @@ if ( taxonomy_exists( 'product_cat' ) && is_array( $layout_category_settings ) )
 			</button>
 		</div>
 		<div class="threaddesk-auth-modal__content">
-			<div class="threaddesk-layout-modal__content" data-threaddesk-layout-step="chooser">
+			<div class="threaddesk-layout-modal__content is-active" data-threaddesk-layout-step="chooser" aria-hidden="false">
 				<h3><?php echo esc_html__( 'Create a placement layout', 'threaddesk' ); ?></h3>
 				<p><?php echo esc_html__( 'Choose a product category to start your layout.', 'threaddesk' ); ?></p>
 				<div class="threaddesk-layout-modal__grid">
@@ -179,7 +179,7 @@ if ( taxonomy_exists( 'product_cat' ) && is_array( $layout_category_settings ) )
 				</div>
 			</div>
 
-			<div class="threaddesk-layout-modal__content threaddesk-layout-viewer" data-threaddesk-layout-step="viewer" hidden>
+			<div class="threaddesk-layout-modal__content threaddesk-layout-viewer" data-threaddesk-layout-step="viewer" hidden aria-hidden="true">
 				<div class="threaddesk-layout-viewer__stage">
 					<img src="" alt="" class="threaddesk-layout-viewer__main-image" data-threaddesk-layout-main-image />
 				</div>

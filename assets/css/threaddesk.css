@@ -1282,3 +1282,12 @@ body.threaddesk-modal-open {
 .threaddesk-layout-modal .threaddesk-layout-viewer {
 	margin-top: 0;
 }
+
+
+.threaddesk-layout-modal [data-threaddesk-layout-step] {
+	display: none;
+}
+
+.threaddesk-layout-modal [data-threaddesk-layout-step].is-active {
+	display: grid;
+}
