@@ -659,16 +659,13 @@ body.threaddesk-modal-open {
 }
 
 .threaddesk__card-delete-button {
-	border: none;
 	background: transparent !important;
-	padding: 0;
 	width: 14px;
 	height: 14px;
 	line-height: 14px;
 	font-size: 20px !important;
-	cursor: pointer;
 	color: #000000 !important;
-	transition: transform 0.18s ease;
+	min-height: 10px !important;
 }
 
 .threaddesk__card-delete-button:hover {
