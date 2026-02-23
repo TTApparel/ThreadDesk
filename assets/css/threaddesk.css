@@ -662,9 +662,9 @@ body.threaddesk-modal-open {
 	border: none;
 	background: transparent !important;
 	padding: 0;
-	width: 18px;
-	height: 18px;
-	line-height: 18px;
+	width: 14px;
+	height: 14px;
+	line-height: 14px;
 	font-size: 20px !important;
 	cursor: pointer;
 	color: #000000 !important;
@@ -688,8 +688,8 @@ body.threaddesk-modal-open {
 	border-radius: 10px;
 	overflow: hidden;
 	background: #f3f3f3;
-	margin-top: 12px;
-	margin-bottom: 10px;
+	margin-top: 0;
+	margin-bottom: 0;
 	aspect-ratio: 4 / 3;
 	display: flex;
 	align-items: center;
