@@ -1255,6 +1255,10 @@ body.threaddesk-modal-open {
 	gap: 12px;
 	flex-wrap: nowrap;
 	align-items: stretch;
+	justify-content: center;
+	width: fit-content;
+	max-width: 100%;
+	margin: 0 auto;
 }
 
 .threaddesk-layout-viewer__angle {
