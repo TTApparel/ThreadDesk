@@ -101,6 +101,13 @@ $nav_base = trailingslashit( wc_get_account_endpoint_url( 'thread-desk' ) );
 					<?php $design_settings = get_post_meta( $design->ID, 'design_analysis_settings', true ); ?>
 					<?php $design_svg_url = get_post_meta( $design->ID, 'design_svg_file_url', true ); ?>
 					<?php $design_svg_name = get_post_meta( $design->ID, 'design_svg_file_name', true ); ?>
+					<?php $design_title = trim( (string) $design->post_title ); ?>
+					<?php if ( '' === $design_title && ! empty( $design_file_name ) ) : ?>
+						<?php $design_title = trim( (string) preg_replace( '/\.[^.]+$/', '', (string) $design_file_name ) ); ?>
+					<?php endif; ?>
+					<?php if ( '' === $design_title ) : ?>
+						<?php $design_title = __( 'Design', 'threaddesk' ); ?>
+					<?php endif; ?>
 					<div class="threaddesk__card threaddesk__card--design">
 						<form class="threaddesk__card-delete" method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
 							<input type="hidden" name="action" value="tta_threaddesk_delete_design" />
@@ -110,7 +117,7 @@ $nav_base = trailingslashit( wc_get_account_endpoint_url( 'thread-desk' ) );
 						</form>
 						<?php if ( $design_preview ) : ?>
 							<div class="threaddesk__card-design-preview">
-								<img class="threaddesk__card-design-preview-svg" src="<?php echo esc_url( $design_preview ); ?>" alt="<?php echo esc_attr( $design->post_title ); ?>" />
+								<img class="threaddesk__card-design-preview-svg" src="<?php echo esc_url( $design_preview ); ?>" alt="<?php echo esc_attr( $design_title ); ?>" />
 								<img class="threaddesk__card-design-preview-original" src="<?php echo esc_url( $design_preview ); ?>" alt="" aria-hidden="true" />
 							</div>
 						<?php endif; ?>
@@ -118,7 +125,7 @@ $nav_base = trailingslashit( wc_get_account_endpoint_url( 'thread-desk' ) );
 							<input type="hidden" name="action" value="tta_threaddesk_rename_design" />
 							<input type="hidden" name="design_id" value="<?php echo esc_attr( $design->ID ); ?>" />
 							<?php wp_nonce_field( 'tta_threaddesk_rename_design' ); ?>
-							<h5 class="threaddesk__card-title"><input class="threaddesk__card-title-input" type="text" name="design_title" value="<?php echo esc_attr( $design->post_title ); ?>" maxlength="120" data-threaddesk-design-title-card-input aria-label="<?php echo esc_attr__( 'Design title', 'threaddesk' ); ?>" /></h5>
+							<h5 class="threaddesk__card-title"><input class="threaddesk__card-title-input" type="text" name="design_title" value="<?php echo esc_attr( $design_title ); ?>" maxlength="120" data-threaddesk-design-title-card-input aria-label="<?php echo esc_attr__( 'Design title', 'threaddesk' ); ?>" /></h5>
 						</form>
 						<div class="threaddesk__card-design-actions">
 							<button
@@ -126,7 +133,7 @@ $nav_base = trailingslashit( wc_get_account_endpoint_url( 'thread-desk' ) );
 								class="threaddesk__button threaddesk__button--small"
 								data-threaddesk-design-edit
 								data-threaddesk-design-id="<?php echo esc_attr( $design->ID ); ?>"
-								data-threaddesk-design-title="<?php echo esc_attr( $design->post_title ); ?>"
+								data-threaddesk-design-title="<?php echo esc_attr( $design_title ); ?>"
 								data-threaddesk-design-preview-url="<?php echo esc_url( $design_preview ); ?>"
 								data-threaddesk-design-file-name="<?php echo esc_attr( $design_file_name ); ?>"
 								data-threaddesk-design-palette="<?php echo esc_attr( $design_palette ? $design_palette : '[]' ); ?>"
