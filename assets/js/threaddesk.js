@@ -113,6 +113,12 @@ jQuery(function ($) {
 		const viewerStep = layoutModal.find('[data-threaddesk-layout-step="viewer"]');
 		const mainImage = layoutModal.find('[data-threaddesk-layout-main-image]');
 		const angleButtons = layoutModal.find('[data-threaddesk-layout-angle]');
+		const angleButtonsByKey = {
+			front: layoutModal.find('[data-threaddesk-layout-angle="front"]'),
+			left: layoutModal.find('[data-threaddesk-layout-angle="left"]'),
+			back: layoutModal.find('[data-threaddesk-layout-angle="back"]'),
+			right: layoutModal.find('[data-threaddesk-layout-angle="right"]'),
+		};
 		const angleImages = {
 			front: layoutModal.find('[data-threaddesk-layout-angle-image="front"]'),
 			left: layoutModal.find('[data-threaddesk-layout-angle-image="left"]'),
@@ -120,6 +126,7 @@ jQuery(function ($) {
 			right: layoutModal.find('[data-threaddesk-layout-angle-image="right"]'),
 		};
 		let currentAngles = { front: '', left: '', back: '', right: '' };
+		let visibleAngles = ['front', 'left', 'back', 'right'];
 
 		const showChooserStep = function () {
 			chooserStep.addClass('is-active').prop('hidden', false).attr('aria-hidden', 'false');
@@ -148,13 +155,16 @@ jQuery(function ($) {
 		};
 
 		const setMainImage = function (angle) {
-			const target = angle || 'front';
-			const url = currentAngles[target] || currentAngles.front || '';
+			const preferred = angle || 'front';
+			const target = visibleAngles.indexOf(preferred) > -1 ? preferred : (visibleAngles[0] || 'front');
+			const url = currentAngles[target] || '';
 			if (url) {
 				mainImage.attr('src', url).attr('alt', target + ' view').show();
+			} else {
+				mainImage.attr('src', '').hide();
 			}
 			angleButtons.removeClass('is-active');
-			angleButtons.filter('[data-threaddesk-layout-angle="' + target + '"]').addClass('is-active');
+			angleButtonsByKey[target].addClass('is-active');
 		};
 
 		showChooserStep();
@@ -172,23 +182,38 @@ jQuery(function ($) {
 		});
 
 		$(document).on('click', '[data-threaddesk-layout-category]', function () {
-			const front = $(this).data('threaddesk-layout-front-image') || $(this).find('img').attr('src') || '';
-			const back = $(this).data('threaddesk-layout-back-image') || front;
-			const side = $(this).data('threaddesk-layout-side-image') || front;
+			const rawFront = $(this).data('threaddesk-layout-front-image') || '';
+			const rawBack = $(this).data('threaddesk-layout-back-image') || '';
+			const rawSide = $(this).data('threaddesk-layout-side-image') || '';
 			const sideLabel = String($(this).data('threaddesk-layout-side-label') || 'left').toLowerCase();
 			const sideIsRight = sideLabel === 'right';
 
 			currentAngles = {
-				front: front,
-				left: side,
-				back: back,
-				right: side,
+				front: rawFront,
+				left: rawSide,
+				back: rawBack,
+				right: rawSide,
 			};
 
-			angleImages.front.attr('src', currentAngles.front).toggle(!!currentAngles.front).css('transform', 'none');
-			angleImages.back.attr('src', currentAngles.back).toggle(!!currentAngles.back).css('transform', 'none');
-			angleImages.left.attr('src', currentAngles.left).toggle(!!currentAngles.left).css('transform', sideIsRight ? 'scaleX(-1)' : 'none');
-			angleImages.right.attr('src', currentAngles.right).toggle(!!currentAngles.right).css('transform', sideIsRight ? 'none' : 'scaleX(-1)');
+			const hasFront = !!rawFront;
+			const hasBack = !!rawBack;
+			const hasSide = !!rawSide;
+
+			angleButtonsByKey.front.prop('hidden', !hasFront).toggle(hasFront);
+			angleButtonsByKey.back.prop('hidden', !hasBack).toggle(hasBack);
+			angleButtonsByKey.left.prop('hidden', !hasSide).toggle(hasSide);
+			angleButtonsByKey.right.prop('hidden', !hasSide).toggle(hasSide);
+
+			visibleAngles = [];
+			if (hasFront) { visibleAngles.push('front'); }
+			if (hasSide) { visibleAngles.push('left'); }
+			if (hasBack) { visibleAngles.push('back'); }
+			if (hasSide) { visibleAngles.push('right'); }
+
+			angleImages.front.attr('src', currentAngles.front).css('transform', 'none');
+			angleImages.back.attr('src', currentAngles.back).css('transform', 'none');
+			angleImages.left.attr('src', currentAngles.left).css('transform', sideIsRight ? 'scaleX(-1)' : 'none');
+			angleImages.right.attr('src', currentAngles.right).css('transform', sideIsRight ? 'none' : 'scaleX(-1)');
 
 			showViewerStep();
 			setMainImage('front');
