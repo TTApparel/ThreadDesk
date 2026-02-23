@@ -121,7 +121,7 @@
 .threaddesk__avatar img {
 	width: 100%;
 	height: 100% !important;
-	object-fit: cover;
+	object-fit: contain;
 	object-position: center;
 	border-radius: 50%;
 	display: block;
@@ -290,7 +290,7 @@
 	flex-shrink: 0;
 	width: 40px;
 	height: 40px;
-	object-fit: cover;
+	object-fit: contain;
 	display: block;
 }
 
@@ -337,7 +337,8 @@
 
 .threaddesk-auth-modal,
 .threaddesk-address-modal,
-.threaddesk-design-modal {
+.threaddesk-design-modal,
+.threaddesk-layout-modal {
 	position: fixed;
 	inset: 0;
 	display: none;
@@ -348,7 +349,8 @@
 
 .threaddesk-auth-modal.is-active,
 .threaddesk-address-modal.is-active,
-.threaddesk-design-modal.is-active {
+.threaddesk-design-modal.is-active,
+.threaddesk-layout-modal.is-active {
 	display: flex;
 }
 
@@ -384,13 +386,15 @@ body.threaddesk-modal-open {
 
 .threaddesk-auth-modal.is-active .threaddesk-auth-modal__overlay,
 .threaddesk-address-modal.is-active .threaddesk-auth-modal__overlay,
-.threaddesk-design-modal.is-active .threaddesk-auth-modal__overlay {
+.threaddesk-design-modal.is-active .threaddesk-auth-modal__overlay,
+.threaddesk-layout-modal.is-active .threaddesk-auth-modal__overlay {
 	opacity: 1;
 }
 
 .threaddesk-auth-modal.is-active .threaddesk-auth-modal__panel,
 .threaddesk-address-modal.is-active .threaddesk-auth-modal__panel,
-.threaddesk-design-modal.is-active .threaddesk-auth-modal__panel {
+.threaddesk-design-modal.is-active .threaddesk-auth-modal__panel,
+.threaddesk-layout-modal.is-active .threaddesk-auth-modal__panel {
 	opacity: 1;
 	transform: translate3d(0, 0, 0);
 }
@@ -925,6 +929,20 @@ body.threaddesk-modal-open {
 	border-radius: 8px;
 }
 
+.threaddesk-designer__design-image.has-upload {
+	display: grid;
+	place-items: center;
+	min-height: calc(var(--threaddesk-preview-max-height) - 20px);
+}
+
+.threaddesk-designer__design-image.has-upload .threaddesk-designer__design-image-upload,
+.threaddesk-designer__design-image.has-upload .threaddesk-designer__design-canvas,
+.threaddesk-designer__design-image.has-upload .threaddesk-designer__design-vector-preview {
+	width: auto;
+	max-width: 100%;
+	max-height: calc(var(--threaddesk-preview-max-height) - 20px);
+}
+
 .threaddesk-designer__design-image.has-upload .threaddesk-designer__design-image-upload,
 .threaddesk-designer__design-image.has-upload .threaddesk-designer__design-canvas {
 	display: block;
@@ -1076,4 +1094,225 @@ body.threaddesk-modal-open {
 
 .threaddesk-designer__palette-dot:hover::after {
 	opacity: 1;
+}
+
+
+.threaddesk-layout-modal .threaddesk-auth-modal__panel {
+	width: min(860px, 92vw);
+}
+
+.threaddesk-layout-modal__content {
+	display: grid;
+	gap: 12px;
+	padding: 0 10px 10px;
+}
+
+.threaddesk-layout-modal__content h3 {
+	margin: 0;
+	font-size: 22px;
+}
+
+.threaddesk-layout-modal__content p {
+	margin: 0;
+	color: #666;
+}
+
+.threaddesk-layout-modal__grid {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+	gap: 12px;
+}
+
+.threaddesk-layout-modal__option {
+	border: 1px solid #e9e9e9;
+	border-radius: 8px;
+	padding: 10px;
+	background: #fff;
+	display: grid;
+	grid-template-rows: 1fr auto;
+	gap: 8px;
+	aspect-ratio: 4 / 5;
+	cursor: pointer;
+	text-align: left;
+	transition: border-color .2s ease, box-shadow .2s ease, transform .2s ease;
+}
+
+.threaddesk-layout-modal__option:hover,
+.threaddesk-layout-modal__option:focus-visible {
+	border-color: #1f1f1f;
+	box-shadow: 0 6px 16px rgba(0, 0, 0, 0.08);
+	transform: translateY(-1px);
+	outline: none;
+}
+
+.threaddesk-layout-modal__image-wrap {
+	aspect-ratio: 4 / 5;
+	background: #f5f5f5;
+	padding: 8px;
+	border-radius: 6px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	overflow: hidden;
+}
+
+.threaddesk-layout-modal__image {
+	width: 100%;
+	height: 100%;
+	object-fit: contain;
+	display: block;
+}
+
+.threaddesk-layout-modal__image-fallback {
+	font-size: 13px;
+	color: #888;
+}
+
+.threaddesk-layout-modal__label {
+	font-size: 14px;
+	font-weight: 600;
+	color: #1f1f1f;
+}
+
+
+.threaddesk-layout-modal__empty {
+	margin: 0;
+	font-size: 14px;
+	color: #666;
+}
+
+
+.threaddesk-layout-viewer {
+	margin-top: 20px;
+}
+
+.threaddesk-layout-viewer__stage {
+	min-height: 360px;
+	background: #efefef;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	border: 1px solid #d8d8d8;
+	border-radius: 8px;
+	padding: 20px;
+}
+
+.threaddesk-layout-viewer__main-image {
+	max-width: 340px;
+	max-height: 420px;
+	width: auto;
+	height: auto;
+	display: none;
+}
+
+.threaddesk-layout-viewer {
+	grid-template-columns: minmax(0, 1fr) 240px;
+	align-items: stretch;
+	column-gap: 20px;
+	row-gap: 14px;
+}
+
+.threaddesk-layout-viewer__left-column {
+	display: grid;
+	grid-template-rows: minmax(0, 1fr) auto;
+	row-gap: 14px;
+}
+
+.threaddesk-layout-viewer__design-panel {
+	border: 1px solid #333;
+	border-radius: 12px;
+	padding: 16px;
+	width: 240px;
+	background: #fff;
+	height: 100%;
+	display: flex;
+	flex-direction: column;
+}
+
+.threaddesk-layout-viewer__design-panel h4 {
+	margin: 0 0 12px;
+	text-transform: uppercase;
+	font-size: 14px;
+	letter-spacing: .08em;
+}
+
+.threaddesk-layout-viewer__choose-button {
+	width: 100%;
+	padding: 10px;
+	border: 1px dashed #555;
+	background: transparent;
+	cursor: pointer;
+}
+
+.threaddesk-layout-viewer__design-panel p {
+	margin: 12px 0 0;
+	font-size: 13px;
+	color: #666;
+}
+
+.threaddesk-layout-viewer__angles {
+	display: flex;
+	gap: 12px;
+	flex-wrap: nowrap;
+	align-items: stretch;
+}
+
+.threaddesk-layout-viewer__angle {
+	border: 1px solid #555;
+	background: #fff;
+	padding: 8px;
+	width: 96px;
+	display: grid;
+	gap: 8px;
+	justify-items: center;
+	cursor: pointer;
+}
+
+.threaddesk-layout-viewer__angle img {
+	width: 50px;
+	height: 70px;
+	object-fit: contain;
+}
+
+.threaddesk-layout-viewer__angle span {
+	font-size: 12px;
+	text-transform: uppercase;
+}
+
+.threaddesk-layout-viewer__angle.is-active {
+	border-color: #111;
+	box-shadow: 0 0 0 2px #111 inset;
+}
+
+
+.threaddesk-layout-modal .threaddesk-layout-viewer__stage {
+	min-height: 300px;
+}
+
+.threaddesk-layout-modal .threaddesk-layout-viewer {
+	margin-top: 0;
+}
+
+
+.threaddesk-layout-modal [data-threaddesk-layout-step] {
+	display: none;
+}
+
+.threaddesk-layout-modal [data-threaddesk-layout-step].is-active {
+	display: grid;
+}
+
+
+@media (max-width: 900px) {
+	.threaddesk-layout-viewer {
+		grid-template-columns: 1fr;
+	}
+
+	.threaddesk-layout-viewer__design-panel {
+		width: 100%;
+	}
+
+	.threaddesk-layout-viewer__angles {
+		flex-wrap: wrap;
+	}
 }

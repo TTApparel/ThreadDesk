@@ -34,6 +34,7 @@ class TTA_ThreadDesk {
 		add_action( 'init', array( $this, 'load_textdomain' ) );
 		add_action( 'admin_menu', array( $this, 'register_settings_page' ) );
 		add_action( 'admin_init', array( $this, 'register_settings' ) );
+		add_action( 'admin_enqueue_scripts', array( $this, 'enqueue_admin_assets' ) );
 		add_action( 'admin_post_tta_threaddesk_generate_demo', array( $this, 'handle_generate_demo' ) );
 		add_action( 'admin_post_tta_threaddesk_request_order', array( $this, 'handle_request_order' ) );
 		add_action( 'admin_post_tta_threaddesk_reorder', array( $this, 'handle_reorder' ) );
@@ -126,9 +127,139 @@ class TTA_ThreadDesk {
 		);
 	}
 
+
+	public function enqueue_admin_assets( $hook ) {
+		if ( 'woocommerce_page_tta-threaddesk' !== $hook ) {
+			return;
+		}
+
+		wp_enqueue_media();
+		wp_enqueue_script( 'jquery-ui-sortable' );
+	}
+
+
+	private function render_media_picker_field( $name, $value ) {
+		$value = $value ? esc_url( $value ) : '';
+		?>
+		<div class="threaddesk-media-picker-field">
+			<input type="hidden" data-threaddesk-media-input name="<?php echo esc_attr( $name ); ?>" value="<?php echo esc_attr( $value ); ?>" />
+			<button type="button" class="button" data-threaddesk-media-select><?php echo esc_html__( 'Select image', 'threaddesk' ); ?></button>
+			<button type="button" class="button-link" data-threaddesk-media-clear><?php echo esc_html__( 'Clear', 'threaddesk' ); ?></button>
+			<div><img data-threaddesk-media-preview src="<?php echo esc_url( $value ); ?>" style="max-width:80px; max-height:80px; <?php echo $value ? '' : 'display:none;'; ?>" alt="" /></div>
+		</div>
+		<?php
+	}
+
+	private function render_settings_page_inline_script() {
+		?>
+		<script>
+		jQuery(function ($) {
+			const tbody = $('[data-threaddesk-placement-sortable]');
+			const refreshOrders = function () {
+				tbody.find('[data-threaddesk-placement-row]').each(function (index) {
+					$(this).find('[data-threaddesk-placement-order]').val(index + 1);
+				});
+			};
+
+			if (tbody.length && $.fn.sortable) {
+				tbody.sortable({
+					items: '> tr[data-threaddesk-placement-row]',
+					handle: '.dashicons-move',
+					axis: 'y',
+					update: refreshOrders,
+				});
+				refreshOrders();
+			}
+
+			$(document).on('click', '[data-threaddesk-media-select]', function (event) {
+				event.preventDefault();
+				const wrapper = $(this).closest('.threaddesk-media-picker-field');
+				const input = wrapper.find('[data-threaddesk-media-input]');
+				const preview = wrapper.find('[data-threaddesk-media-preview]');
+				const frame = wp.media({
+					title: 'Select image',
+					button: { text: 'Use image' },
+					multiple: false,
+					library: { type: 'image' }
+				});
+
+				frame.on('select', function () {
+					const attachment = frame.state().get('selection').first().toJSON();
+					const url = attachment.url || '';
+					input.val(url);
+					if (url) {
+						preview.attr('src', url).show();
+					}
+				});
+
+				frame.open();
+			});
+
+			$(document).on('click', '[data-threaddesk-media-clear]', function (event) {
+				event.preventDefault();
+				const wrapper = $(this).closest('.threaddesk-media-picker-field');
+				wrapper.find('[data-threaddesk-media-input]').val('');
+				wrapper.find('[data-threaddesk-media-preview]').attr('src', '').hide();
+			});
+		});
+		</script>
+		<?php
+	}
+
 	public function register_settings() {
 		register_setting( 'tta_threaddesk_settings', 'tta_threaddesk_cover_image_url', array( 'sanitize_callback' => 'esc_url_raw' ) );
 		register_setting( 'tta_threaddesk_settings', 'tta_threaddesk_default_company', array( 'sanitize_callback' => 'sanitize_text_field' ) );
+		register_setting( 'tta_threaddesk_settings', 'tta_threaddesk_layout_categories', array( 'sanitize_callback' => array( $this, 'sanitize_layout_categories' ) ) );
+	}
+
+	public function sanitize_layout_categories( $value ) {
+		$sanitized = array();
+		if ( ! is_array( $value ) ) {
+			return $sanitized;
+		}
+
+		$sortable = array();
+
+		foreach ( $value as $term_id => $row ) {
+			$term_id = absint( $term_id );
+			if ( ! $term_id || empty( $row['enabled'] ) ) {
+				continue;
+			}
+
+			$order = isset( $row['order'] ) ? absint( $row['order'] ) : 9999;
+			$sortable[] = array(
+				'term_id' => $term_id,
+				'order'   => $order,
+				'data'    => array(
+					'enabled'     => 1,
+					'order'       => $order,
+					'front_image' => isset( $row['front_image'] ) ? esc_url_raw( $row['front_image'] ) : '',
+					'back_image'  => isset( $row['back_image'] ) ? esc_url_raw( $row['back_image'] ) : '',
+					'side_image'  => isset( $row['side_image'] ) ? esc_url_raw( $row['side_image'] ) : '',
+					'side_label'  => isset( $row['side_label'] ) && 'right' === sanitize_key( $row['side_label'] ) ? 'right' : 'left',
+				),
+			);
+		}
+
+		usort(
+			$sortable,
+			function ( $a, $b ) {
+				if ( $a['order'] === $b['order'] ) {
+					return $a['term_id'] - $b['term_id'];
+				}
+
+				return $a['order'] - $b['order'];
+			}
+		);
+
+		$position = 1;
+		foreach ( $sortable as $item ) {
+			$item['data']['order'] = $position;
+			$sanitized[ $item['term_id'] ] = $item['data'];
+			$position++;
+		}
+
+		return $sanitized;
 	}
 
 	public function render_settings_page() {
@@ -136,9 +267,36 @@ class TTA_ThreadDesk {
 			return;
 		}
 
-		$cover_image = get_option( 'tta_threaddesk_cover_image_url', '' );
-		$company     = get_option( 'tta_threaddesk_default_company', '' );
-		$nonce       = wp_create_nonce( 'tta_threaddesk_generate_demo' );
+		$cover_image        = get_option( 'tta_threaddesk_cover_image_url', '' );
+		$company            = get_option( 'tta_threaddesk_default_company', '' );
+		$layout_categories  = get_option( 'tta_threaddesk_layout_categories', array() );
+		$placement_terms    = taxonomy_exists( 'product_cat' ) ? get_terms(
+			array(
+				'taxonomy'   => 'product_cat',
+				'hide_empty' => false,
+			)
+		) : array();
+		$placement_terms    = is_wp_error( $placement_terms ) ? array() : $placement_terms;
+		$placement_order_map = array();
+		if ( is_array( $layout_categories ) ) {
+			foreach ( $layout_categories as $term_id => $row ) {
+				$placement_order_map[ absint( $term_id ) ] = isset( $row['order'] ) ? absint( $row['order'] ) : 9999;
+			}
+		}
+		if ( ! empty( $placement_terms ) ) {
+			usort(
+				$placement_terms,
+				function ( $a, $b ) use ( $placement_order_map ) {
+					$a_order = isset( $placement_order_map[ $a->term_id ] ) ? $placement_order_map[ $a->term_id ] : 9999;
+					$b_order = isset( $placement_order_map[ $b->term_id ] ) ? $placement_order_map[ $b->term_id ] : 9999;
+					if ( $a_order === $b_order ) {
+						return strcasecmp( $a->name, $b->name );
+					}
+					return $a_order - $b_order;
+				}
+			);
+		}
+		$nonce              = wp_create_nonce( 'tta_threaddesk_generate_demo' );
 		?>
 		<div class="wrap">
 			<h1><?php echo esc_html__( 'ThreadDesk Settings', 'threaddesk' ); ?></h1>
@@ -159,6 +317,53 @@ class TTA_ThreadDesk {
 						</th>
 						<td>
 							<input type="text" class="regular-text" id="tta_threaddesk_default_company" name="tta_threaddesk_default_company" value="<?php echo esc_attr( $company ); ?>" />
+						</td>
+					</tr>
+					<tr>
+						<th scope="row"><?php echo esc_html__( 'Placement Categories', 'threaddesk' ); ?></th>
+						<td>
+							<p class="description"><?php echo esc_html__( 'Choose which WooCommerce product categories appear under Placements. Configure Front, Back, and Side (default Left) images for each enabled category.', 'threaddesk' ); ?></p>
+							<?php if ( ! empty( $placement_terms ) ) : ?>
+								<table class="widefat striped" style="margin-top:10px;">
+										<thead>
+											<tr>
+												<th><?php echo esc_html__( 'Order', 'threaddesk' ); ?></th>
+												<th><?php echo esc_html__( 'Use', 'threaddesk' ); ?></th>
+												<th><?php echo esc_html__( 'Category', 'threaddesk' ); ?></th>
+												<th><?php echo esc_html__( 'Front Image', 'threaddesk' ); ?></th>
+												<th><?php echo esc_html__( 'Back Image', 'threaddesk' ); ?></th>
+												<th><?php echo esc_html__( 'Side Image', 'threaddesk' ); ?></th>
+												<th><?php echo esc_html__( 'Side', 'threaddesk' ); ?></th>
+											</tr>
+										</thead>
+										<tbody data-threaddesk-placement-sortable>
+											<?php foreach ( $placement_terms as $index => $term ) : ?>
+												<?php $configured = isset( $layout_categories[ $term->term_id ] ) && is_array( $layout_categories[ $term->term_id ] ) ? $layout_categories[ $term->term_id ] : array(); ?>
+												<?php $front_image = isset( $configured['front_image'] ) ? $configured['front_image'] : ''; ?>
+												<?php $back_image = isset( $configured['back_image'] ) ? $configured['back_image'] : ''; ?>
+												<?php $side_image = isset( $configured['side_image'] ) ? $configured['side_image'] : ''; ?>
+												<?php $row_order = isset( $configured['order'] ) ? absint( $configured['order'] ) : ( $index + 1 ); ?>
+												<tr data-threaddesk-placement-row>
+													<td><span class="dashicons dashicons-move" aria-hidden="true"></span><input type="hidden" data-threaddesk-placement-order name="tta_threaddesk_layout_categories[<?php echo esc_attr( $term->term_id ); ?>][order]" value="<?php echo esc_attr( $row_order ); ?>" /></td>
+													<td><label><input type="checkbox" name="tta_threaddesk_layout_categories[<?php echo esc_attr( $term->term_id ); ?>][enabled]" value="1" <?php checked( ! empty( $configured['enabled'] ) ); ?> /> <?php echo esc_html__( 'Show', 'threaddesk' ); ?></label></td>
+													<td><strong><?php echo esc_html( $term->name ); ?></strong><br /><code><?php echo esc_html( $term->slug ); ?></code></td>
+													<td><?php $this->render_media_picker_field( "tta_threaddesk_layout_categories[{$term->term_id}][front_image]", $front_image ); ?></td>
+													<td><?php $this->render_media_picker_field( "tta_threaddesk_layout_categories[{$term->term_id}][back_image]", $back_image ); ?></td>
+													<td><?php $this->render_media_picker_field( "tta_threaddesk_layout_categories[{$term->term_id}][side_image]", $side_image ); ?></td>
+													<td>
+														<select name="tta_threaddesk_layout_categories[<?php echo esc_attr( $term->term_id ); ?>][side_label]">
+															<option value="left" <?php selected( isset( $configured['side_label'] ) ? $configured['side_label'] : 'left', 'left' ); ?>><?php echo esc_html__( 'Left', 'threaddesk' ); ?></option>
+															<option value="right" <?php selected( isset( $configured['side_label'] ) ? $configured['side_label'] : 'left', 'right' ); ?>><?php echo esc_html__( 'Right', 'threaddesk' ); ?></option>
+														</select>
+													</td>
+												</tr>
+											<?php endforeach; ?>
+										</tbody>
+</table>
+								<p class="description"><?php echo esc_html__( 'Drag rows by the move icon to control display order in Placements.', 'threaddesk' ); ?></p>
+							<?php else : ?>
+								<p><?php echo esc_html__( 'No product categories found. Create WooCommerce product categories first.', 'threaddesk' ); ?></p>
+							<?php endif; ?>
 						</td>
 					</tr>
 				</table>
@@ -193,6 +398,7 @@ class TTA_ThreadDesk {
 				<input type="hidden" name="_wpnonce" value="<?php echo esc_attr( $nonce ); ?>" />
 				<?php submit_button( __( 'Generate Demo Data', 'threaddesk' ), 'secondary' ); ?>
 			</form>
+			<?php $this->render_settings_page_inline_script(); ?>
 		</div>
 		<?php
 	}
