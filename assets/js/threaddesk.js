@@ -127,6 +127,7 @@ jQuery(function ($) {
 		};
 		let currentAngles = { front: '', left: '', back: '', right: '' };
 		let visibleAngles = ['front', 'left', 'back', 'right'];
+		let sideConfiguredAsRight = false;
 
 		const showChooserStep = function () {
 			chooserStep.addClass('is-active').prop('hidden', false).attr('aria-hidden', 'false');
@@ -158,10 +159,18 @@ jQuery(function ($) {
 			const preferred = angle || 'front';
 			const target = visibleAngles.indexOf(preferred) > -1 ? preferred : (visibleAngles[0] || 'front');
 			const url = currentAngles[target] || '';
+			let transform = 'none';
+
+			if (target === 'left') {
+				transform = sideConfiguredAsRight ? 'scaleX(-1)' : 'none';
+			} else if (target === 'right') {
+				transform = sideConfiguredAsRight ? 'none' : 'scaleX(-1)';
+			}
+
 			if (url) {
-				mainImage.attr('src', url).attr('alt', target + ' view').show();
+				mainImage.attr('src', url).attr('alt', target + ' view').css('transform', transform).show();
 			} else {
-				mainImage.attr('src', '').hide();
+				mainImage.attr('src', '').css('transform', 'none').hide();
 			}
 			angleButtons.removeClass('is-active');
 			angleButtonsByKey[target].addClass('is-active');
@@ -187,6 +196,7 @@ jQuery(function ($) {
 			const rawSide = $(this).data('threaddesk-layout-side-image') || '';
 			const sideLabel = String($(this).data('threaddesk-layout-side-label') || 'left').toLowerCase();
 			const sideIsRight = sideLabel === 'right';
+			sideConfiguredAsRight = sideIsRight;
 
 			currentAngles = {
 				front: rawFront,
