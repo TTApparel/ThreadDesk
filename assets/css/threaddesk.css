@@ -655,7 +655,6 @@ body.threaddesk-modal-open {
 	margin: 0;
 	display: flex;
 	justify-content: flex-end;
-	margin-bottom: 8px;
 }
 
 .threaddesk__card-delete-button {
