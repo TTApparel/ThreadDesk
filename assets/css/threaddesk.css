@@ -41,6 +41,7 @@
 
 .threaddesk__content {
 	flex: 1;
+	padding-bottom: 100px;
 }
 
 .threaddesk__content-inner {
@@ -652,7 +653,7 @@ body.threaddesk-modal-open {
 
 .threaddesk__card-delete-button {
 	border: none;
-	background: transparent;
+	background-color: #0000;
 	padding: 0;
 	width: 18px;
 	height: 18px;
