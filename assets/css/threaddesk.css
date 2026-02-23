@@ -666,6 +666,7 @@ body.threaddesk-modal-open {
 	font-size: 20px !important;
 	color: #000000 !important;
 	min-height: 10px !important;
+	padding: 0px !important;
 }
 
 .threaddesk__card-delete-button:hover {
