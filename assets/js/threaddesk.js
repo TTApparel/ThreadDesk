@@ -176,7 +176,7 @@ jQuery(function ($) {
 		let dragState = null;
 		let currentOverlayConfig = null;
 		const savedPlacementsByAngle = { front: {}, left: {}, back: {}, right: {} };
-		const overlayRenderScale = 0.85;
+		const overlayRenderScale = 0.75;
 		const designRatioCache = {};
 
 		const placementStyleMap = {
