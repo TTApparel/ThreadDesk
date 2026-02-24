@@ -261,52 +261,6 @@ jQuery(function ($) {
 			applySelectedDesign(saved.url, { top: saved.top, left: saved.left, width: saved.width });
 		};
 
-		const placementStyleMap = {
-			left_chest: { top: '36%', left: '40%', width: 18, approx: 4.5 },
-			right_chest: { top: '36%', left: '60%', width: 18, approx: 4.5 },
-			full_chest: { top: '38%', left: '50%', width: 34, approx: 10 },
-			left_sleeve: { top: '38%', left: '24%', width: 13, approx: 3.5 },
-			right_sleeve: { top: '38%', left: '76%', width: 13, approx: 3.5 },
-			back: { top: '38%', left: '50%', width: 34, approx: 10 },
-		};
-
-		const setPanelStep = function (panel) {
-			placementPanelStep.prop('hidden', panel !== 'placements');
-			designPanelStep.prop('hidden', panel !== 'designs');
-			adjustPanelStep.prop('hidden', panel !== 'adjust');
-		};
-
-		const updateSizeReading = function () {
-			const sliderPercent = Number(sizeSlider.val() || 100) / 100;
-			const preset = placementStyleMap[selectedPlacementKey] || placementStyleMap.full_chest;
-			const inches = (preset.approx * sliderPercent).toFixed(1);
-			sizeReading.text('Approx. size: ' + inches + '" W x ' + inches + '" H');
-		};
-
-		const applySelectedDesign = function (sourceUrl) {
-			const url = String(sourceUrl || '').trim();
-			if (!url) {
-				designOverlay.attr('src', '').prop('hidden', true).removeAttr('style');
-				return;
-			}
-
-			const preset = placementStyleMap[selectedPlacementKey] || placementStyleMap.full_chest;
-			const sliderPercent = Number(sizeSlider.val() || 100) / 100;
-			const width = (selectedBaseWidthPct * sliderPercent).toFixed(2) + '%';
-
-			designOverlay
-				.attr('src', url)
-				.css({
-					top: preset.top,
-					left: preset.left,
-					width: width,
-					transform: 'translate(-50%, -50%)',
-					background: 'transparent'
-				})
-				.prop('hidden', false);
-			updateSizeReading();
-		};
-
 		const showChooserStep = function () {
 			chooserStep.addClass('is-active').prop('hidden', false).attr('aria-hidden', 'false');
 			viewerStep.removeClass('is-active').prop('hidden', true).attr('aria-hidden', 'true');
@@ -366,33 +320,6 @@ jQuery(function ($) {
 					.attr('data-threaddesk-layout-design-name', title)
 					.attr('data-threaddesk-layout-design-svg', svg)
 					.attr('data-threaddesk-layout-design-preview', preview);
-				if (displayImage) {
-					option.append($('<img class="threaddesk-layout-viewer__design-option-image" alt="" aria-hidden="true" />').attr('src', displayImage));
-				}
-				option.append($('<span class="threaddesk-layout-viewer__design-option-title"></span>').text(title));
-				designList.append(option);
-			});
-		};
-
-		const renderDesignOptions = function () {
-			designList.empty();
-			const items = Array.isArray(layoutDesigns) ? layoutDesigns : [];
-			if (!items.length) {
-				designEmpty.show();
-				return;
-			}
-
-			designEmpty.hide();
-			items.forEach(function (design) {
-				const title = String((design && design.title) || '').trim() || 'Design';
-				const svg = String((design && design.svg) || '').trim();
-				const preview = String((design && design.preview) || '').trim();
-				const displayImage = svg || preview;
-				const option = $('<button type="button" class="threaddesk-layout-viewer__design-option"></button>')
-					.attr('data-threaddesk-layout-design-name', title)
-					.attr('data-threaddesk-layout-design-svg', svg)
-					.attr('data-threaddesk-layout-design-preview', preview);
-
 				if (displayImage) {
 					option.append($('<img class="threaddesk-layout-viewer__design-option-image" alt="" aria-hidden="true" />').attr('src', displayImage));
 				}
@@ -505,7 +432,7 @@ jQuery(function ($) {
 			const name = String($(this).attr('data-threaddesk-layout-design-name') || '').trim() || 'Design';
 			const svgUrl = String($(this).attr('data-threaddesk-layout-design-svg') || '').trim();
 			const previewUrl = String($(this).attr('data-threaddesk-layout-design-preview') || '').trim();
-			const url = svgUrl || previewUrl;
+			const url = previewUrl || svgUrl;
 			const preset = placementStyleMap[selectedPlacementKey] || placementStyleMap.full_chest;
 			selectedBaseWidthPct = Number(preset.width) || 34;
 			selectedDesignName = name;
@@ -1508,7 +1435,7 @@ jQuery(function ($) {
 				if (!quantized || !quantized.labels) {
 					return '';
 				}
-				const exportSettings = $.extend({}, traceSettings, { transparentAsWhite: true });
+				const exportSettings = $.extend({}, traceSettings, { transparentAsWhite: false });
 				const smoothSvg = buildSmoothExportSvgMarkup(quantized.labels, analysis.imageData.data, analysis.width, analysis.height, normalizedPalette, highResVectorMaxPixels, exportSettings);
 				if (smoothSvg) {
 					return smoothSvg;
@@ -1923,7 +1850,7 @@ jQuery(function ($) {
 				const submitButton = designForm.find('[type="submit"]').first();
 				submitButton.prop('disabled', true);
 				let svgMarkup = '';
-				const saveVectorSettings = $.extend({}, state.analysisSettings || {}, { transparentAsWhite: true });
+				const saveVectorSettings = $.extend({}, state.analysisSettings || {}, { transparentAsWhite: false });
 				if (state.labels && state.sourcePixels && state.palette.length && state.width && state.height) {
 					svgMarkup = buildSmoothExportSvgMarkup(state.labels, state.sourcePixels, state.width, state.height, state.palette, exportVectorMaxPixels, saveVectorSettings);
 					if (!svgMarkup) {
