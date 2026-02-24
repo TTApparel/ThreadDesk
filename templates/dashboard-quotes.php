@@ -61,6 +61,7 @@ $format_price = function ( $amount ) use ( $currency ) {
 
 	<div class="threaddesk__content">
 		<div class="threaddesk__header" style="background-image: url('<?php echo esc_url( $cover ); ?>');">
+
 			<?php if ( $map_url ) : ?>
 				<div class="threaddesk__header-map" aria-hidden="true">
 					<iframe
