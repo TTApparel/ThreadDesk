@@ -1195,6 +1195,8 @@ body.threaddesk-modal-open {
 	border: 1px solid #d8d8d8;
 	border-radius: 8px;
 	padding: 20px;
+	position: relative;
+	overflow: hidden;
 }
 
 .threaddesk-layout-viewer__main-image {
@@ -1203,6 +1205,14 @@ body.threaddesk-modal-open {
 	width: auto;
 	height: auto;
 	display: none;
+	z-index: 1;
+}
+
+.threaddesk-layout-viewer__design-overlay {
+	position: absolute;
+	height: auto;
+	pointer-events: none;
+	z-index: 2;
 }
 
 .threaddesk-layout-viewer {

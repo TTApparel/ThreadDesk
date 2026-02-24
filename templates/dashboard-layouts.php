@@ -58,7 +58,8 @@ if ( ! empty( $context['designs'] ) && is_array( $context['designs'] ) ) {
 			continue;
 		}
 
-		$design_preview = get_post_meta( $design->ID, 'design_preview_url', true );
+		$design_svg_url = get_post_meta( $design->ID, 'design_svg_file_url', true );
+		$design_preview = $design_svg_url ? $design_svg_url : get_post_meta( $design->ID, 'design_preview_url', true );
 		$design_title   = trim( (string) $design->post_title );
 		if ( '' === $design_title ) {
 			$design_title = __( 'Design', 'threaddesk' );
@@ -235,6 +236,7 @@ if ( taxonomy_exists( 'product_cat' ) && is_array( $layout_category_settings ) )
 				<div class="threaddesk-layout-viewer__left-column">
 					<div class="threaddesk-layout-viewer__stage">
 						<img src="" alt="" class="threaddesk-layout-viewer__main-image" data-threaddesk-layout-main-image />
+						<img src="" alt="" class="threaddesk-layout-viewer__design-overlay" data-threaddesk-layout-design-overlay hidden />
 					</div>
 					<div class="threaddesk-layout-viewer__angles">
 						<button type="button" class="threaddesk-layout-viewer__angle is-active" data-threaddesk-layout-angle="front">
