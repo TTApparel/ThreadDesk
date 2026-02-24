@@ -726,7 +726,7 @@ body.threaddesk-modal-open {
 }
 
 .threaddesk__card-design-preview-original {
-	z-index: 2;
+	z-index: 3;
 	opacity: 0;
 	transition: opacity 0.18s ease;
 	pointer-events: auto;
@@ -1048,14 +1048,12 @@ body.threaddesk-modal-open {
 .threaddesk-designer__palette-row,
 .threaddesk-designer__palette-grid {
 	display: flex;
-	gap: 10px;
+	gap: 4px;
 	flex-wrap: wrap;
 }
 
 .threaddesk-designer__palette-grid {
 	max-height: 270px;
-	overflow: auto;
-	padding-right: 4px;
 }
 
 .threaddesk-designer__palette-dot {
@@ -1091,9 +1089,8 @@ body.threaddesk-modal-open {
 	font-size: 11px;
 	white-space: nowrap;
 	opacity: 0;
-	pointer-events: auto;
-	cursor: grab;
-	touch-action: none;
+	pointer-events: none;
+	cursor: default;
 	transition: opacity 0.15s ease;
 	z-index: 5;
 }
@@ -1220,9 +1217,17 @@ body.threaddesk-modal-open {
 	pointer-events: auto;
 	cursor: grab;
 	touch-action: none;
-	z-index: 2;
+	z-index: 3;
 }
 
+
+
+.threaddesk-layout-viewer__saved-overlay {
+	position: absolute;
+	height: auto;
+	pointer-events: none;
+	z-index: 2;
+}
 .threaddesk-layout-viewer__design-overlay.is-dragging {
 	cursor: grabbing;
 }
@@ -1271,6 +1276,28 @@ body.threaddesk-modal-open {
 }
 
 
+
+.threaddesk-layout-viewer__add-design-button {
+	width: 100%;
+	margin-top: 10px;
+	padding: 10px;
+	border: 1px solid #111;
+	background: #111;
+	color: #fff;
+	text-transform: uppercase;
+	letter-spacing: .06em;
+	font-size: 12px;
+	cursor: pointer;
+}
+
+.threaddesk-layout-viewer__add-design-button:hover,
+.threaddesk-layout-viewer__add-design-button:focus-visible {
+	background: #2d2d2d;
+	outline: none;
+}
+
+
+
 .threaddesk-layout-viewer__placement-list {
 	display: grid;
 	gap: 10px;
@@ -1284,6 +1311,36 @@ body.threaddesk-modal-open {
 	cursor: pointer;
 	text-transform: uppercase;
 	letter-spacing: .04em;
+	font-size: 12px;
+}
+
+.threaddesk-layout-viewer__placement-option.is-complete {
+	background: #111;
+	border-color: #111;
+	color: #fff;
+	display: grid;
+	grid-template-columns: auto minmax(0, 1fr);
+	gap: 8px;
+	align-items: center;
+	text-align: left;
+}
+
+.threaddesk-layout-viewer__placement-abbr {
+	font-weight: 700;
+	font-size: 11px;
+	line-height: 1;
+	padding: 4px 6px;
+	border: 1px solid rgba(255, 255, 255, 0.4);
+	border-radius: 2px;
+}
+
+.threaddesk-layout-viewer__placement-file {
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	text-transform: none;
+	letter-spacing: normal;
 	font-size: 12px;
 }
 
@@ -1366,6 +1423,39 @@ body.threaddesk-modal-open {
 .threaddesk-layout-viewer__size-slider {
 	width: 100%;
 	margin: 0;
+	accent-color: #111;
+}
+
+.threaddesk-layout-viewer__size-slider::-webkit-slider-runnable-track {
+	height: 4px;
+	background: #111;
+	border-radius: 999px;
+}
+
+.threaddesk-layout-viewer__size-slider::-webkit-slider-thumb {
+	-webkit-appearance: none;
+	appearance: none;
+	width: 14px;
+	height: 14px;
+	border-radius: 50%;
+	background: #111;
+	border: 0;
+	margin-top: -5px;
+}
+
+.threaddesk-layout-viewer__size-slider::-moz-range-track {
+	height: 4px;
+	background: #111;
+	border-radius: 999px;
+	border: 0;
+}
+
+.threaddesk-layout-viewer__size-slider::-moz-range-thumb {
+	width: 14px;
+	height: 14px;
+	border-radius: 50%;
+	background: #111;
+	border: 0;
 }
 
 .threaddesk-layout-viewer__size-reading {
@@ -1433,10 +1523,25 @@ body.threaddesk-modal-open {
 	cursor: pointer;
 }
 
-.threaddesk-layout-viewer__angle img {
+.threaddesk-layout-viewer__angle-image-wrap {
+	position: relative;
 	width: 50px;
 	height: 70px;
+}
+
+.threaddesk-layout-viewer__angle-image-wrap > img[data-threaddesk-layout-angle-image] {
+	width: 100%;
+	height: 100%;
 	object-fit: contain;
+	display: block;
+}
+
+.threaddesk-layout-viewer__angle-overlay {
+	position: absolute;
+	height: auto;
+	pointer-events: none;
+	transform: translate(-50%, -50%);
+	z-index: 2;
 }
 
 .threaddesk-layout-viewer__angle span {
