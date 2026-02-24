@@ -190,6 +190,9 @@ $nav_base = trailingslashit( wc_get_account_endpoint_url( 'thread-desk' ) );
 				<input type="hidden" name="action" value="tta_threaddesk_save_design" />
 				<?php wp_nonce_field( 'tta_threaddesk_save_design' ); ?>
 				<input type="hidden" name="threaddesk_design_id" value="0" data-threaddesk-design-id-field />
+				<input type="hidden" name="threaddesk_design_return_context" value="" data-threaddesk-design-return-context />
+				<input type="hidden" name="threaddesk_design_return_layout_category" value="" data-threaddesk-design-return-layout-category />
+				<input type="hidden" name="threaddesk_design_return_layout_placement" value="" data-threaddesk-design-return-layout-placement />
 				<label class="threaddesk-designer__title-field" for="threaddesk_design_title"><?php echo esc_html__( 'Title', 'threaddesk' ); ?></label>
 				<input type="text" id="threaddesk_design_title" name="threaddesk_design_title" data-threaddesk-design-title-input maxlength="120" value="" />
 				<div class="threaddesk-designer__design-image" data-threaddesk-design-preview>
