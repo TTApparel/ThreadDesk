@@ -1091,9 +1091,8 @@ body.threaddesk-modal-open {
 	font-size: 11px;
 	white-space: nowrap;
 	opacity: 0;
-	pointer-events: auto;
-	cursor: grab;
-	touch-action: none;
+	pointer-events: none;
+	cursor: default;
 	transition: opacity 0.15s ease;
 	z-index: 5;
 }
