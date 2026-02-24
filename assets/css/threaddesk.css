@@ -1276,6 +1276,28 @@ body.threaddesk-modal-open {
 }
 
 
+
+.threaddesk-layout-viewer__add-design-button {
+	width: 100%;
+	margin-top: 10px;
+	padding: 10px;
+	border: 1px solid #111;
+	background: #111;
+	color: #fff;
+	text-transform: uppercase;
+	letter-spacing: .06em;
+	font-size: 12px;
+	cursor: pointer;
+}
+
+.threaddesk-layout-viewer__add-design-button:hover,
+.threaddesk-layout-viewer__add-design-button:focus-visible {
+	background: #2d2d2d;
+	outline: none;
+}
+
+
+
 .threaddesk-layout-viewer__placement-list {
 	display: grid;
 	gap: 10px;
