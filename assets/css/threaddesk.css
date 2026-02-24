@@ -1048,14 +1048,12 @@ body.threaddesk-modal-open {
 .threaddesk-designer__palette-row,
 .threaddesk-designer__palette-grid {
 	display: flex;
-	gap: 10px;
+	gap: 4px;
 	flex-wrap: wrap;
 }
 
 .threaddesk-designer__palette-grid {
 	max-height: 270px;
-	overflow: auto;
-	padding-right: 4px;
 }
 
 .threaddesk-designer__palette-dot {
