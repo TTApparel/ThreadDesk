@@ -307,7 +307,7 @@ if ( taxonomy_exists( 'product_cat' ) && is_array( $layout_category_settings ) )
 						<button type="button" class="threaddesk-layout-viewer__back-button" data-threaddesk-layout-back-to-placements><?php echo esc_html__( '← Back to placements', 'threaddesk' ); ?></button>
 						<div class="threaddesk-layout-viewer__design-list" data-threaddesk-layout-design-list></div>
 						<p class="threaddesk-layout-viewer__placement-empty" data-threaddesk-layout-design-empty><?php echo esc_html__( 'No saved designs yet. Add designs from the Designs panel first.', 'threaddesk' ); ?></p>
-						<button type="button" class="threaddesk-layout-viewer__add-design-button" data-threaddesk-design-open><?php echo esc_html__( 'Add Design', 'threaddesk' ); ?></button>
+						<button type="button" class="threaddesk-layout-viewer__add-design-button" data-threaddesk-design-open><?php echo esc_html__( 'Add New Design', 'threaddesk' ); ?></button>
 					</div>
 					<div class="threaddesk-layout-viewer__panel-step" data-threaddesk-layout-panel-step="adjust" hidden>
 						<h4><?php echo esc_html__( 'Adjust Placement', 'threaddesk' ); ?></h4>
@@ -323,6 +323,71 @@ if ( taxonomy_exists( 'product_cat' ) && is_array( $layout_category_settings ) )
 					</div>
 				</div>
 			</div>
+		</div>
+	</div>
+</div>
+
+<div class="threaddesk-design-modal" aria-hidden="true">
+	<div class="threaddesk-auth-modal__overlay" data-threaddesk-design-close></div>
+	<div class="threaddesk-auth-modal__panel" role="dialog" aria-label="<?php echo esc_attr__( 'Choose design', 'threaddesk' ); ?>" aria-modal="true">
+		<div class="threaddesk-auth-modal__actions">
+			<button type="button" class="threaddesk-auth-modal__close" data-threaddesk-design-close aria-label="<?php echo esc_attr__( 'Close design modal', 'threaddesk' ); ?>">
+				<svg class="threaddesk-auth-modal__close-icon" width="12" height="12" viewBox="0 0 15 15" aria-hidden="true" focusable="false">
+					<path d="M1 15a1 1 0 01-.71-.29 1 1 0 010-1.41l5.8-5.8-5.8-5.8A1 1 0 011.7.29l5.8 5.8 5.8-5.8a1 1 0 011.41 1.41l-5.8 5.8 5.8 5.8a1 1 0 01-1.41 1.41l-5.8-5.8-5.8 5.8A1 1 0 011 15z"></path>
+				</svg>
+			</button>
+		</div>
+		<div class="threaddesk-auth-modal__content threaddesk-designer">
+			<form class="threaddesk-auth-modal__form-inner" method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" enctype="multipart/form-data">
+				<input type="hidden" name="action" value="tta_threaddesk_save_design" />
+				<?php wp_nonce_field( 'tta_threaddesk_save_design' ); ?>
+				<input type="hidden" name="threaddesk_design_id" value="0" data-threaddesk-design-id-field />
+				<label class="threaddesk-designer__title-field" for="threaddesk_design_title"><?php echo esc_html__( 'Title', 'threaddesk' ); ?></label>
+				<input type="text" id="threaddesk_design_title" name="threaddesk_design_title" data-threaddesk-design-title-input maxlength="120" value="" />
+				<div class="threaddesk-designer__design-image" data-threaddesk-design-preview>
+					<img class="threaddesk-designer__design-image-upload" data-threaddesk-design-upload-preview alt="<?php echo esc_attr__( 'Uploaded design preview', 'threaddesk' ); ?>" />
+					<canvas class="threaddesk-designer__design-canvas" data-threaddesk-design-canvas aria-hidden="true"></canvas>
+					<div class="threaddesk-designer__design-image-overlay" aria-hidden="true"></div>
+					<svg viewBox="0 0 320 210" role="img" aria-label="<?php echo esc_attr__( 'Design preview', 'threaddesk' ); ?>">
+						<rect x="0" y="0" width="320" height="210" rx="14" fill="#f4f4f4"></rect>
+						<path d="M58 168L99 56h35l41 112h-27l-8-24H93l-8 24H58z" fill="#111111" data-threaddesk-preview-layer="0"></path>
+						<path d="M110 124h28l-14-42-14 42z" fill="#ffffff" data-threaddesk-preview-layer="1"></path>
+						<circle cx="217" cy="98" r="44" fill="#1f1f1f" data-threaddesk-preview-layer="2"></circle>
+						<rect x="187" y="142" width="60" height="18" rx="9" fill="#3a3a3a" data-threaddesk-preview-layer="3"></rect>
+					</svg>
+				</div>
+
+				<input type="file" id="threaddesk_design_file" accept=".png,.jpg,.jpeg,image/png,image/jpeg" name="threaddesk_design_file" data-threaddesk-design-file hidden />
+				<small class="threaddesk-designer__file-name" data-threaddesk-design-file-name><?php echo esc_html__( 'No file selected', 'threaddesk' ); ?></small>
+				<input type="hidden" name="threaddesk_design_palette" data-threaddesk-design-palette value="[]" />
+				<input type="hidden" name="threaddesk_design_color_count" data-threaddesk-design-color-count value="0" />
+				<input type="hidden" name="threaddesk_design_analysis_settings" data-threaddesk-design-settings value="{}" />
+				<input type="hidden" name="threaddesk_design_svg_markup" data-threaddesk-design-svg-markup value="" />
+					<input type="hidden" name="threaddesk_design_mockup_png_data" data-threaddesk-design-mockup-png value="" />
+
+				<div class="threaddesk-designer__controls">
+					<div class="threaddesk-designer__control-head">
+						<label for="threaddesk_design_max_colors"><?php echo esc_html__( 'Maximum color count', 'threaddesk' ); ?></label>
+						<div class="threaddesk-designer__color-counter">
+							<input type="range" id="threaddesk_design_max_colors" min="1" max="8" value="8" data-threaddesk-max-colors />
+							<strong data-threaddesk-color-count>8</strong>
+						</div>
+					</div>
+					<p class="threaddesk-designer__status" data-threaddesk-design-status aria-live="polite"></p>
+					<div class="threaddesk-designer__swatches" data-threaddesk-color-swatches>
+						<label>
+							<span><?php echo esc_html__( 'Color 1', 'threaddesk' ); ?></span>
+							<input type="color" value="#000000" />
+						</label>
+					</div>
+				</div>
+
+				<p class="threaddesk-auth-modal__submit">
+					<button type="submit" class="threaddesk-auth-modal__button">
+						<?php echo esc_html__( 'Save Design', 'threaddesk' ); ?>
+					</button>
+				</p>
+			</form>
 		</div>
 	</div>
 </div>
