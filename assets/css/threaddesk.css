@@ -1265,7 +1265,6 @@ body.threaddesk-modal-open {
 }
 
 .threaddesk-layout-viewer__back-button {
-	margin: 0 0 10px;
 	padding: 0;
 	border: 0;
 	background: transparent;
@@ -1496,7 +1495,6 @@ body.threaddesk-modal-open {
 }
 
 .threaddesk-layout-viewer__design-panel p {
-	margin: 12px 0 0;
 	font-size: 13px;
 	color: #666;
 }
