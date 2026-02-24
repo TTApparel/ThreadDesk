@@ -322,13 +322,13 @@ jQuery(function ($) {
 				const title = String((design && design.title) || '').trim() || 'Design';
 				const svg = String((design && design.svg) || '').trim();
 				const preview = String((design && design.preview) || '').trim();
-				const displayImage = preview || svg;
+				const mockup = String((design && design.mockup) || '').trim();
+				const displayImage = mockup || preview || svg;
 				const option = $('<button type="button" class="threaddesk-layout-viewer__design-option"></button>')
 					.attr('data-threaddesk-layout-design-name', title)
-					.attr('data-threaddesk-layout-design-svg', preferredSvg)
+					.attr('data-threaddesk-layout-design-svg', svg)
 					.attr('data-threaddesk-layout-design-preview', preview)
-					.attr('data-threaddesk-layout-design-version', version)
-					.attr('data-threaddesk-layout-design-has-transparent', hasTransparent ? '1' : '0');
+					.attr('data-threaddesk-layout-design-mockup', mockup);
 				if (displayImage) {
 					option.append($('<img class="threaddesk-layout-viewer__design-option-image" alt="" aria-hidden="true" />').attr('src', displayImage));
 				}
@@ -441,13 +441,8 @@ jQuery(function ($) {
 			const name = String($(this).attr('data-threaddesk-layout-design-name') || '').trim() || 'Design';
 			const svgUrl = String($(this).attr('data-threaddesk-layout-design-svg') || '').trim();
 			const previewUrl = String($(this).attr('data-threaddesk-layout-design-preview') || '').trim();
-			const version = Number($(this).attr('data-threaddesk-layout-design-version') || 0);
-			const hasTransparent = $(this).attr('data-threaddesk-layout-design-has-transparent') === '1';
-			let url = svgUrl || previewUrl;
-			if (hasTransparent && svgUrl) {
-				url = svgUrl;
-			}
-			url = withVersion(url, version);
+			const mockupUrl = String($(this).attr('data-threaddesk-layout-design-mockup') || '').trim();
+			const url = mockupUrl || previewUrl || svgUrl;
 			const preset = placementStyleMap[selectedPlacementKey] || placementStyleMap.full_chest;
 			selectedBaseWidthPct = Number(preset.width) || 34;
 			selectedDesignName = name;
