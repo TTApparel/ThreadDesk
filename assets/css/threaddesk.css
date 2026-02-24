@@ -726,7 +726,7 @@ body.threaddesk-modal-open {
 }
 
 .threaddesk__card-design-preview-original {
-	z-index: 2;
+	z-index: 3;
 	opacity: 0;
 	transition: opacity 0.18s ease;
 	pointer-events: auto;
@@ -1217,9 +1217,17 @@ body.threaddesk-modal-open {
 	pointer-events: auto;
 	cursor: grab;
 	touch-action: none;
-	z-index: 2;
+	z-index: 3;
 }
 
+
+
+.threaddesk-layout-viewer__saved-overlay {
+	position: absolute;
+	height: auto;
+	pointer-events: none;
+	z-index: 2;
+}
 .threaddesk-layout-viewer__design-overlay.is-dragging {
 	cursor: grabbing;
 }
