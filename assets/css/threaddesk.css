@@ -1253,8 +1253,16 @@ body.threaddesk-modal-open {
 	width: 240px;
 	background: #fff;
 	min-height: 300px;
+	height: 100%;
 	display: flex;
 	flex-direction: column;
+}
+
+.threaddesk-layout-viewer__panel-step:not([hidden]) {
+	display: flex;
+	flex-direction: column;
+	flex: 1 1 auto;
+	height: 100%;
 }
 
 .threaddesk-layout-viewer__design-panel h4 {
@@ -1278,7 +1286,7 @@ body.threaddesk-modal-open {
 
 .threaddesk-layout-viewer__add-design-button {
 	width: 100%;
-	margin-top: 10px;
+	margin-top: auto;
 	padding: 10px;
 	border: 1px solid #111;
 	background: #111;
@@ -1356,6 +1364,7 @@ body.threaddesk-modal-open {
 .threaddesk-layout-viewer__design-list {
 	display: grid;
 	gap: 10px;
+	margin-bottom: 10px;
 }
 
 .threaddesk-layout-viewer__design-option {
@@ -1466,6 +1475,7 @@ body.threaddesk-modal-open {
 .threaddesk-layout-viewer__adjust-actions {
 	display: grid;
 	gap: 8px;
+	margin-top: auto;
 }
 
 .threaddesk-layout-viewer__save-button {
