@@ -272,13 +272,13 @@ if ( taxonomy_exists( 'product_cat' ) && is_array( $layout_category_settings ) )
 					</div>
 					<div class="threaddesk-layout-viewer__panel-step" data-threaddesk-layout-panel-step="adjust" hidden>
 						<h4><?php echo esc_html__( 'Adjust Placement', 'threaddesk' ); ?></h4>
+						<button type="button" class="threaddesk-layout-viewer__back-button" data-threaddesk-layout-back-to-designs><?php echo esc_html__( '← Change design', 'threaddesk' ); ?></button>
 						<p class="threaddesk-layout-viewer__selection-name" data-threaddesk-layout-selected-design><?php echo esc_html__( 'No design selected', 'threaddesk' ); ?></p>
 						<div class="threaddesk-layout-viewer__selection-placement" data-threaddesk-layout-selected-placement><?php echo esc_html__( 'Placement', 'threaddesk' ); ?></div>
 						<label class="threaddesk-layout-viewer__size-label" for="threaddesk-layout-size-slider"><?php echo esc_html__( 'Size', 'threaddesk' ); ?></label>
 						<input id="threaddesk-layout-size-slider" type="range" min="60" max="140" value="100" class="threaddesk-layout-viewer__size-slider" data-threaddesk-layout-size-slider />
 						<p class="threaddesk-layout-viewer__size-reading" data-threaddesk-layout-size-reading><?php echo esc_html__( 'Approx. size: --', 'threaddesk' ); ?></p>
 						<div class="threaddesk-layout-viewer__adjust-actions">
-							<button type="button" class="threaddesk-layout-viewer__back-button" data-threaddesk-layout-back-to-designs><?php echo esc_html__( '← Change design', 'threaddesk' ); ?></button>
 							<button type="button" class="threaddesk-layout-viewer__save-button" data-threaddesk-layout-save-placement><?php echo esc_html__( 'Save Placement', 'threaddesk' ); ?></button>
 						</div>
 					</div>

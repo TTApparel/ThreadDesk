@@ -729,7 +729,9 @@ body.threaddesk-modal-open {
 	z-index: 2;
 	opacity: 0;
 	transition: opacity 0.18s ease;
-	pointer-events: none;
+	pointer-events: auto;
+	cursor: grab;
+	touch-action: none;
 }
 
 .threaddesk__card-design-preview:hover .threaddesk__card-design-preview-original {
@@ -925,7 +927,9 @@ body.threaddesk-modal-open {
 	background: var(--threaddesk-preview-accent);
 	mix-blend-mode: multiply;
 	opacity: 0.35;
-	pointer-events: none;
+	pointer-events: auto;
+	cursor: grab;
+	touch-action: none;
 	border-radius: 8px;
 }
 
@@ -1087,7 +1091,9 @@ body.threaddesk-modal-open {
 	font-size: 11px;
 	white-space: nowrap;
 	opacity: 0;
-	pointer-events: none;
+	pointer-events: auto;
+	cursor: grab;
+	touch-action: none;
 	transition: opacity 0.15s ease;
 	z-index: 5;
 }
@@ -1211,8 +1217,14 @@ body.threaddesk-modal-open {
 .threaddesk-layout-viewer__design-overlay {
 	position: absolute;
 	height: auto;
-	pointer-events: none;
+	pointer-events: auto;
+	cursor: grab;
+	touch-action: none;
 	z-index: 2;
+}
+
+.threaddesk-layout-viewer__design-overlay.is-dragging {
+	cursor: grabbing;
 }
 
 .threaddesk-layout-viewer {
