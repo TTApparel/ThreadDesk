@@ -45,6 +45,16 @@ jQuery(function ($) {
 		});
 
 
+
+		$(document).on('click', '[data-threaddesk-layout-save-placement]', function () {
+			if (!designOverlay.attr('src')) {
+				return;
+			}
+			const button = $(this);
+			button.text('Placement Saved');
+			setTimeout(function () { button.text('Save Placement'); }, 1400);
+		});
+
 		$(document).on('keyup', function (event) {
 			if (event.key === 'Escape') {
 				closeModal();
@@ -95,6 +105,16 @@ jQuery(function ($) {
 
 		$(document).on('click', '[data-threaddesk-address-close]', function () {
 			closeAddressModal();
+		});
+
+
+		$(document).on('click', '[data-threaddesk-layout-save-placement]', function () {
+			if (!designOverlay.attr('src')) {
+				return;
+			}
+			const button = $(this);
+			button.text('Placement Saved');
+			setTimeout(function () { button.text('Save Placement'); }, 1400);
 		});
 
 		$(document).on('keyup', function (event) {
@@ -1852,6 +1872,16 @@ jQuery(function ($) {
 				designForm.get(0).submit();
 			});
 		}
+
+
+		$(document).on('click', '[data-threaddesk-layout-save-placement]', function () {
+			if (!designOverlay.attr('src')) {
+				return;
+			}
+			const button = $(this);
+			button.text('Placement Saved');
+			setTimeout(function () { button.text('Save Placement'); }, 1400);
+		});
 
 		$(document).on('keyup', function (event) {
 			if (event.key === 'Escape') {
