@@ -191,6 +191,21 @@ jQuery(function ($) {
 			adjustPanelStep.prop('hidden', panel !== 'adjust');
 		};
 
+		const isLikelySvgUrl = function (url) {
+			const value = String(url || '').trim().toLowerCase();
+			if (!value) { return false; }
+			if (value.indexOf('data:image/svg+xml') === 0) { return true; }
+			return value.split('?')[0].split('#')[0].slice(-4) === '.svg';
+		};
+
+		const withVersion = function (url, version) {
+			const value = String(url || '').trim();
+			const stamp = Number(version || 0);
+			if (!value || !Number.isFinite(stamp) || stamp <= 0) { return value; }
+			const joiner = value.indexOf('?') === -1 ? '?' : '&';
+			return value + joiner + 'tdv=' + String(stamp);
+		};
+
 		const updateSizeReading = function () {
 			const sliderPercent = Number(sizeSlider.val() || 100) / 100;
 			const preset = placementStyleMap[selectedPlacementKey] || placementStyleMap.full_chest;
@@ -323,11 +338,16 @@ jQuery(function ($) {
 				const title = String((design && design.title) || '').trim() || 'Design';
 				const svg = String((design && design.svg) || '').trim();
 				const preview = String((design && design.preview) || '').trim();
-				const displayImage = svg || preview;
+				const version = Number((design && design.version) || 0);
+				const hasTransparent = !!(design && design.has_transparent);
+				const preferredSvg = svg || (isLikelySvgUrl(preview) ? preview : '');
+				const displayImage = withVersion(preferredSvg || preview, version);
 				const option = $('<button type="button" class="threaddesk-layout-viewer__design-option"></button>')
 					.attr('data-threaddesk-layout-design-name', title)
-					.attr('data-threaddesk-layout-design-svg', svg)
-					.attr('data-threaddesk-layout-design-preview', preview);
+					.attr('data-threaddesk-layout-design-svg', preferredSvg)
+					.attr('data-threaddesk-layout-design-preview', preview)
+					.attr('data-threaddesk-layout-design-version', version)
+					.attr('data-threaddesk-layout-design-has-transparent', hasTransparent ? '1' : '0');
 				if (displayImage) {
 					option.append($('<img class="threaddesk-layout-viewer__design-option-image" alt="" aria-hidden="true" />').attr('src', displayImage));
 				}
@@ -440,7 +460,13 @@ jQuery(function ($) {
 			const name = String($(this).attr('data-threaddesk-layout-design-name') || '').trim() || 'Design';
 			const svgUrl = String($(this).attr('data-threaddesk-layout-design-svg') || '').trim();
 			const previewUrl = String($(this).attr('data-threaddesk-layout-design-preview') || '').trim();
-			const url = svgUrl || previewUrl;
+			const version = Number($(this).attr('data-threaddesk-layout-design-version') || 0);
+			const hasTransparent = $(this).attr('data-threaddesk-layout-design-has-transparent') === '1';
+			let url = svgUrl || previewUrl;
+			if (hasTransparent && svgUrl) {
+				url = svgUrl;
+			}
+			url = withVersion(url, version);
 			const preset = placementStyleMap[selectedPlacementKey] || placementStyleMap.full_chest;
 			selectedBaseWidthPct = Number(preset.width) || 34;
 			selectedDesignName = name;
