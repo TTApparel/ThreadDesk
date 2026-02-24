@@ -1651,6 +1651,7 @@ class TTA_ThreadDesk {
 
 	public function register_admin_meta_boxes() {
 		add_meta_box( 'threaddesk_design_detail', __( 'ThreadDesk Design Details', 'threaddesk' ), array( $this, 'render_design_admin_meta_box' ), 'tta_design', 'normal', 'high' );
+		add_meta_box( 'threaddesk_design_usage', __( 'Used Layouts / Quotes / Invoices', 'threaddesk' ), array( $this, 'render_design_usage_admin_meta_box' ), 'tta_design', 'side', 'default' );
 		add_meta_box( 'threaddesk_layout_detail', __( 'ThreadDesk Layout Details', 'threaddesk' ), array( $this, 'render_layout_admin_meta_box' ), 'tta_layout', 'normal', 'high' );
 	}
 
@@ -1687,10 +1688,13 @@ class TTA_ThreadDesk {
 		echo '</div>';
 		if ( $svg_url ) { echo '<p><strong>' . esc_html__( 'Created SVG', 'threaddesk' ) . ':</strong> <a href="' . esc_url( $svg_url ) . '" target="_blank" rel="noopener">' . esc_html__( 'Open SVG', 'threaddesk' ) . '</a></p>'; }
 		echo '<p><em>' . esc_html__( 'Mockup PNG uses the saved design mockup image generated at save/edit time to match the design-card preview, with SVG/preview fallback for older designs.', 'threaddesk' ) . '</em></p>';
-		$related_layouts = $this->find_related_posts_by_id_in_meta( $post->ID, 'tta_layout' );
-		$related_quotes = $this->find_related_posts_by_id_in_meta( $post->ID, 'tta_quote' );
+	}
+
+	public function render_design_usage_admin_meta_box( $post ) {
+		$related_layouts  = $this->find_related_posts_by_id_in_meta( $post->ID, 'tta_layout' );
+		$related_quotes   = $this->find_related_posts_by_id_in_meta( $post->ID, 'tta_quote' );
 		$related_invoices = $this->find_related_posts_by_id_in_meta( $post->ID, 'shop_order' );
-		echo '<p><strong>' . esc_html__( 'Used on layouts/quotes/invoices', 'threaddesk' ) . ':</strong></p>';
+
 		echo $this->render_related_post_links_list( $related_layouts, __( 'Layouts', 'threaddesk' ) );
 		echo $this->render_related_post_links_list( $related_quotes, __( 'Quotes', 'threaddesk' ) );
 		echo $this->render_related_post_links_list( $related_invoices, __( 'Invoices', 'threaddesk' ) );
