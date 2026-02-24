@@ -173,6 +173,7 @@ jQuery(function ($) {
 		let visibleAngles = ['front', 'left', 'back', 'right'];
 		let sideConfiguredAsRight = false;
 		let dragState = null;
+		let currentOverlayConfig = null;
 		const savedPlacementsByAngle = { front: {}, left: {}, back: {}, right: {} };
 
 		const placementStyleMap = {
@@ -189,7 +190,6 @@ jQuery(function ($) {
 			designPanelStep.prop('hidden', panel !== 'designs');
 			adjustPanelStep.prop('hidden', panel !== 'adjust');
 		};
-
 		const updateSizeReading = function () {
 			const sliderPercent = Number(sizeSlider.val() || 100) / 100;
 			const preset = placementStyleMap[selectedPlacementKey] || placementStyleMap.full_chest;
@@ -200,24 +200,31 @@ jQuery(function ($) {
 		const hideOverlay = function () {
 			designOverlay.attr('src', '').prop('hidden', true).removeAttr('style');
 			selectedDesignSourceUrl = '';
+			currentOverlayConfig = null;
 		};
 
 		const applyOverlayStyle = function (cfg) {
+			currentOverlayConfig = {
+				top: Number(cfg.top),
+				left: Number(cfg.left),
+				width: Number(cfg.width),
+			};
 			designOverlay.css({
-				top: Number(cfg.top).toFixed(2) + '%',
-				left: Number(cfg.left).toFixed(2) + '%',
-				width: Number(cfg.width).toFixed(2) + '%',
+				top: currentOverlayConfig.top.toFixed(2) + '%',
+				left: currentOverlayConfig.left.toFixed(2) + '%',
+				width: currentOverlayConfig.width.toFixed(2) + '%',
 				transform: 'translate(-50%, -50%)',
 				background: 'transparent'
 			});
 		};
 
 		const getOverlayConfig = function () {
-			const top = parseFloat(String(designOverlay.css('top') || '').replace('%', ''));
-			const left = parseFloat(String(designOverlay.css('left') || '').replace('%', ''));
-			const width = parseFloat(String(designOverlay.css('width') || '').replace('%', ''));
-			if (Number.isFinite(top) && Number.isFinite(left) && Number.isFinite(width)) {
-				return { top: top, left: left, width: width };
+			if (currentOverlayConfig) {
+				return {
+					top: currentOverlayConfig.top,
+					left: currentOverlayConfig.left,
+					width: currentOverlayConfig.width,
+				};
 			}
 			return null;
 		};
@@ -315,7 +322,7 @@ jQuery(function ($) {
 				const title = String((design && design.title) || '').trim() || 'Design';
 				const svg = String((design && design.svg) || '').trim();
 				const preview = String((design && design.preview) || '').trim();
-				const displayImage = svg || preview;
+				const displayImage = preview || svg;
 				const option = $('<button type="button" class="threaddesk-layout-viewer__design-option"></button>')
 					.attr('data-threaddesk-layout-design-name', title)
 					.attr('data-threaddesk-layout-design-svg', svg)
@@ -1835,6 +1842,20 @@ jQuery(function ($) {
 		});
 
 
+		const getCurrentMockupPngData = function () {
+			if (previewCanvas.length) {
+				const canvasEl = previewCanvas.get(0);
+				if (canvasEl && canvasEl.width > 0 && canvasEl.height > 0) {
+					try {
+						return canvasEl.toDataURL('image/png');
+					} catch (error) {
+						return '';
+					}
+				}
+			}
+			return '';
+		};
+
 		if (designForm.length) {
 			designForm.on('submit', async function (event) {
 				if (designForm.data('threaddeskSubmitting')) {
@@ -1842,6 +1863,7 @@ jQuery(function ($) {
 				}
 				event.preventDefault();
 				const svgField = designForm.find('[data-threaddesk-design-svg-markup]');
+				const mockupPngField = designForm.find('[data-threaddesk-design-mockup-png]');
 				if (!svgField.length) {
 					designForm.data('threaddeskSubmitting', true);
 					designForm.get(0).submit();
@@ -1868,6 +1890,9 @@ jQuery(function ($) {
 					}
 				}
 				svgField.val(svgMarkup || '');
+				if (mockupPngField.length) {
+					mockupPngField.val(getCurrentMockupPngData());
+				}
 				designForm.data('threaddeskSubmitting', true);
 				designForm.get(0).submit();
 			});
