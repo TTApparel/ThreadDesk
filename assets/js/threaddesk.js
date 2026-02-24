@@ -580,7 +580,11 @@ jQuery(function ($) {
 			let params = null;
 			try { params = new URLSearchParams(window.location.search || ''); } catch (e) { params = null; }
 			if (!params || params.get('td_layout_return') !== '1') { return; }
-			openLayoutModal(layoutModal.find('[data-threaddesk-layout-open]').get(0) || document.activeElement);
+			if (!layoutModal.hasClass('is-active')) {
+				openLayoutModal(layoutModal.find('[data-threaddesk-layout-open]').get(0) || document.activeElement);
+			} else {
+				$('body').addClass('threaddesk-modal-open');
+			}
 			const categories = layoutModal.find('[data-threaddesk-layout-category]');
 			if (!categories.length) { return; }
 			const desiredCategory = String(params.get('td_layout_category') || '').trim();

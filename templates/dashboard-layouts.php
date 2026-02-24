@@ -40,6 +40,14 @@ $profile_username = $user ? $user->user_login : __( 'Username', 'threaddesk' );
 
 $nav_base = trailingslashit( wc_get_account_endpoint_url( 'thread-desk' ) );
 
+$resume_layout_viewer = isset( $_GET['td_layout_return'] ) && '1' === sanitize_text_field( wp_unslash( $_GET['td_layout_return'] ) );
+$layout_modal_classes = 'threaddesk-layout-modal' . ( $resume_layout_viewer ? ' is-active' : '' );
+$layout_modal_aria_hidden = $resume_layout_viewer ? 'false' : 'true';
+$chooser_step_classes = 'threaddesk-layout-modal__content' . ( $resume_layout_viewer ? '' : ' is-active' );
+$chooser_step_aria_hidden = $resume_layout_viewer ? 'true' : 'false';
+$viewer_step_classes = 'threaddesk-layout-modal__content threaddesk-layout-viewer' . ( $resume_layout_viewer ? ' is-active' : '' );
+$viewer_step_aria_hidden = $resume_layout_viewer ? 'false' : 'true';
+
 $layout_category_settings = get_option( 'tta_threaddesk_layout_categories', array() );
 $placement_slot_labels = array(
 	'left_chest'  => __( 'Left Chest', 'threaddesk' ),
@@ -222,7 +230,7 @@ if ( taxonomy_exists( 'product_cat' ) && is_array( $layout_category_settings ) )
 	</div>
 </div>
 
-<div class="threaddesk-layout-modal" aria-hidden="true" data-threaddesk-layout-designs="<?php echo esc_attr( wp_json_encode( $saved_designs ) ); ?>">
+<div class="<?php echo esc_attr( $layout_modal_classes ); ?>" aria-hidden="<?php echo esc_attr( $layout_modal_aria_hidden ); ?>" data-threaddesk-layout-designs="<?php echo esc_attr( wp_json_encode( $saved_designs ) ); ?>">
 	<div class="threaddesk-auth-modal__overlay" data-threaddesk-layout-close></div>
 	<div class="threaddesk-auth-modal__panel" role="dialog" aria-label="<?php echo esc_attr__( 'Choose a placement category', 'threaddesk' ); ?>" aria-modal="true">
 		<div class="threaddesk-auth-modal__actions">
@@ -233,7 +241,7 @@ if ( taxonomy_exists( 'product_cat' ) && is_array( $layout_category_settings ) )
 			</button>
 		</div>
 		<div class="threaddesk-auth-modal__content">
-			<div class="threaddesk-layout-modal__content is-active" data-threaddesk-layout-step="chooser" aria-hidden="false">
+			<div class="<?php echo esc_attr( $chooser_step_classes ); ?>" data-threaddesk-layout-step="chooser" aria-hidden="<?php echo esc_attr( $chooser_step_aria_hidden ); ?>"<?php echo $resume_layout_viewer ? " hidden" : ""; ?>>
 				<h3><?php echo esc_html__( 'Create a placement layout', 'threaddesk' ); ?></h3>
 				<p><?php echo esc_html__( 'Choose a product category to start your layout.', 'threaddesk' ); ?></p>
 				<div class="threaddesk-layout-modal__grid">
@@ -263,7 +271,7 @@ if ( taxonomy_exists( 'product_cat' ) && is_array( $layout_category_settings ) )
 				</div>
 			</div>
 
-			<div class="threaddesk-layout-modal__content threaddesk-layout-viewer" data-threaddesk-layout-step="viewer" hidden aria-hidden="true">
+			<div class="<?php echo esc_attr( $viewer_step_classes ); ?>" data-threaddesk-layout-step="viewer"<?php echo $resume_layout_viewer ? "" : " hidden"; ?> aria-hidden="<?php echo esc_attr( $viewer_step_aria_hidden ); ?>">
 				<div class="threaddesk-layout-viewer__left-column">
 					<div class="threaddesk-layout-viewer__stage">
 						<img src="" alt="" class="threaddesk-layout-viewer__main-image" data-threaddesk-layout-main-image />
