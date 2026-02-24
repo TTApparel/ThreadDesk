@@ -127,6 +127,17 @@ jQuery(function ($) {
 		};
 		const placementList = layoutModal.find('[data-threaddesk-layout-placement-list]');
 		const placementEmpty = layoutModal.find('[data-threaddesk-layout-placement-empty]');
+		const placementPanelStep = layoutModal.find('[data-threaddesk-layout-panel-step="placements"]');
+		const designPanelStep = layoutModal.find('[data-threaddesk-layout-panel-step="designs"]');
+		const designList = layoutModal.find('[data-threaddesk-layout-design-list]');
+		const designEmpty = layoutModal.find('[data-threaddesk-layout-design-empty]');
+		const designHeading = layoutModal.find('[data-threaddesk-layout-design-heading]');
+		const designOverlay = layoutModal.find('[data-threaddesk-layout-design-overlay]');
+		const layoutDesignsRaw = layoutModal.attr('data-threaddesk-layout-designs') || '[]';
+		let layoutDesigns = [];
+		try { layoutDesigns = JSON.parse(layoutDesignsRaw); } catch (e) { layoutDesigns = []; }
+		let selectedPlacementLabel = '';
+		let selectedPlacementKey = '';
 		let currentAngles = { front: '', left: '', back: '', right: '' };
 		let visibleAngles = ['front', 'left', 'back', 'right'];
 		let sideConfiguredAsRight = false;
@@ -136,6 +147,11 @@ jQuery(function ($) {
 			viewerStep.removeClass('is-active').prop('hidden', true).attr('aria-hidden', 'true');
 			placementList.empty();
 			placementEmpty.hide();
+			designList.empty();
+			designEmpty.hide();
+			selectedPlacementLabel = '';
+			selectedPlacementKey = '';
+			designOverlay.attr('src', '').prop('hidden', true).removeAttr('style');
 		};
 
 		const showViewerStep = function () {
@@ -158,7 +174,11 @@ jQuery(function ($) {
 				if (!label) {
 					return;
 				}
-				const btn = $('<button type="button" class="threaddesk-layout-viewer__placement-option"></button>').text(label.toUpperCase());
+				const placementKey = String((placement && placement.key) || '').trim();
+				const btn = $('<button type="button" class="threaddesk-layout-viewer__placement-option"></button>')
+					.text(label.toUpperCase())
+					.attr('data-threaddesk-layout-placement-label', label)
+					.attr('data-threaddesk-layout-placement-key', placementKey);
 				placementList.append(btn);
 			});
 
@@ -167,17 +187,76 @@ jQuery(function ($) {
 			}
 		};
 
+		const showPlacementPanel = function () {
+			placementPanelStep.prop('hidden', false);
+			designPanelStep.prop('hidden', true);
+		};
+
+		const showDesignPanel = function () {
+			placementPanelStep.prop('hidden', true);
+			designPanelStep.prop('hidden', false);
+		};
+
+		const renderDesignOptions = function () {
+			designList.empty();
+			const items = Array.isArray(layoutDesigns) ? layoutDesigns : [];
+
+			if (!items.length) {
+				designEmpty.show();
+				return;
+			}
+
+			designEmpty.hide();
+			items.forEach(function (design) {
+				const title = String((design && design.title) || '').trim() || 'Design';
+				const preview = String((design && design.preview) || '').trim();
+				const designId = String((design && design.id) || '').trim();
+				const option = $('<button type="button" class="threaddesk-layout-viewer__design-option"></button>').attr('data-threaddesk-layout-design-id', designId).attr('data-threaddesk-layout-design-preview', preview);
+				if (preview) {
+					option.append($('<img class="threaddesk-layout-viewer__design-option-image" alt="" aria-hidden="true" />').attr('src', preview));
+				}
+				option.append($('<span class="threaddesk-layout-viewer__design-option-title"></span>').text(title));
+				designList.append(option);
+			});
+		};
+
+
+		const applySelectedDesign = function (previewUrl) {
+			const url = String(previewUrl || '').trim();
+			if (!url) {
+				designOverlay.attr('src', '').prop('hidden', true).removeAttr('style');
+				return;
+			}
+
+			const placementStyleMap = {
+				left_chest: { top: '36%', left: '40%', width: '22%' },
+				right_chest: { top: '36%', left: '60%', width: '22%' },
+				full_chest: { top: '38%', left: '50%', width: '42%' },
+				left_sleeve: { top: '38%', left: '24%', width: '16%' },
+				right_sleeve: { top: '38%', left: '76%', width: '16%' },
+				back: { top: '38%', left: '50%', width: '42%' },
+			};
+
+			const style = placementStyleMap[selectedPlacementKey] || placementStyleMap.full_chest;
+			designOverlay
+				.attr('src', url)
+				.css({ top: style.top, left: style.left, width: style.width, transform: 'translate(-50%, -50%)' })
+				.prop('hidden', false);
+		};
+
 		const openLayoutModal = function (triggerEl) {
 			lastLayoutTrigger = triggerEl || document.activeElement || lastLayoutTrigger;
 			layoutModal.addClass('is-active').attr('aria-hidden', 'false');
 			$('body').addClass('threaddesk-modal-open');
 			showChooserStep();
+			showPlacementPanel();
 		};
 
 		const closeLayoutModal = function () {
 			layoutModal.removeClass('is-active').attr('aria-hidden', 'true');
 			$('body').removeClass('threaddesk-modal-open');
 			showChooserStep();
+			showPlacementPanel();
 			if (lastLayoutTrigger && typeof lastLayoutTrigger.focus === 'function') {
 				try { lastLayoutTrigger.focus(); } catch (e) {}
 			}
@@ -256,8 +335,30 @@ jQuery(function ($) {
 			angleImages.right.attr('src', currentAngles.right).css('transform', sideIsRight ? 'none' : 'scaleX(-1)');
 
 			renderPlacementOptions(placements);
+			showPlacementPanel();
 			showViewerStep();
 			setMainImage('front');
+		});
+
+		$(document).on('click', '.threaddesk-layout-viewer__placement-option', function () {
+			selectedPlacementLabel = String($(this).attr('data-threaddesk-layout-placement-label') || '').trim();
+			selectedPlacementKey = String($(this).attr('data-threaddesk-layout-placement-key') || '').trim();
+			if (!selectedPlacementLabel) {
+				selectedPlacementLabel = 'Placement';
+			}
+			designHeading.text('Choose Design for ' + selectedPlacementLabel);
+			renderDesignOptions();
+			applySelectedDesign('');
+			showDesignPanel();
+		});
+
+		$(document).on('click', '[data-threaddesk-layout-back-to-placements]', function () {
+			showPlacementPanel();
+		});
+
+		$(document).on('click', '.threaddesk-layout-viewer__design-option', function () {
+			const previewUrl = String($(this).attr('data-threaddesk-layout-design-preview') || '').trim();
+			applySelectedDesign(previewUrl);
 		});
 
 		$(document).on('keyup', function (event) {
