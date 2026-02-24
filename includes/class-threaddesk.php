@@ -1598,18 +1598,30 @@ class TTA_ThreadDesk {
 		$palette_raw = (string) get_post_meta( $post->ID, 'design_palette', true );
 		$palette = json_decode( $palette_raw, true );
 		if ( ! is_array( $palette ) ) { $palette = array(); }
-		$color_count = absint( get_post_meta( $post->ID, 'design_color_count', true ) );
+		$normalized_palette = array();
+		foreach ( $palette as $raw_color ) {
+			$color = strtoupper( trim( (string) $raw_color ) );
+			if ( '' === $color || 'TRANSPARENT' === $color ) {
+				continue;
+			}
+			$normalized_palette[] = $color;
+		}
+		$unique_palette = array_values( array_unique( $normalized_palette ) );
+		$color_count = count( $unique_palette );
 		$uploaded_at = (string) get_post_meta( $post->ID, 'created_at', true );
 		$owner = get_userdata( (int) $post->post_author );
 		$dimensions = $this->get_image_dimensions_from_url( $preview_url );
 		echo '<p><strong>' . esc_html__( 'Owner', 'threaddesk' ) . ':</strong> ' . esc_html( $owner ? $owner->display_name : __( 'Unknown', 'threaddesk' ) ) . '</p>';
 		echo '<p><strong>' . esc_html__( 'Uploaded', 'threaddesk' ) . ':</strong> ' . esc_html( $uploaded_at ?: $post->post_date ) . '</p>';
 		echo '<p><strong>' . esc_html__( 'Color count', 'threaddesk' ) . ':</strong> ' . esc_html( (string) $color_count ) . '</p>';
-		echo '<p><strong>' . esc_html__( 'Palette (Pantone/Hex)', 'threaddesk' ) . ':</strong> ' . esc_html( implode( ', ', array_map( 'strval', $palette ) ) ) . '</p>';
+		echo '<p><strong>' . esc_html__( 'Palette (Pantone/Hex)', 'threaddesk' ) . ':</strong> ' . esc_html( implode( ', ', $unique_palette ) ) . '</p>';
 		echo '<p><strong>' . esc_html__( 'PNG ratio (W:H)', 'threaddesk' ) . ':</strong> ' . esc_html( $dimensions ) . '</p>';
-		if ( $original_url ) { echo '<p><strong>' . esc_html__( 'Original image', 'threaddesk' ) . ':</strong><br><img style="max-width:280px;height:auto;" src="' . esc_url( $original_url ) . '" alt="" /></p>'; }
+		echo '<div style="display:flex; gap:20px; flex-wrap:wrap; align-items:flex-start;">';
+		if ( $original_url ) { echo '<div><p><strong>' . esc_html__( 'Original image', 'threaddesk' ) . ':</strong></p><img style="max-width:280px;height:auto;display:block;" src="' . esc_url( $original_url ) . '" alt="" /></div>'; }
+		if ( $preview_url ) { echo '<div><p><strong>' . esc_html__( 'Mockup PNG', 'threaddesk' ) . ':</strong></p><img style="max-width:280px;height:auto;display:block;" src="' . esc_url( $preview_url ) . '" alt="" /></div>'; }
+		echo '</div>';
 		if ( $svg_url ) { echo '<p><strong>' . esc_html__( 'Created SVG', 'threaddesk' ) . ':</strong> <a href="' . esc_url( $svg_url ) . '" target="_blank" rel="noopener">' . esc_html__( 'Open SVG', 'threaddesk' ) . '</a></p>'; }
-		if ( $preview_url ) { echo '<p><strong>' . esc_html__( 'Generated display PNG', 'threaddesk' ) . ':</strong><br><img style="max-width:280px;height:auto;" src="' . esc_url( $preview_url ) . '" alt="" /></p>'; }
+		echo '<p><em>' . esc_html__( 'Mockup PNG uses design_preview_url, matching the image source used by design-card preview rendering.', 'threaddesk' ) . '</em></p>';
 		$related_layouts = $this->find_related_posts_by_id_in_meta( $post->ID, 'tta_layout' );
 		$related_quotes = $this->find_related_posts_by_id_in_meta( $post->ID, 'tta_quote' );
 		$related_invoices = $this->find_related_posts_by_id_in_meta( $post->ID, 'shop_order' );
