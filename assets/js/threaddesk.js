@@ -1850,6 +1850,20 @@ jQuery(function ($) {
 		});
 
 
+		const getCurrentMockupPngData = function () {
+			if (previewCanvas.length) {
+				const canvasEl = previewCanvas.get(0);
+				if (canvasEl && canvasEl.width > 0 && canvasEl.height > 0) {
+					try {
+						return canvasEl.toDataURL('image/png');
+					} catch (error) {
+						return '';
+					}
+				}
+			}
+			return '';
+		};
+
 		if (designForm.length) {
 			designForm.on('submit', async function (event) {
 				if (designForm.data('threaddeskSubmitting')) {
@@ -1857,6 +1871,7 @@ jQuery(function ($) {
 				}
 				event.preventDefault();
 				const svgField = designForm.find('[data-threaddesk-design-svg-markup]');
+				const mockupPngField = designForm.find('[data-threaddesk-design-mockup-png]');
 				if (!svgField.length) {
 					designForm.data('threaddeskSubmitting', true);
 					designForm.get(0).submit();
@@ -1883,6 +1898,9 @@ jQuery(function ($) {
 					}
 				}
 				svgField.val(svgMarkup || '');
+				if (mockupPngField.length) {
+					mockupPngField.val(getCurrentMockupPngData());
+				}
 				designForm.data('threaddeskSubmitting', true);
 				designForm.get(0).submit();
 			});

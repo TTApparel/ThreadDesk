@@ -712,6 +712,34 @@ class TTA_ThreadDesk {
 		update_post_meta( $design_id, 'design_svg_file_name', $svg_filename );
 	}
 
+	private function persist_design_mockup_png_file( $design_id, $png_data_url, $base_name, $storage ) {
+		if ( ! is_array( $storage ) || empty( $storage['dir'] ) || empty( $storage['url'] ) ) {
+			return;
+		}
+		$png_data_url = is_string( $png_data_url ) ? trim( $png_data_url ) : '';
+		if ( '' === $png_data_url || 0 !== strpos( $png_data_url, 'data:image/png;base64,' ) ) {
+			return;
+		}
+		$binary = base64_decode( substr( $png_data_url, 22 ), true );
+		if ( false === $binary || '' === $binary ) {
+			return;
+		}
+		$base_name = sanitize_file_name( $base_name );
+		if ( '' === $base_name ) {
+			$base_name = 'design-' . (string) $design_id;
+		}
+		$png_filename = $base_name . '-mockup.png';
+		$png_path     = trailingslashit( $storage['dir'] ) . $png_filename;
+		$png_url      = trailingslashit( $storage['url'] ) . rawurlencode( $png_filename );
+		$bytes = file_put_contents( $png_path, $binary );
+		if ( false === $bytes ) {
+			return;
+		}
+		update_post_meta( $design_id, 'design_mockup_file_path', $png_path );
+		update_post_meta( $design_id, 'design_mockup_file_url', esc_url_raw( $png_url ) );
+		update_post_meta( $design_id, 'design_mockup_file_name', $png_filename );
+	}
+
 	private function rename_design_file( $current_path, $current_url, $target_base_name, $extension, $storage ) {
 		$current_path = is_string( $current_path ) ? trim( $current_path ) : '';
 		$current_url  = is_string( $current_url ) ? trim( $current_url ) : '';
@@ -779,6 +807,7 @@ class TTA_ThreadDesk {
 		$paths = array(
 			(string) get_post_meta( $design_id, 'design_original_file_path', true ),
 			(string) get_post_meta( $design_id, 'design_svg_file_path', true ),
+			(string) get_post_meta( $design_id, 'design_mockup_file_path', true ),
 		);
 
 		foreach ( $paths as $path ) {
@@ -819,6 +848,7 @@ class TTA_ThreadDesk {
 
 		$old_original_path = $design_id ? (string) get_post_meta( $design_id, 'design_original_file_path', true ) : '';
 		$old_svg_path      = $design_id ? (string) get_post_meta( $design_id, 'design_svg_file_path', true ) : '';
+		$old_mockup_path   = $design_id ? (string) get_post_meta( $design_id, 'design_mockup_file_path', true ) : '';
 
 		if ( ! empty( $_FILES['threaddesk_design_file']['name'] ) ) {
 			require_once ABSPATH . 'wp-admin/includes/file.php';
@@ -903,6 +933,7 @@ class TTA_ThreadDesk {
 
 		$color_count = isset( $_POST['threaddesk_design_color_count'] ) ? absint( $_POST['threaddesk_design_color_count'] ) : count( $palette );
 		$svg_markup  = isset( $_POST['threaddesk_design_svg_markup'] ) ? wp_unslash( $_POST['threaddesk_design_svg_markup'] ) : '';
+		$mockup_png_data = isset( $_POST['threaddesk_design_mockup_png_data'] ) ? wp_unslash( $_POST['threaddesk_design_mockup_png_data'] ) : '';
 		if ( $upload && isset( $upload['file'] ) ) {
 			$incoming_name      = sanitize_file_name( wp_basename( $upload['file'] ) );
 			$incoming_extension = strtolower( pathinfo( $incoming_name, PATHINFO_EXTENSION ) );
@@ -966,6 +997,13 @@ class TTA_ThreadDesk {
 					update_post_meta( $design_id, 'design_svg_file_url', esc_url_raw( (string) $renamed_svg['url'] ) );
 					update_post_meta( $design_id, 'design_svg_file_name', (string) $renamed_svg['name'] );
 				}
+
+				$renamed_mockup = $this->rename_design_file( $current_mockup_path, $current_mockup_url, $rename_base . '-mockup', 'png', $storage );
+				if ( ! empty( $renamed_mockup['name'] ) ) {
+					update_post_meta( $design_id, 'design_mockup_file_path', (string) $renamed_mockup['path'] );
+					update_post_meta( $design_id, 'design_mockup_file_url', esc_url_raw( (string) $renamed_mockup['url'] ) );
+					update_post_meta( $design_id, 'design_mockup_file_name', (string) $renamed_mockup['name'] );
+				}
 			}
 		}
 
@@ -992,10 +1030,15 @@ class TTA_ThreadDesk {
 			$svg_base_name = 'design-' . (string) $design_id;
 		}
 		$this->persist_design_svg_file( $design_id, $svg_markup, $svg_base_name, $storage );
+		$this->persist_design_mockup_png_file( $design_id, $mockup_png_data, $svg_base_name, $storage );
 
 		$current_svg_path = (string) get_post_meta( $design_id, 'design_svg_file_path', true );
 		if ( $old_svg_path && $current_svg_path && $old_svg_path !== $current_svg_path ) {
 			$this->maybe_delete_design_file( $old_svg_path );
+		}
+		$current_mockup_path = (string) get_post_meta( $design_id, 'design_mockup_file_path', true );
+		if ( $old_mockup_path && $current_mockup_path && $old_mockup_path !== $current_mockup_path ) {
+			$this->maybe_delete_design_file( $old_mockup_path );
 		}
 
 		update_post_meta( $design_id, 'design_palette', wp_json_encode( $palette ) );
@@ -1054,6 +1097,8 @@ class TTA_ThreadDesk {
 		$current_original_url  = (string) get_post_meta( $design_id, 'design_original_file_url', true );
 		$current_svg_path      = (string) get_post_meta( $design_id, 'design_svg_file_path', true );
 		$current_svg_url       = (string) get_post_meta( $design_id, 'design_svg_file_url', true );
+		$current_mockup_path   = (string) get_post_meta( $design_id, 'design_mockup_file_path', true );
+		$current_mockup_url    = (string) get_post_meta( $design_id, 'design_mockup_file_url', true );
 		$original_extension    = strtolower( pathinfo( $current_file_name, PATHINFO_EXTENSION ) );
 		$rename_base           = sanitize_file_name( $title );
 
@@ -1071,6 +1116,13 @@ class TTA_ThreadDesk {
 				update_post_meta( $design_id, 'design_svg_file_path', (string) $renamed_svg['path'] );
 				update_post_meta( $design_id, 'design_svg_file_url', esc_url_raw( (string) $renamed_svg['url'] ) );
 				update_post_meta( $design_id, 'design_svg_file_name', (string) $renamed_svg['name'] );
+			}
+
+			$renamed_mockup = $this->rename_design_file( $current_mockup_path, $current_mockup_url, $rename_base . '-mockup', 'png', $storage );
+			if ( ! empty( $renamed_mockup['name'] ) ) {
+				update_post_meta( $design_id, 'design_mockup_file_path', (string) $renamed_mockup['path'] );
+				update_post_meta( $design_id, 'design_mockup_file_url', esc_url_raw( (string) $renamed_mockup['url'] ) );
+				update_post_meta( $design_id, 'design_mockup_file_name', (string) $renamed_mockup['name'] );
 			}
 		}
 
@@ -1606,7 +1658,8 @@ class TTA_ThreadDesk {
 		$original_url = (string) get_post_meta( $post->ID, 'design_original_file_url', true );
 		$svg_url = (string) get_post_meta( $post->ID, 'design_svg_file_url', true );
 		$preview_url = (string) get_post_meta( $post->ID, 'design_preview_url', true );
-		$mockup_url = $svg_url ? $svg_url : $preview_url;
+		$saved_mockup_url = (string) get_post_meta( $post->ID, 'design_mockup_file_url', true );
+		$mockup_url = $saved_mockup_url ? $saved_mockup_url : ( $svg_url ? $svg_url : $preview_url );
 		$palette_raw = (string) get_post_meta( $post->ID, 'design_palette', true );
 		$palette = json_decode( $palette_raw, true );
 		if ( ! is_array( $palette ) ) { $palette = array(); }
@@ -1633,7 +1686,7 @@ class TTA_ThreadDesk {
 		if ( $mockup_url ) { echo '<div><p><strong>' . esc_html__( 'Mockup PNG', 'threaddesk' ) . ':</strong></p><img style="max-width:280px;height:auto;display:block;" src="' . esc_url( $mockup_url ) . '" alt="" /></div>'; }
 		echo '</div>';
 		if ( $svg_url ) { echo '<p><strong>' . esc_html__( 'Created SVG', 'threaddesk' ) . ':</strong> <a href="' . esc_url( $svg_url ) . '" target="_blank" rel="noopener">' . esc_html__( 'Open SVG', 'threaddesk' ) . '</a></p>'; }
-		echo '<p><em>' . esc_html__( 'Mockup PNG prefers design_svg_file_url (same visual source used by the design-card preview SVG) and falls back to design_preview_url.', 'threaddesk' ) . '</em></p>';
+		echo '<p><em>' . esc_html__( 'Mockup PNG uses the saved design mockup image generated at save/edit time to match the design-card preview, with SVG/preview fallback for older designs.', 'threaddesk' ) . '</em></p>';
 		$related_layouts = $this->find_related_posts_by_id_in_meta( $post->ID, 'tta_layout' );
 		$related_quotes = $this->find_related_posts_by_id_in_meta( $post->ID, 'tta_quote' );
 		$related_invoices = $this->find_related_posts_by_id_in_meta( $post->ID, 'shop_order' );
