@@ -141,6 +141,7 @@ jQuery(function ($) {
 		const sizeReading = layoutModal.find('[data-threaddesk-layout-size-reading]');
 		const selectedDesignNameEl = layoutModal.find('[data-threaddesk-layout-selected-design]');
 		const adjustHeading = layoutModal.find('[data-threaddesk-layout-adjust-heading]');
+		const adjustPaletteLabel = layoutModal.find('[data-threaddesk-layout-adjust-palette-label]');
 		const adjustPalette = layoutModal.find('[data-threaddesk-layout-adjust-palette]');
 		const layoutDesignsRaw = layoutModal.attr('data-threaddesk-layout-designs') || '[]';
 		let layoutDesigns = [];
@@ -456,17 +457,30 @@ jQuery(function ($) {
 
 		const renderAdjustPaletteDots = function () {
 			adjustPalette.empty().prop('hidden', true);
+			adjustPaletteLabel.prop('hidden', true);
 			if (!selectedDesignMeta) { return; }
 			let palette = [];
 			try { palette = JSON.parse(String(selectedDesignMeta.palette || '[]')); } catch (e) { palette = []; }
-			palette = Array.isArray(palette) ? palette.filter(Boolean) : [];
-			if (!palette.length) { return; }
-			palette.forEach(function (hex, index) {
+			palette = Array.isArray(palette) ? palette : [];
+			const uniqueColors = [];
+			const seen = {};
+			palette.forEach(function (color) {
+				const token = String(color || '').trim();
+				if (!token) { return; }
+				if (token.toLowerCase() === 'transparent') { return; }
+				const key = token.toLowerCase();
+				if (seen[key]) { return; }
+				seen[key] = true;
+				uniqueColors.push(token);
+			});
+			if (!uniqueColors.length) { return; }
+			uniqueColors.forEach(function (hex, index) {
 				const dot = $('<button type="button" class="threaddesk-layout-viewer__palette-dot" title="Edit design colors"></button>')
 					.attr('data-threaddesk-layout-palette-index', index)
 					.css('--threaddesk-layout-palette-color', String(hex));
 				adjustPalette.append(dot);
 			});
+			adjustPaletteLabel.prop('hidden', false);
 			adjustPalette.prop('hidden', false);
 		};
 

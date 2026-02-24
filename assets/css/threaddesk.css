@@ -1273,7 +1273,7 @@ body.threaddesk-modal-open {
 }
 
 .threaddesk-layout-viewer__back-button {
-	margin-bottom: 10px;
+	margin-bottom: 20px;
 	padding: 0;
 	border: 0;
 	background: transparent;
@@ -1409,6 +1409,14 @@ body.threaddesk-modal-open {
 	color: #2e2e2e;
 }
 
+.threaddesk-layout-viewer__adjust-palette-label {
+	font-size: 12px;
+	text-transform: uppercase;
+	letter-spacing: .06em;
+	margin-bottom: 6px;
+	color: #2e2e2e;
+}
+
 .threaddesk-layout-viewer__adjust-palette {
 	display: flex;
 	flex-wrap: wrap;
@@ -1442,7 +1450,7 @@ body.threaddesk-modal-open {
 
 .threaddesk-layout-viewer__size-slider {
 	width: 100%;
-	margin: 0;
+	margin: 0 0 4px;
 	accent-color: #111;
 }
 

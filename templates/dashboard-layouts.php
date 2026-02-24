@@ -329,6 +329,7 @@ if ( taxonomy_exists( 'product_cat' ) && is_array( $layout_category_settings ) )
 						<h4 data-threaddesk-layout-adjust-heading><?php echo esc_html__( 'Adjust Placement', 'threaddesk' ); ?></h4>
 						<p class="threaddesk-layout-viewer__selection-name" data-threaddesk-layout-selected-design><?php echo esc_html__( 'No design selected', 'threaddesk' ); ?></p>
 						<button type="button" class="threaddesk-layout-viewer__back-button" data-threaddesk-layout-back-to-designs><?php echo esc_html__( '← Change design', 'threaddesk' ); ?></button>
+						<div class="threaddesk-layout-viewer__adjust-palette-label" data-threaddesk-layout-adjust-palette-label hidden><?php echo esc_html__( 'Colors', 'threaddesk' ); ?></div>
 						<div class="threaddesk-layout-viewer__adjust-palette" data-threaddesk-layout-adjust-palette hidden></div>
 						<label class="threaddesk-layout-viewer__size-label" for="threaddesk-layout-size-slider"><?php echo esc_html__( 'Size', 'threaddesk' ); ?></label>
 						<input id="threaddesk-layout-size-slider" type="range" min="60" max="140" value="100" class="threaddesk-layout-viewer__size-slider" data-threaddesk-layout-size-slider />
