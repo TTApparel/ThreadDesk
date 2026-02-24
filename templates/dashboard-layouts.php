@@ -58,18 +58,32 @@ if ( ! empty( $context['designs'] ) && is_array( $context['designs'] ) ) {
 			continue;
 		}
 
-		$design_svg_url = get_post_meta( $design->ID, 'design_svg_file_url', true );
-		$design_preview = get_post_meta( $design->ID, 'design_preview_url', true );
+		$design_svg_url        = get_post_meta( $design->ID, 'design_svg_file_url', true );
+		$design_preview        = get_post_meta( $design->ID, 'design_preview_url', true );
+		$design_palette_raw    = (string) get_post_meta( $design->ID, 'design_palette', true );
+		$design_palette        = json_decode( $design_palette_raw, true );
+		$design_has_transparent = false;
+		if ( is_array( $design_palette ) ) {
+			foreach ( $design_palette as $color ) {
+				if ( 'transparent' === strtolower( (string) $color ) ) {
+					$design_has_transparent = true;
+					break;
+				}
+			}
+		}
+		$design_version = (int) get_post_modified_time( 'U', true, $design );
 		$design_title   = trim( (string) $design->post_title );
 		if ( '' === $design_title ) {
 			$design_title = __( 'Design', 'threaddesk' );
 		}
 
 		$saved_designs[] = array(
-			'id'      => (int) $design->ID,
-			'title'   => $design_title,
-			'svg'     => $design_svg_url ? esc_url_raw( $design_svg_url ) : '',
-			'preview' => $design_preview ? esc_url_raw( $design_preview ) : '',
+			'id'              => (int) $design->ID,
+			'title'           => $design_title,
+			'svg'             => $design_svg_url ? esc_url_raw( $design_svg_url ) : '',
+			'preview'         => $design_preview ? esc_url_raw( $design_preview ) : '',
+			'version'         => $design_version,
+			'has_transparent' => $design_has_transparent,
 		);
 	}
 }
