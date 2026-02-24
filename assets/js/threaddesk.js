@@ -165,10 +165,10 @@ jQuery(function ($) {
 		const placementStyleMap = {
 			left_chest: { top: 36, left: 40, width: 18, approx: 4.5, readoutApprox: 4 },
 			right_chest: { top: 36, left: 60, width: 18, approx: 4.5, readoutApprox: 4 },
-			full_chest: { top: 38, left: 50, width: 34, approx: 10, readoutApprox: 10.5 },
+			full_chest: { top: 38, left: 50, width: 34, approx: 10, readoutApprox: 10.5, readoutMin: 4.5, readoutMax: 12.5 },
 			left_sleeve: { top: 38, left: 24, width: 13, approx: 3.5, readoutApprox: 4 },
 			right_sleeve: { top: 38, left: 76, width: 13, approx: 3.5, readoutApprox: 4 },
-			back: { top: 38, left: 50, width: 34, approx: 10, readoutApprox: 10.5 },
+			back: { top: 38, left: 50, width: 34, approx: 10, readoutApprox: 10.5, readoutMin: 4.5, readoutMax: 12.5 },
 		};
 
 		const setPanelStep = function (panel) {
@@ -248,10 +248,22 @@ jQuery(function ($) {
 		};
 		const updateSizeReading = function () {
 			const sliderPercent = Number(sizeSlider.val() || 100) / 100;
+			const sliderValue = Number(sizeSlider.val() || 100);
+			const sliderMin = Number(sizeSlider.attr('min') || 60);
+			const sliderMax = Number(sizeSlider.attr('max') || 140);
 			const preset = placementStyleMap[selectedPlacementKey] || placementStyleMap.full_chest;
 			const ratio = Number(selectedDesignAspectRatio || 1);
-			const readoutBase = Number(preset.readoutApprox || (preset.approx * overlayRenderScale) || 0);
-			const maxDimension = readoutBase * sliderPercent;
+			let maxDimension = 0;
+			if (Number.isFinite(Number(preset.readoutMin)) && Number.isFinite(Number(preset.readoutMax)) && sliderMax > sliderMin) {
+				const readoutMin = Number(preset.readoutMin);
+				const readoutMax = Number(preset.readoutMax);
+				const clampedValue = Math.min(Math.max(sliderValue, sliderMin), sliderMax);
+				const normalized = (clampedValue - sliderMin) / (sliderMax - sliderMin);
+				maxDimension = readoutMin + ((readoutMax - readoutMin) * normalized);
+			} else {
+				const readoutBase = Number(preset.readoutApprox || (preset.approx * overlayRenderScale) || 0);
+				maxDimension = readoutBase * sliderPercent;
+			}
 			let widthInches = maxDimension;
 			let heightInches = maxDimension;
 			if (ratio > 1) {
