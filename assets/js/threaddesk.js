@@ -99,17 +99,6 @@ jQuery(function ($) {
 		});
 
 
-		$(document).on('click', '[data-threaddesk-layout-save-placement]', function () {
-			if (!designOverlay.attr('src')) {
-				return;
-			}
-			const targetAngle = getPlacementAngleTarget(selectedPlacementKey);
-			applyPlacementOverlayToAngle(targetAngle, selectedPlacementKey, selectedDesignSourceUrl, cfg);
-			const button = $(this);
-			button.text('Placement Saved');
-			setTimeout(function () { button.text('Save Placement'); }, 1400);
-		});
-
 		$(document).on('keyup', function (event) {
 			if (event.key === 'Escape') {
 				closeAddressModal();
@@ -168,6 +157,7 @@ jQuery(function ($) {
 		let sideConfiguredAsRight = false;
 		let dragState = null;
 		let currentOverlayConfig = null;
+		let isAdjustMode = false;
 		const savedPlacementsByAngle = { front: {}, left: {}, back: {}, right: {} };
 		const overlayRenderScale = 0.7;
 		const designRatioCache = {};
@@ -182,9 +172,53 @@ jQuery(function ($) {
 		};
 
 		const setPanelStep = function (panel) {
+			isAdjustMode = panel === 'adjust';
 			placementPanelStep.prop('hidden', panel !== 'placements');
 			designPanelStep.prop('hidden', panel !== 'designs');
 			adjustPanelStep.prop('hidden', panel !== 'adjust');
+		};
+
+		const getPlacementAbbreviation = function (placementLabel, placementKey) {
+			const key = String(placementKey || '').trim();
+			switch (key) {
+				case 'left_chest': return 'LC';
+				case 'right_chest': return 'RC';
+				case 'full_chest': return 'FC';
+				case 'left_sleeve': return 'LS';
+				case 'right_sleeve': return 'RS';
+				case 'back': return 'B';
+				default: {
+					const words = String(placementLabel || '').trim().split(/\s+/).filter(Boolean);
+					if (!words.length) { return 'P'; }
+					if (words.length === 1) { return words[0].charAt(0).toUpperCase(); }
+					return words.slice(0, 2).map(function (word) { return word.charAt(0).toUpperCase(); }).join('');
+				}
+			}
+		};
+
+		const getDesignFileName = function (designUrl, fallbackName) {
+			const raw = String(designUrl || '').trim();
+			if (raw) {
+				const path = raw.split('#')[0].split('?')[0];
+				const parts = path.split('/').filter(Boolean);
+				const file = parts.length ? decodeURIComponent(parts[parts.length - 1]) : '';
+				if (file) { return file; }
+			}
+			const fallback = String(fallbackName || '').trim();
+			return fallback || 'Design';
+		};
+
+		const updatePlacementOptionStatus = function (placementKey, placementLabel, designUrl, fallbackName) {
+			const key = String(placementKey || '').trim();
+			if (!key) { return; }
+			const option = placementList.find('.threaddesk-layout-viewer__placement-option[data-threaddesk-layout-placement-key="' + key + '"]');
+			if (!option.length) { return; }
+			const abbr = getPlacementAbbreviation(placementLabel, key);
+			const fileName = getDesignFileName(designUrl, fallbackName);
+			option
+				.addClass('is-complete')
+				.attr('data-threaddesk-layout-placement-complete', '1')
+				.html('<span class="threaddesk-layout-viewer__placement-abbr">' + $('<div>').text(abbr).html() + '</span><span class="threaddesk-layout-viewer__placement-file">' + $('<div>').text(fileName).html() + '</span>');
 		};
 
 		const setDesignRatioFromUrl = function (url) {
@@ -486,6 +520,7 @@ jQuery(function ($) {
 			selectedPlacementLabel = String($(this).attr('data-threaddesk-layout-placement-label') || '').trim();
 			selectedPlacementKey = String($(this).attr('data-threaddesk-layout-placement-key') || '').trim();
 			if (!selectedPlacementLabel) { selectedPlacementLabel = 'Placement'; }
+			setMainImage(getPlacementAngleTarget(selectedPlacementKey));
 			designHeading.text('Choose Design for ' + selectedPlacementLabel);
 			sizeSlider.val(100);
 			selectedDesignName = '';
@@ -502,6 +537,7 @@ jQuery(function ($) {
 		$(document).on('click', '[data-threaddesk-layout-back-to-designs]', function () { setPanelStep('designs'); });
 
 		$(document).on('input change', '[data-threaddesk-layout-size-slider]', function () {
+			if (!isAdjustMode) { return; }
 			if (!selectedDesignSourceUrl) { updateSizeReading(); return; }
 			const overlayCfg = getOverlayConfig();
 			if (overlayCfg) {
@@ -541,6 +577,7 @@ jQuery(function ($) {
 		};
 
 		const startDrag = function (event) {
+			if (!isAdjustMode) { return; }
 			if (!selectedDesignSourceUrl) { return; }
 			dragState = { active: true };
 			designOverlay.addClass('is-dragging');
@@ -570,7 +607,8 @@ jQuery(function ($) {
 			if (!selectedDesignSourceUrl || !selectedPlacementKey) { return; }
 			const cfg = getOverlayConfig();
 			if (!cfg) { return; }
-			savedPlacementsByAngle[currentAngle][selectedPlacementKey] = {
+			const targetAngle = getPlacementAngleTarget(selectedPlacementKey);
+			savedPlacementsByAngle[targetAngle][selectedPlacementKey] = {
 				url: selectedDesignSourceUrl,
 				designName: selectedDesignName,
 				top: cfg.top,
@@ -580,6 +618,17 @@ jQuery(function ($) {
 				sliderValue: Number(sizeSlider.val() || 100),
 				designRatio: Number(selectedDesignAspectRatio || 1),
 			};
+			applyPlacementOverlayToAngle(targetAngle, selectedPlacementKey, selectedDesignSourceUrl, cfg);
+			updatePlacementOptionStatus(selectedPlacementKey, selectedPlacementLabel, selectedDesignSourceUrl, selectedDesignName);
+			selectedPlacementLabel = '';
+			selectedPlacementKey = '';
+			selectedDesignName = '';
+			sizeSlider.val(100);
+			selectedPlacementBox.text('Placement');
+			selectedDesignNameEl.text('No design selected');
+			hideOverlay();
+			updateSizeReading();
+			setPanelStep('placements');
 			const button = $(this);
 			button.text('Placement Saved');
 			setTimeout(function () { button.text('Save Placement'); }, 1400);

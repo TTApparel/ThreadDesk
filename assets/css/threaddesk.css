@@ -1284,6 +1284,36 @@ body.threaddesk-modal-open {
 	font-size: 12px;
 }
 
+.threaddesk-layout-viewer__placement-option.is-complete {
+	background: #111;
+	border-color: #111;
+	color: #fff;
+	display: grid;
+	grid-template-columns: auto minmax(0, 1fr);
+	gap: 8px;
+	align-items: center;
+	text-align: left;
+}
+
+.threaddesk-layout-viewer__placement-abbr {
+	font-weight: 700;
+	font-size: 11px;
+	line-height: 1;
+	padding: 4px 6px;
+	border: 1px solid rgba(255, 255, 255, 0.4);
+	border-radius: 2px;
+}
+
+.threaddesk-layout-viewer__placement-file {
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	text-transform: none;
+	letter-spacing: normal;
+	font-size: 12px;
+}
+
 .threaddesk-layout-viewer__placement-option:hover,
 .threaddesk-layout-viewer__placement-option:focus-visible {
 	border-color: #111;
