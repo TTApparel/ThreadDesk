@@ -45,6 +45,16 @@ jQuery(function ($) {
 		});
 
 
+
+		$(document).on('click', '[data-threaddesk-layout-save-placement]', function () {
+			if (!designOverlay.attr('src')) {
+				return;
+			}
+			const button = $(this);
+			button.text('Placement Saved');
+			setTimeout(function () { button.text('Save Placement'); }, 1400);
+		});
+
 		$(document).on('keyup', function (event) {
 			if (event.key === 'Escape') {
 				closeModal();
@@ -97,6 +107,16 @@ jQuery(function ($) {
 			closeAddressModal();
 		});
 
+
+		$(document).on('click', '[data-threaddesk-layout-save-placement]', function () {
+			if (!designOverlay.attr('src')) {
+				return;
+			}
+			const button = $(this);
+			button.text('Placement Saved');
+			setTimeout(function () { button.text('Save Placement'); }, 1400);
+		});
+
 		$(document).on('keyup', function (event) {
 			if (event.key === 'Escape') {
 				closeAddressModal();
@@ -129,18 +149,71 @@ jQuery(function ($) {
 		const placementEmpty = layoutModal.find('[data-threaddesk-layout-placement-empty]');
 		const placementPanelStep = layoutModal.find('[data-threaddesk-layout-panel-step="placements"]');
 		const designPanelStep = layoutModal.find('[data-threaddesk-layout-panel-step="designs"]');
+		const adjustPanelStep = layoutModal.find('[data-threaddesk-layout-panel-step="adjust"]');
 		const designList = layoutModal.find('[data-threaddesk-layout-design-list]');
 		const designEmpty = layoutModal.find('[data-threaddesk-layout-design-empty]');
 		const designHeading = layoutModal.find('[data-threaddesk-layout-design-heading]');
 		const designOverlay = layoutModal.find('[data-threaddesk-layout-design-overlay]');
+		const sizeSlider = layoutModal.find('[data-threaddesk-layout-size-slider]');
+		const sizeReading = layoutModal.find('[data-threaddesk-layout-size-reading]');
+		const selectedPlacementBox = layoutModal.find('[data-threaddesk-layout-selected-placement]');
+		const selectedDesignNameEl = layoutModal.find('[data-threaddesk-layout-selected-design]');
 		const layoutDesignsRaw = layoutModal.attr('data-threaddesk-layout-designs') || '[]';
 		let layoutDesigns = [];
 		try { layoutDesigns = JSON.parse(layoutDesignsRaw); } catch (e) { layoutDesigns = []; }
 		let selectedPlacementLabel = '';
 		let selectedPlacementKey = '';
+		let selectedDesignName = '';
+		let selectedBaseWidthPct = 34;
 		let currentAngles = { front: '', left: '', back: '', right: '' };
 		let visibleAngles = ['front', 'left', 'back', 'right'];
 		let sideConfiguredAsRight = false;
+
+		const placementStyleMap = {
+			left_chest: { top: '36%', left: '40%', width: 18, approx: 4.5 },
+			right_chest: { top: '36%', left: '60%', width: 18, approx: 4.5 },
+			full_chest: { top: '38%', left: '50%', width: 34, approx: 10 },
+			left_sleeve: { top: '38%', left: '24%', width: 13, approx: 3.5 },
+			right_sleeve: { top: '38%', left: '76%', width: 13, approx: 3.5 },
+			back: { top: '38%', left: '50%', width: 34, approx: 10 },
+		};
+
+		const setPanelStep = function (panel) {
+			placementPanelStep.prop('hidden', panel !== 'placements');
+			designPanelStep.prop('hidden', panel !== 'designs');
+			adjustPanelStep.prop('hidden', panel !== 'adjust');
+		};
+
+		const updateSizeReading = function () {
+			const sliderPercent = Number(sizeSlider.val() || 100) / 100;
+			const preset = placementStyleMap[selectedPlacementKey] || placementStyleMap.full_chest;
+			const inches = (preset.approx * sliderPercent).toFixed(1);
+			sizeReading.text('Approx. size: ' + inches + '" W x ' + inches + '" H');
+		};
+
+		const applySelectedDesign = function (sourceUrl) {
+			const url = String(sourceUrl || '').trim();
+			if (!url) {
+				designOverlay.attr('src', '').prop('hidden', true).removeAttr('style');
+				return;
+			}
+
+			const preset = placementStyleMap[selectedPlacementKey] || placementStyleMap.full_chest;
+			const sliderPercent = Number(sizeSlider.val() || 100) / 100;
+			const width = (selectedBaseWidthPct * sliderPercent).toFixed(2) + '%';
+
+			designOverlay
+				.attr('src', url)
+				.css({
+					top: preset.top,
+					left: preset.left,
+					width: width,
+					transform: 'translate(-50%, -50%)',
+					background: 'transparent'
+				})
+				.prop('hidden', false);
+			updateSizeReading();
+		};
 
 		const showChooserStep = function () {
 			chooserStep.addClass('is-active').prop('hidden', false).attr('aria-hidden', 'false');
@@ -151,14 +224,19 @@ jQuery(function ($) {
 			designEmpty.hide();
 			selectedPlacementLabel = '';
 			selectedPlacementKey = '';
+			selectedDesignName = '';
+			selectedBaseWidthPct = 34;
+			sizeSlider.val(100);
+			selectedPlacementBox.text('Placement');
+			selectedDesignNameEl.text('No design selected');
 			designOverlay.attr('src', '').prop('hidden', true).removeAttr('style');
+			updateSizeReading();
 		};
 
 		const showViewerStep = function () {
 			chooserStep.removeClass('is-active').prop('hidden', true).attr('aria-hidden', 'true');
 			viewerStep.addClass('is-active').prop('hidden', false).attr('aria-hidden', 'false');
 		};
-
 
 		const renderPlacementOptions = function (placements) {
 			placementList.empty();
@@ -187,20 +265,9 @@ jQuery(function ($) {
 			}
 		};
 
-		const showPlacementPanel = function () {
-			placementPanelStep.prop('hidden', false);
-			designPanelStep.prop('hidden', true);
-		};
-
-		const showDesignPanel = function () {
-			placementPanelStep.prop('hidden', true);
-			designPanelStep.prop('hidden', false);
-		};
-
 		const renderDesignOptions = function () {
 			designList.empty();
 			const items = Array.isArray(layoutDesigns) ? layoutDesigns : [];
-
 			if (!items.length) {
 				designEmpty.show();
 				return;
@@ -209,39 +276,20 @@ jQuery(function ($) {
 			designEmpty.hide();
 			items.forEach(function (design) {
 				const title = String((design && design.title) || '').trim() || 'Design';
+				const svg = String((design && design.svg) || '').trim();
 				const preview = String((design && design.preview) || '').trim();
-				const designId = String((design && design.id) || '').trim();
-				const option = $('<button type="button" class="threaddesk-layout-viewer__design-option"></button>').attr('data-threaddesk-layout-design-id', designId).attr('data-threaddesk-layout-design-preview', preview);
-				if (preview) {
-					option.append($('<img class="threaddesk-layout-viewer__design-option-image" alt="" aria-hidden="true" />').attr('src', preview));
+				const displayImage = svg || preview;
+				const option = $('<button type="button" class="threaddesk-layout-viewer__design-option"></button>')
+					.attr('data-threaddesk-layout-design-name', title)
+					.attr('data-threaddesk-layout-design-svg', svg)
+					.attr('data-threaddesk-layout-design-preview', preview);
+
+				if (displayImage) {
+					option.append($('<img class="threaddesk-layout-viewer__design-option-image" alt="" aria-hidden="true" />').attr('src', displayImage));
 				}
 				option.append($('<span class="threaddesk-layout-viewer__design-option-title"></span>').text(title));
 				designList.append(option);
 			});
-		};
-
-
-		const applySelectedDesign = function (previewUrl) {
-			const url = String(previewUrl || '').trim();
-			if (!url) {
-				designOverlay.attr('src', '').prop('hidden', true).removeAttr('style');
-				return;
-			}
-
-			const placementStyleMap = {
-				left_chest: { top: '36%', left: '40%', width: '22%' },
-				right_chest: { top: '36%', left: '60%', width: '22%' },
-				full_chest: { top: '38%', left: '50%', width: '42%' },
-				left_sleeve: { top: '38%', left: '24%', width: '16%' },
-				right_sleeve: { top: '38%', left: '76%', width: '16%' },
-				back: { top: '38%', left: '50%', width: '42%' },
-			};
-
-			const style = placementStyleMap[selectedPlacementKey] || placementStyleMap.full_chest;
-			designOverlay
-				.attr('src', url)
-				.css({ top: style.top, left: style.left, width: style.width, transform: 'translate(-50%, -50%)' })
-				.prop('hidden', false);
 		};
 
 		const openLayoutModal = function (triggerEl) {
@@ -249,14 +297,14 @@ jQuery(function ($) {
 			layoutModal.addClass('is-active').attr('aria-hidden', 'false');
 			$('body').addClass('threaddesk-modal-open');
 			showChooserStep();
-			showPlacementPanel();
+			setPanelStep('placements');
 		};
 
 		const closeLayoutModal = function () {
 			layoutModal.removeClass('is-active').attr('aria-hidden', 'true');
 			$('body').removeClass('threaddesk-modal-open');
 			showChooserStep();
-			showPlacementPanel();
+			setPanelStep('placements');
 			if (lastLayoutTrigger && typeof lastLayoutTrigger.focus === 'function') {
 				try { lastLayoutTrigger.focus(); } catch (e) {}
 			}
@@ -335,7 +383,7 @@ jQuery(function ($) {
 			angleImages.right.attr('src', currentAngles.right).css('transform', sideIsRight ? 'none' : 'scaleX(-1)');
 
 			renderPlacementOptions(placements);
-			showPlacementPanel();
+			setPanelStep('placements');
 			showViewerStep();
 			setMainImage('front');
 		});
@@ -347,18 +395,54 @@ jQuery(function ($) {
 				selectedPlacementLabel = 'Placement';
 			}
 			designHeading.text('Choose Design for ' + selectedPlacementLabel);
+			sizeSlider.val(100);
+			selectedDesignName = '';
+			selectedDesignNameEl.text('No design selected');
+			selectedPlacementBox.text(selectedPlacementLabel.toUpperCase());
 			renderDesignOptions();
 			applySelectedDesign('');
-			showDesignPanel();
+			updateSizeReading();
+			setPanelStep('designs');
 		});
 
 		$(document).on('click', '[data-threaddesk-layout-back-to-placements]', function () {
-			showPlacementPanel();
+			setPanelStep('placements');
+		});
+
+		$(document).on('click', '[data-threaddesk-layout-back-to-designs]', function () {
+			setPanelStep('designs');
+		});
+
+		$(document).on('input change', '[data-threaddesk-layout-size-slider]', function () {
+			if (!designOverlay.attr('src')) {
+				updateSizeReading();
+				return;
+			}
+			applySelectedDesign(designOverlay.attr('src'));
 		});
 
 		$(document).on('click', '.threaddesk-layout-viewer__design-option', function () {
+			const name = String($(this).attr('data-threaddesk-layout-design-name') || '').trim() || 'Design';
+			const svgUrl = String($(this).attr('data-threaddesk-layout-design-svg') || '').trim();
 			const previewUrl = String($(this).attr('data-threaddesk-layout-design-preview') || '').trim();
-			applySelectedDesign(previewUrl);
+			const url = svgUrl || previewUrl;
+			const preset = placementStyleMap[selectedPlacementKey] || placementStyleMap.full_chest;
+			selectedBaseWidthPct = Number(preset.width) || 34;
+			selectedDesignName = name;
+			selectedPlacementBox.text((selectedPlacementLabel || 'Placement').toUpperCase());
+			selectedDesignNameEl.text(selectedDesignName.toUpperCase());
+			applySelectedDesign(url);
+			setPanelStep('adjust');
+		});
+
+
+		$(document).on('click', '[data-threaddesk-layout-save-placement]', function () {
+			if (!designOverlay.attr('src')) {
+				return;
+			}
+			const button = $(this);
+			button.text('Placement Saved');
+			setTimeout(function () { button.text('Save Placement'); }, 1400);
 		});
 
 		$(document).on('keyup', function (event) {
@@ -1736,6 +1820,16 @@ jQuery(function ($) {
 				designForm.get(0).submit();
 			});
 		}
+
+
+		$(document).on('click', '[data-threaddesk-layout-save-placement]', function () {
+			if (!designOverlay.attr('src')) {
+				return;
+			}
+			const button = $(this);
+			button.text('Placement Saved');
+			setTimeout(function () { button.text('Save Placement'); }, 1400);
+		});
 
 		$(document).on('keyup', function (event) {
 			if (event.key === 'Escape') {

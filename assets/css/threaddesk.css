@@ -1312,7 +1312,7 @@ body.threaddesk-modal-open {
 	width: 44px;
 	height: 44px;
 	object-fit: contain;
-	background: #f5f5f5;
+	background: transparent;
 	border-radius: 4px;
 }
 
@@ -1320,6 +1320,69 @@ body.threaddesk-modal-open {
 	font-size: 12px;
 	text-transform: uppercase;
 	letter-spacing: .04em;
+}
+
+
+.threaddesk-layout-viewer__selection-name {
+	margin: 0 0 10px;
+	font-size: 12px;
+	text-transform: uppercase;
+	letter-spacing: .04em;
+	color: #2e2e2e;
+}
+
+.threaddesk-layout-viewer__selection-placement {
+	padding: 10px;
+	background: #111;
+	color: #fff;
+	font-size: 12px;
+	text-align: center;
+	text-transform: uppercase;
+	letter-spacing: .06em;
+	font-weight: 700;
+	margin-bottom: 12px;
+}
+
+.threaddesk-layout-viewer__size-label {
+	font-size: 12px;
+	text-transform: uppercase;
+	letter-spacing: .06em;
+	margin-bottom: 8px;
+	display: block;
+}
+
+.threaddesk-layout-viewer__size-slider {
+	width: 100%;
+	margin: 0;
+}
+
+.threaddesk-layout-viewer__size-reading {
+	font-size: 13px;
+	margin: 8px 0 14px;
+	color: #4a4a4a;
+}
+
+.threaddesk-layout-viewer__adjust-actions {
+	display: grid;
+	gap: 8px;
+}
+
+.threaddesk-layout-viewer__save-button {
+	width: 100%;
+	padding: 10px;
+	border: 1px solid #111;
+	background: #111;
+	color: #fff;
+	text-transform: uppercase;
+	letter-spacing: .06em;
+	font-size: 12px;
+	cursor: pointer;
+}
+
+.threaddesk-layout-viewer__save-button:hover,
+.threaddesk-layout-viewer__save-button:focus-visible {
+	background: #2d2d2d;
+	outline: none;
 }
 
 .threaddesk-layout-viewer__choose-button {
