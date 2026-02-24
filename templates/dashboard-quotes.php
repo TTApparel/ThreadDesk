@@ -61,6 +61,16 @@ $format_price = function ( $amount ) use ( $currency ) {
 
 	<div class="threaddesk__content">
 		<div class="threaddesk__header" style="background-image: url('<?php echo esc_url( $cover ); ?>');">
+
+			<?php if ( $map_url ) : ?>
+				<div class="threaddesk__header-map" aria-hidden="true">
+					<iframe
+						title="<?php echo esc_attr__( 'Shipping address map', 'threaddesk' ); ?>"
+						src="<?php echo esc_url( $map_url ); ?>"
+						loading="lazy"
+						referrerpolicy="no-referrer-when-downgrade"></iframe>
+				</div>
+			<?php endif; ?>
 			<form class="threaddesk__profile" method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" enctype="multipart/form-data">
 				<input type="hidden" name="action" value="tta_threaddesk_avatar_upload" />
 				<?php wp_nonce_field( 'tta_threaddesk_avatar_upload' ); ?>
