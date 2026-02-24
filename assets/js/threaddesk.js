@@ -145,6 +145,7 @@ jQuery(function ($) {
 		let layoutDesigns = [];
 		try { layoutDesigns = JSON.parse(layoutDesignsRaw); } catch (e) { layoutDesigns = []; }
 
+		let selectedCategorySlug = '';
 		let selectedPlacementLabel = '';
 		let selectedPlacementKey = '';
 		let selectedDesignName = '';
@@ -521,6 +522,9 @@ jQuery(function ($) {
 		$(document).on('click', '[data-threaddesk-layout-angle]', function () { setMainImage($(this).data('threaddesk-layout-angle')); });
 
 		$(document).on('click', '[data-threaddesk-layout-category]', function () {
+			selectedCategorySlug = String($(this).attr('data-threaddesk-layout-category') || '').trim();
+			layoutModal.attr('data-threaddesk-current-category', selectedCategorySlug);
+			layoutModal.attr('data-threaddesk-current-placement', '');
 			const rawFront = $(this).data('threaddesk-layout-front-image') || '';
 			const rawBack = $(this).data('threaddesk-layout-back-image') || '';
 			const rawSide = $(this).data('threaddesk-layout-side-image') || '';
@@ -553,6 +557,7 @@ jQuery(function ($) {
 		$(document).on('click', '.threaddesk-layout-viewer__placement-option', function () {
 			selectedPlacementLabel = String($(this).attr('data-threaddesk-layout-placement-label') || '').trim();
 			selectedPlacementKey = String($(this).attr('data-threaddesk-layout-placement-key') || '').trim();
+			layoutModal.attr('data-threaddesk-current-placement', selectedPlacementKey);
 			if (!selectedPlacementLabel) { selectedPlacementLabel = 'Placement'; }
 			setMainImage(getPlacementAngleTarget(selectedPlacementKey));
 			designHeading.text('Choose Design for ' + selectedPlacementLabel);
@@ -569,6 +574,48 @@ jQuery(function ($) {
 
 		$(document).on('click', '[data-threaddesk-layout-back-to-placements]', function () { setPanelStep('placements'); });
 		$(document).on('click', '[data-threaddesk-layout-back-to-designs]', function () { setPanelStep('designs'); });
+
+
+		const resumeLayoutDesignStepFromQuery = function () {
+			let params = null;
+			try { params = new URLSearchParams(window.location.search || ''); } catch (e) { params = null; }
+			if (!params || params.get('td_layout_return') !== '1') { return; }
+			openLayoutModal(layoutModal.find('[data-threaddesk-layout-open]').get(0) || document.activeElement);
+			const categories = layoutModal.find('[data-threaddesk-layout-category]');
+			if (!categories.length) { return; }
+			const desiredCategory = String(params.get('td_layout_category') || '').trim();
+			let categoryButton = categories.first();
+			if (desiredCategory) {
+				const matchedCategory = categories.filter(function () {
+					return String($(this).attr('data-threaddesk-layout-category') || '').trim() === desiredCategory;
+				}).first();
+				if (matchedCategory.length) { categoryButton = matchedCategory; }
+			}
+			categoryButton.trigger('click');
+			const desiredPlacement = String(params.get('td_layout_placement') || '').trim();
+			if (desiredPlacement) {
+				const placementButton = layoutModal.find('.threaddesk-layout-viewer__placement-option').filter(function () {
+					return String($(this).attr('data-threaddesk-layout-placement-key') || '').trim() === desiredPlacement;
+				}).first();
+				if (placementButton.length) {
+					placementButton.trigger('click');
+				} else {
+					setPanelStep('designs');
+				}
+			} else {
+				setPanelStep('designs');
+			}
+
+			try {
+				const cleanedUrl = new URL(window.location.href);
+				cleanedUrl.searchParams.delete('td_layout_return');
+				cleanedUrl.searchParams.delete('td_layout_category');
+				cleanedUrl.searchParams.delete('td_layout_placement');
+				window.history.replaceState({}, document.title, cleanedUrl.toString());
+			} catch (e) {}
+		};
+
+		resumeLayoutDesignStepFromQuery();
 
 		$(document).on('input change', '[data-threaddesk-layout-size-slider]', function () {
 			if (!isAdjustMode) { return; }
@@ -797,6 +844,9 @@ jQuery(function ($) {
 		const statusEl = designModal.find('[data-threaddesk-design-status]');
 		const designIdField = designModal.find('[data-threaddesk-design-id-field]');
 		const designForm = designModal.find('form.threaddesk-auth-modal__form-inner').first();
+		const returnContextField = designForm.find('[data-threaddesk-design-return-context]');
+		const returnCategoryField = designForm.find('[data-threaddesk-design-return-layout-category]');
+		const returnPlacementField = designForm.find('[data-threaddesk-design-return-layout-placement]');
 		const designTitleInput = designModal.find('[data-threaddesk-design-title-input]');
 		const updatePreviewMaxHeight = function () {
 			const panelHeight = Math.round(designModal.find('.threaddesk-auth-modal__panel').innerHeight() || 0);
@@ -1787,6 +1837,16 @@ jQuery(function ($) {
 
 		$(document).on('click', '[data-threaddesk-design-open]', function (event) {
 			event.preventDefault();
+			const fromLayoutViewer = layoutModal.length && layoutModal.hasClass('is-active');
+			if (fromLayoutViewer) {
+				returnContextField.val('layout_viewer');
+				returnCategoryField.val(String(layoutModal.attr('data-threaddesk-current-category') || '').trim());
+				returnPlacementField.val(String(layoutModal.attr('data-threaddesk-current-placement') || '').trim());
+			} else {
+				returnContextField.val('');
+				returnCategoryField.val('');
+				returnPlacementField.val('');
+			}
 			openAndPromptDesignUpload();
 		});
 
@@ -1794,6 +1854,9 @@ jQuery(function ($) {
 		$(document).on('click', '[data-threaddesk-design-edit]', async function (event) {
 			event.preventDefault();
 			shouldOpenModalAfterChoose = false;
+			returnContextField.val('');
+			returnCategoryField.val('');
+			returnPlacementField.val('');
 			openDesignModal(this);
 			const designId = parseInt($(this).attr('data-threaddesk-design-id'), 10) || 0;
 			const title = $(this).attr('data-threaddesk-design-title') || '';
