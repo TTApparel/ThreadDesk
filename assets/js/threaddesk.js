@@ -173,6 +173,7 @@ jQuery(function ($) {
 		let visibleAngles = ['front', 'left', 'back', 'right'];
 		let sideConfiguredAsRight = false;
 		let dragState = null;
+		let currentOverlayConfig = null;
 		const savedPlacementsByAngle = { front: {}, left: {}, back: {}, right: {} };
 
 		const placementStyleMap = {
@@ -200,24 +201,31 @@ jQuery(function ($) {
 		const hideOverlay = function () {
 			designOverlay.attr('src', '').prop('hidden', true).removeAttr('style');
 			selectedDesignSourceUrl = '';
+			currentOverlayConfig = null;
 		};
 
 		const applyOverlayStyle = function (cfg) {
+			currentOverlayConfig = {
+				top: Number(cfg.top),
+				left: Number(cfg.left),
+				width: Number(cfg.width),
+			};
 			designOverlay.css({
-				top: Number(cfg.top).toFixed(2) + '%',
-				left: Number(cfg.left).toFixed(2) + '%',
-				width: Number(cfg.width).toFixed(2) + '%',
+				top: currentOverlayConfig.top.toFixed(2) + '%',
+				left: currentOverlayConfig.left.toFixed(2) + '%',
+				width: currentOverlayConfig.width.toFixed(2) + '%',
 				transform: 'translate(-50%, -50%)',
 				background: 'transparent'
 			});
 		};
 
 		const getOverlayConfig = function () {
-			const top = parseFloat(String(designOverlay.css('top') || '').replace('%', ''));
-			const left = parseFloat(String(designOverlay.css('left') || '').replace('%', ''));
-			const width = parseFloat(String(designOverlay.css('width') || '').replace('%', ''));
-			if (Number.isFinite(top) && Number.isFinite(left) && Number.isFinite(width)) {
-				return { top: top, left: left, width: width };
+			if (currentOverlayConfig) {
+				return {
+					top: currentOverlayConfig.top,
+					left: currentOverlayConfig.left,
+					width: currentOverlayConfig.width,
+				};
 			}
 			return null;
 		};
@@ -432,7 +440,7 @@ jQuery(function ($) {
 			const name = String($(this).attr('data-threaddesk-layout-design-name') || '').trim() || 'Design';
 			const svgUrl = String($(this).attr('data-threaddesk-layout-design-svg') || '').trim();
 			const previewUrl = String($(this).attr('data-threaddesk-layout-design-preview') || '').trim();
-			const url = previewUrl || svgUrl;
+			const url = svgUrl || previewUrl;
 			const preset = placementStyleMap[selectedPlacementKey] || placementStyleMap.full_chest;
 			selectedBaseWidthPct = Number(preset.width) || 34;
 			selectedDesignName = name;
