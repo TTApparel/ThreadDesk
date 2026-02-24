@@ -58,18 +58,32 @@ if ( ! empty( $context['designs'] ) && is_array( $context['designs'] ) ) {
 			continue;
 		}
 
-		$design_svg_url = get_post_meta( $design->ID, 'design_svg_file_url', true );
-		$design_preview = get_post_meta( $design->ID, 'design_preview_url', true );
+		$design_svg_url        = get_post_meta( $design->ID, 'design_svg_file_url', true );
+		$design_preview        = get_post_meta( $design->ID, 'design_preview_url', true );
+		$design_palette_raw    = (string) get_post_meta( $design->ID, 'design_palette', true );
+		$design_palette        = json_decode( $design_palette_raw, true );
+		$design_has_transparent = false;
+		if ( is_array( $design_palette ) ) {
+			foreach ( $design_palette as $color ) {
+				if ( 'transparent' === strtolower( (string) $color ) ) {
+					$design_has_transparent = true;
+					break;
+				}
+			}
+		}
+		$design_version = (int) get_post_modified_time( 'U', true, $design );
 		$design_title   = trim( (string) $design->post_title );
 		if ( '' === $design_title ) {
 			$design_title = __( 'Design', 'threaddesk' );
 		}
 
 		$saved_designs[] = array(
-			'id'      => (int) $design->ID,
-			'title'   => $design_title,
-			'svg'     => $design_svg_url ? esc_url_raw( $design_svg_url ) : '',
-			'preview' => $design_preview ? esc_url_raw( $design_preview ) : '',
+			'id'              => (int) $design->ID,
+			'title'           => $design_title,
+			'svg'             => $design_svg_url ? esc_url_raw( $design_svg_url ) : '',
+			'preview'         => $design_preview ? esc_url_raw( $design_preview ) : '',
+			'version'         => $design_version,
+			'has_transparent' => $design_has_transparent,
 		);
 	}
 }
@@ -265,8 +279,8 @@ if ( taxonomy_exists( 'product_cat' ) && is_array( $layout_category_settings ) )
 						<p class="threaddesk-layout-viewer__placement-empty" data-threaddesk-layout-placement-empty><?php echo esc_html__( 'No placements available for this category.', 'threaddesk' ); ?></p>
 					</div>
 					<div class="threaddesk-layout-viewer__panel-step" data-threaddesk-layout-panel-step="designs" hidden>
-						<button type="button" class="threaddesk-layout-viewer__back-button" data-threaddesk-layout-back-to-placements><?php echo esc_html__( '← Back to placements', 'threaddesk' ); ?></button>
 						<h4 data-threaddesk-layout-design-heading><?php echo esc_html__( 'Choose Design', 'threaddesk' ); ?></h4>
+						<button type="button" class="threaddesk-layout-viewer__back-button" data-threaddesk-layout-back-to-placements><?php echo esc_html__( '← Back to placements', 'threaddesk' ); ?></button>
 						<div class="threaddesk-layout-viewer__design-list" data-threaddesk-layout-design-list></div>
 						<p class="threaddesk-layout-viewer__placement-empty" data-threaddesk-layout-design-empty><?php echo esc_html__( 'No saved designs yet. Add designs from the Designs panel first.', 'threaddesk' ); ?></p>
 					</div>
