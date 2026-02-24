@@ -143,6 +143,7 @@ jQuery(function ($) {
 		const adjustHeading = layoutModal.find('[data-threaddesk-layout-adjust-heading]');
 		const adjustPaletteLabel = layoutModal.find('[data-threaddesk-layout-adjust-palette-label]');
 		const adjustPalette = layoutModal.find('[data-threaddesk-layout-adjust-palette]');
+		const adjustPaletteOptions = layoutModal.find('[data-threaddesk-layout-adjust-palette-options]');
 		const layoutDesignsRaw = layoutModal.attr('data-threaddesk-layout-designs') || '[]';
 		let layoutDesigns = [];
 		try { layoutDesigns = JSON.parse(layoutDesignsRaw); } catch (e) { layoutDesigns = []; }
@@ -152,6 +153,7 @@ jQuery(function ($) {
 		let selectedPlacementKey = '';
 		let selectedDesignName = '';
 		let selectedDesignMeta = null;
+		let selectedDesignBaseSourceUrl = '';
 		let selectedBaseWidthPct = 34;
 		let selectedDesignSourceUrl = '';
 		let selectedDesignAspectRatio = 1;
@@ -165,6 +167,13 @@ jQuery(function ($) {
 		const savedPlacementsByAngle = { front: {}, left: {}, back: {}, right: {} };
 		const overlayRenderScale = 0.7;
 		const designRatioCache = {};
+		const layoutPaletteOptionSet = ['#FFFFFF','#000000','#FEDB00','#FFB81C','#FF6A39','#C8102E','#A50034','#512D6D','#002D72','#0092CB','#007A53','#B1B3B3'];
+		const layoutPaletteState = {
+			basePalette: [],
+			currentPalette: [],
+			activeIndex: -1,
+			recolorCache: {},
+		};
 
 		const placementStyleMap = {
 			left_chest: { top: 36, left: 40, width: 18, approx: 4.5, readoutApprox: 4 },
@@ -281,6 +290,7 @@ jQuery(function ($) {
 		const hideOverlay = function () {
 			designOverlay.attr('src', '').prop('hidden', true).removeAttr('style');
 			selectedDesignSourceUrl = '';
+			selectedDesignBaseSourceUrl = '';
 			currentOverlayConfig = null;
 		};
 
@@ -383,6 +393,7 @@ jQuery(function ($) {
 			sizeSlider.val(100);
 			selectedDesignNameEl.text('No design selected');
 			selectedDesignMeta = null;
+			selectedDesignBaseSourceUrl = '';
 			renderAdjustPaletteDots();
 			adjustHeading.text('Adjust Placement');
 			Object.keys(savedPlacementsByAngle).forEach(function (angle) { savedPlacementsByAngle[angle] = {}; });
@@ -455,54 +466,171 @@ jQuery(function ($) {
 		};
 
 
-		const renderAdjustPaletteDots = function () {
-			adjustPalette.empty().prop('hidden', true);
-			adjustPaletteLabel.prop('hidden', true);
-			if (!selectedDesignMeta) { return; }
-			let palette = [];
-			try { palette = JSON.parse(String(selectedDesignMeta.palette || '[]')); } catch (e) { palette = []; }
-			palette = Array.isArray(palette) ? palette : [];
-			const uniqueColors = [];
+		const hexToRgbTriplet = function (hex) {
+			const normalized = String(hex || '').trim().replace('#', '');
+			if (!/^[0-9a-fA-F]{6}$/.test(normalized)) { return null; }
+			return [
+				parseInt(normalized.substring(0, 2), 16),
+				parseInt(normalized.substring(2, 4), 16),
+				parseInt(normalized.substring(4, 6), 16),
+			];
+		};
+
+		const getUniqueLayoutPaletteColors = function (rawPalette) {
+			const colors = Array.isArray(rawPalette) ? rawPalette : [];
+			const unique = [];
 			const seen = {};
-			palette.forEach(function (color) {
+			colors.forEach(function (color) {
 				const token = String(color || '').trim();
 				if (!token) { return; }
 				if (token.toLowerCase() === 'transparent') { return; }
-				const key = token.toLowerCase();
-				if (seen[key]) { return; }
-				seen[key] = true;
-				uniqueColors.push(token);
+				const upper = token.toUpperCase();
+				if (!hexToRgbTriplet(upper)) { return; }
+				if (seen[upper]) { return; }
+				seen[upper] = true;
+				unique.push(upper);
 			});
-			if (!uniqueColors.length) { return; }
+			return unique;
+		};
+
+		const renderAdjustPaletteOptions = function () {
+			adjustPaletteOptions.empty().prop('hidden', true);
+			const activeIndex = Number(layoutPaletteState.activeIndex);
+			if (!Number.isInteger(activeIndex) || activeIndex < 0) { return; }
+			const current = layoutPaletteState.currentPalette[activeIndex];
+			if (!current) { return; }
+			layoutPaletteOptionSet.forEach(function (color) {
+				const choice = $('<button type="button" class="threaddesk-layout-viewer__adjust-palette-choice" title="Apply color"></button>')
+					.attr('data-threaddesk-layout-palette-choice', color)
+					.css('--threaddesk-layout-palette-choice-color', color);
+				if (String(current).toUpperCase() === String(color).toUpperCase()) {
+					choice.addClass('is-active');
+				}
+				adjustPaletteOptions.append(choice);
+			});
+			adjustPaletteOptions.prop('hidden', false);
+		};
+
+		const recolorOverlayForLayoutContext = function (configOverride) {
+			const baseUrl = String(selectedDesignBaseSourceUrl || '').trim();
+			if (!baseUrl) { return Promise.resolve(); }
+			const sourceColors = layoutPaletteState.basePalette.slice();
+			const targetColors = layoutPaletteState.currentPalette.slice();
+			if (!sourceColors.length || sourceColors.length !== targetColors.length) {
+				applySelectedDesign(baseUrl, configOverride);
+				return Promise.resolve();
+			}
+			let changed = false;
+			for (let i = 0; i < sourceColors.length; i += 1) {
+				if (String(sourceColors[i]).toUpperCase() !== String(targetColors[i]).toUpperCase()) { changed = true; break; }
+			}
+			if (!changed) {
+				applySelectedDesign(baseUrl, configOverride);
+				return Promise.resolve();
+			}
+			const cacheKey = baseUrl + '|' + sourceColors.join(',') + '|' + targetColors.join(',');
+			if (layoutPaletteState.recolorCache[cacheKey]) {
+				applySelectedDesign(layoutPaletteState.recolorCache[cacheKey], configOverride);
+				return Promise.resolve();
+			}
+			const sourceRgb = sourceColors.map(hexToRgbTriplet).filter(Boolean);
+			const targetRgb = targetColors.map(hexToRgbTriplet).filter(Boolean);
+			if (!sourceRgb.length || sourceRgb.length !== targetRgb.length) {
+				applySelectedDesign(baseUrl, configOverride);
+				return Promise.resolve();
+			}
+			return new Promise(function (resolve) {
+				const img = new Image();
+				img.crossOrigin = 'anonymous';
+				img.onload = function () {
+					try {
+						const canvas = document.createElement('canvas');
+						canvas.width = img.naturalWidth || img.width;
+						canvas.height = img.naturalHeight || img.height;
+						const ctx = canvas.getContext('2d', { willReadFrequently: true });
+						ctx.drawImage(img, 0, 0);
+						const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+						const pixels = imageData.data;
+						for (let i = 0; i < pixels.length; i += 4) {
+							if (pixels[i + 3] === 0) { continue; }
+							let bestIndex = 0;
+							let bestScore = Number.POSITIVE_INFINITY;
+							for (let c = 0; c < sourceRgb.length; c += 1) {
+								const dr = pixels[i] - sourceRgb[c][0];
+								const dg = pixels[i + 1] - sourceRgb[c][1];
+								const db = pixels[i + 2] - sourceRgb[c][2];
+								const score = (dr * dr) + (dg * dg) + (db * db);
+								if (score < bestScore) { bestScore = score; bestIndex = c; }
+							}
+							pixels[i] = targetRgb[bestIndex][0];
+							pixels[i + 1] = targetRgb[bestIndex][1];
+							pixels[i + 2] = targetRgb[bestIndex][2];
+						}
+						ctx.putImageData(imageData, 0, 0);
+						const recolored = canvas.toDataURL('image/png');
+						layoutPaletteState.recolorCache[cacheKey] = recolored;
+						applySelectedDesign(recolored, configOverride);
+					} catch (error) {
+						applySelectedDesign(baseUrl, configOverride);
+					}
+					resolve();
+				};
+				img.onerror = function () { applySelectedDesign(baseUrl, configOverride); resolve(); };
+				img.src = baseUrl;
+			});
+		};
+
+		const renderAdjustPaletteDots = function () {
+			adjustPalette.empty().prop('hidden', true);
+			adjustPaletteLabel.prop('hidden', true);
+			if (!selectedDesignMeta) {
+				layoutPaletteState.basePalette = [];
+				layoutPaletteState.currentPalette = [];
+				layoutPaletteState.activeIndex = -1;
+				renderAdjustPaletteOptions();
+				return;
+			}
+			let palette = [];
+			try { palette = JSON.parse(String(selectedDesignMeta.palette || '[]')); } catch (e) { palette = []; }
+			const uniqueColors = getUniqueLayoutPaletteColors(palette);
+			layoutPaletteState.basePalette = uniqueColors.slice();
+			layoutPaletteState.currentPalette = uniqueColors.slice();
+			layoutPaletteState.activeIndex = uniqueColors.length ? 0 : -1;
+			if (!uniqueColors.length) { renderAdjustPaletteOptions(); return; }
 			uniqueColors.forEach(function (hex, index) {
-				const dot = $('<button type="button" class="threaddesk-layout-viewer__palette-dot" title="Edit design colors"></button>')
+				const dot = $('<button type="button" class="threaddesk-layout-viewer__palette-dot" title="Adjust this color"></button>')
 					.attr('data-threaddesk-layout-palette-index', index)
-					.css('--threaddesk-layout-palette-color', String(hex));
+					.css('--threaddesk-layout-palette-color', String(layoutPaletteState.currentPalette[index] || hex));
+				if (index === layoutPaletteState.activeIndex) { dot.addClass('is-active'); }
 				adjustPalette.append(dot);
 			});
 			adjustPaletteLabel.prop('hidden', false);
 			adjustPalette.prop('hidden', false);
-		};
-
-		const openSelectedDesignInEditor = function () {
-			if (!selectedDesignMeta || !selectedDesignMeta.id) { return; }
-			const trigger = $('<button type="button" data-threaddesk-design-edit></button>')
-				.attr('data-threaddesk-design-id', String(selectedDesignMeta.id || 0))
-				.attr('data-threaddesk-design-title', String(selectedDesignMeta.title || ''))
-				.attr('data-threaddesk-design-preview-url', String(selectedDesignMeta.preview || ''))
-				.attr('data-threaddesk-design-file-name', String(selectedDesignMeta.fileName || 'No file selected'))
-				.attr('data-threaddesk-design-palette', String(selectedDesignMeta.palette || '[]'))
-				.attr('data-threaddesk-design-settings', String(selectedDesignMeta.settings || '{}'))
-				.attr('data-threaddesk-design-svg-url', String(selectedDesignMeta.svg || ''))
-				.attr('data-threaddesk-design-svg-name', String(selectedDesignMeta.svgName || ''));
-			$('body').append(trigger);
-			trigger.trigger('click');
-			trigger.remove();
+			renderAdjustPaletteOptions();
 		};
 
 		$(document).on('click', '.threaddesk-layout-viewer__palette-dot', function (event) {
 			event.preventDefault();
-			openSelectedDesignInEditor();
+			const idx = parseInt($(this).attr('data-threaddesk-layout-palette-index'), 10);
+			if (!Number.isInteger(idx) || idx < 0) { return; }
+			layoutPaletteState.activeIndex = idx;
+			adjustPalette.find('.threaddesk-layout-viewer__palette-dot').removeClass('is-active');
+			$(this).addClass('is-active');
+			renderAdjustPaletteOptions();
+		});
+
+		$(document).on('click', '.threaddesk-layout-viewer__adjust-palette-choice', function (event) {
+			event.preventDefault();
+			const idx = Number(layoutPaletteState.activeIndex);
+			if (!Number.isInteger(idx) || idx < 0) { return; }
+			const chosen = String($(this).attr('data-threaddesk-layout-palette-choice') || '').trim().toUpperCase();
+			if (!hexToRgbTriplet(chosen)) { return; }
+			layoutPaletteState.currentPalette[idx] = chosen;
+			adjustPalette.find('.threaddesk-layout-viewer__palette-dot[data-threaddesk-layout-palette-index="' + idx + '"]')
+				.css('--threaddesk-layout-palette-color', chosen);
+			renderAdjustPaletteOptions();
+			const cfg = getOverlayConfig();
+			recolorOverlayForLayoutContext(cfg || undefined);
 		});
 
 		const getPlacementAngleTarget = function (placementKey) {
@@ -633,6 +761,7 @@ jQuery(function ($) {
 			adjustHeading.text('Adjust ' + selectedPlacementLabel.toUpperCase() + ' Placement');
 			selectedDesignNameEl.text('No design selected');
 			selectedDesignMeta = null;
+			selectedDesignBaseSourceUrl = '';
 			renderAdjustPaletteDots();
 			renderDesignOptions();
 			hideOverlay();
@@ -721,6 +850,8 @@ jQuery(function ($) {
 			const preset = placementStyleMap[selectedPlacementKey] || placementStyleMap.full_chest;
 			selectedBaseWidthPct = Number(preset.width) || 34;
 			selectedDesignName = name;
+			selectedDesignBaseSourceUrl = url;
+			layoutPaletteState.recolorCache = {};
 			selectedDesignNameEl.text(selectedDesignName.toUpperCase());
 			renderAdjustPaletteDots();
 			applySelectedDesign(url);
@@ -789,6 +920,9 @@ jQuery(function ($) {
 			selectedDesignName = '';
 			sizeSlider.val(100);
 			selectedDesignNameEl.text('No design selected');
+			selectedDesignMeta = null;
+			selectedDesignBaseSourceUrl = '';
+			renderAdjustPaletteDots();
 			hideOverlay();
 			updateSizeReading();
 			setPanelStep('placements');

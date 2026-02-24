@@ -1440,6 +1440,30 @@ body.threaddesk-modal-open {
 	outline-offset: 1px;
 }
 
+.threaddesk-layout-viewer__adjust-palette-options {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 6px;
+	margin-bottom: 10px;
+}
+
+.threaddesk-layout-viewer__adjust-palette-choice {
+	width: 18px;
+	height: 18px;
+	border-radius: 50%;
+	border: 1px solid #bfbfbf;
+	background: var(--threaddesk-layout-palette-choice-color, #111);
+	cursor: pointer;
+	padding: 0;
+}
+
+.threaddesk-layout-viewer__adjust-palette-choice.is-active,
+.threaddesk-layout-viewer__adjust-palette-choice:hover,
+.threaddesk-layout-viewer__adjust-palette-choice:focus-visible {
+	outline: 2px solid #111;
+	outline-offset: 1px;
+}
+
 .threaddesk-layout-viewer__size-label {
 	font-size: 12px;
 	text-transform: uppercase;
