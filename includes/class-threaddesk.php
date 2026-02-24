@@ -128,29 +128,8 @@ class TTA_ThreadDesk {
 			56
 		);
 
-		add_submenu_page(
-			'tta-threaddesk',
-			__( 'Quotes', 'threaddesk' ),
-			__( 'Quotes', 'threaddesk' ),
-			'manage_woocommerce',
-			'edit.php?post_type=tta_quote'
-		);
 
-		add_submenu_page(
-			'tta-threaddesk',
-			__( 'Designs', 'threaddesk' ),
-			__( 'Designs', 'threaddesk' ),
-			'manage_woocommerce',
-			'edit.php?post_type=tta_design'
-		);
 
-		add_submenu_page(
-			'tta-threaddesk',
-			__( 'Layouts', 'threaddesk' ),
-			__( 'Layouts', 'threaddesk' ),
-			'manage_woocommerce',
-			'edit.php?post_type=tta_layout'
-		);
 
 		add_submenu_page(
 			'tta-threaddesk',
