@@ -1265,6 +1265,12 @@ body.threaddesk-modal-open {
 	height: 100%;
 }
 
+.threaddesk-layout-viewer__panel-step:not([hidden]) {
+	display: flex;
+	flex-direction: column;
+	height: 100%;
+}
+
 .threaddesk-layout-viewer__design-panel h4 {
 	margin: 0 0 12px;
 	text-transform: uppercase;
