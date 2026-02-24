@@ -46,15 +46,6 @@ jQuery(function ($) {
 
 
 
-		$(document).on('click', '[data-threaddesk-layout-save-placement]', function () {
-			if (!designOverlay.attr('src')) {
-				return;
-			}
-			const button = $(this);
-			button.text('Placement Saved');
-			setTimeout(function () { button.text('Save Placement'); }, 1400);
-		});
-
 		$(document).on('keyup', function (event) {
 			if (event.key === 'Escape') {
 				closeModal();
@@ -108,15 +99,6 @@ jQuery(function ($) {
 		});
 
 
-		$(document).on('click', '[data-threaddesk-layout-save-placement]', function () {
-			if (!designOverlay.attr('src')) {
-				return;
-			}
-			const button = $(this);
-			button.text('Placement Saved');
-			setTimeout(function () { button.text('Save Placement'); }, 1400);
-		});
-
 		$(document).on('keyup', function (event) {
 			if (event.key === 'Escape') {
 				closeAddressModal();
@@ -168,56 +150,145 @@ jQuery(function ($) {
 		let selectedDesignName = '';
 		let selectedBaseWidthPct = 34;
 		let selectedDesignSourceUrl = '';
+		let selectedDesignAspectRatio = 1;
 		let currentAngle = 'front';
 		let currentAngles = { front: '', left: '', back: '', right: '' };
 		let visibleAngles = ['front', 'left', 'back', 'right'];
 		let sideConfiguredAsRight = false;
 		let dragState = null;
+		let currentOverlayConfig = null;
+		let isAdjustMode = false;
 		const savedPlacementsByAngle = { front: {}, left: {}, back: {}, right: {} };
+		const overlayRenderScale = 0.7;
+		const designRatioCache = {};
 
 		const placementStyleMap = {
-			left_chest: { top: 36, left: 40, width: 18, approx: 4.5 },
-			right_chest: { top: 36, left: 60, width: 18, approx: 4.5 },
-			full_chest: { top: 38, left: 50, width: 34, approx: 10 },
-			left_sleeve: { top: 38, left: 24, width: 13, approx: 3.5 },
-			right_sleeve: { top: 38, left: 76, width: 13, approx: 3.5 },
-			back: { top: 38, left: 50, width: 34, approx: 10 },
+			left_chest: { top: 36, left: 40, width: 18, approx: 4.5, readoutApprox: 4 },
+			right_chest: { top: 36, left: 60, width: 18, approx: 4.5, readoutApprox: 4 },
+			full_chest: { top: 38, left: 50, width: 34, approx: 10, readoutApprox: 10.5 },
+			left_sleeve: { top: 38, left: 24, width: 13, approx: 3.5, readoutApprox: 4 },
+			right_sleeve: { top: 38, left: 76, width: 13, approx: 3.5, readoutApprox: 4 },
+			back: { top: 38, left: 50, width: 34, approx: 10, readoutApprox: 10.5 },
 		};
 
 		const setPanelStep = function (panel) {
+			isAdjustMode = panel === 'adjust';
 			placementPanelStep.prop('hidden', panel !== 'placements');
 			designPanelStep.prop('hidden', panel !== 'designs');
 			adjustPanelStep.prop('hidden', panel !== 'adjust');
 		};
 
+		const getPlacementAbbreviation = function (placementLabel, placementKey) {
+			const key = String(placementKey || '').trim();
+			switch (key) {
+				case 'left_chest': return 'LC';
+				case 'right_chest': return 'RC';
+				case 'full_chest': return 'FC';
+				case 'left_sleeve': return 'LS';
+				case 'right_sleeve': return 'RS';
+				case 'back': return 'B';
+				default: {
+					const words = String(placementLabel || '').trim().split(/\s+/).filter(Boolean);
+					if (!words.length) { return 'P'; }
+					if (words.length === 1) { return words[0].charAt(0).toUpperCase(); }
+					return words.slice(0, 2).map(function (word) { return word.charAt(0).toUpperCase(); }).join('');
+				}
+			}
+		};
+
+		const getDesignFileName = function (designUrl, fallbackName) {
+			const raw = String(designUrl || '').trim();
+			if (raw) {
+				const path = raw.split('#')[0].split('?')[0];
+				const parts = path.split('/').filter(Boolean);
+				const file = parts.length ? decodeURIComponent(parts[parts.length - 1]) : '';
+				if (file) { return file; }
+			}
+			const fallback = String(fallbackName || '').trim();
+			return fallback || 'Design';
+		};
+
+		const updatePlacementOptionStatus = function (placementKey, placementLabel, designUrl, fallbackName) {
+			const key = String(placementKey || '').trim();
+			if (!key) { return; }
+			const option = placementList.find('.threaddesk-layout-viewer__placement-option[data-threaddesk-layout-placement-key="' + key + '"]');
+			if (!option.length) { return; }
+			const abbr = getPlacementAbbreviation(placementLabel, key);
+			const fileName = getDesignFileName(designUrl, fallbackName);
+			option
+				.addClass('is-complete')
+				.attr('data-threaddesk-layout-placement-complete', '1')
+				.html('<span class="threaddesk-layout-viewer__placement-abbr">' + $('<div>').text(abbr).html() + '</span><span class="threaddesk-layout-viewer__placement-file">' + $('<div>').text(fileName).html() + '</span>');
+		};
+
+		const setDesignRatioFromUrl = function (url) {
+			const source = String(url || '').trim();
+			if (!source) { return; }
+			if (Object.prototype.hasOwnProperty.call(designRatioCache, source)) {
+				selectedDesignAspectRatio = Number(designRatioCache[source]) > 0 ? Number(designRatioCache[source]) : 1;
+				updateSizeReading();
+				return;
+			}
+			const img = new Image();
+			img.onload = function () {
+				const w = Number(img.naturalWidth || 0);
+				const h = Number(img.naturalHeight || 0);
+				const ratio = (w > 0 && h > 0) ? (w / h) : 1;
+				designRatioCache[source] = ratio;
+				selectedDesignAspectRatio = ratio > 0 ? ratio : 1;
+				updateSizeReading();
+			};
+			img.onerror = function () {
+				designRatioCache[source] = 1;
+				selectedDesignAspectRatio = 1;
+				updateSizeReading();
+			};
+			img.src = source;
+		};
 		const updateSizeReading = function () {
 			const sliderPercent = Number(sizeSlider.val() || 100) / 100;
 			const preset = placementStyleMap[selectedPlacementKey] || placementStyleMap.full_chest;
-			const inches = (preset.approx * sliderPercent).toFixed(1);
-			sizeReading.text('Approx. size: ' + inches + '" W x ' + inches + '" H');
+			const ratio = Number(selectedDesignAspectRatio || 1);
+			const readoutBase = Number(preset.readoutApprox || (preset.approx * overlayRenderScale) || 0);
+			const maxDimension = readoutBase * sliderPercent;
+			let widthInches = maxDimension;
+			let heightInches = maxDimension;
+			if (ratio > 1) {
+				heightInches = maxDimension / ratio;
+			} else if (ratio > 0 && ratio < 1) {
+				widthInches = maxDimension * ratio;
+			}
+			sizeReading.text('Approx. size: ' + widthInches.toFixed(1) + '" W x ' + heightInches.toFixed(1) + '" H');
 		};
 
 		const hideOverlay = function () {
 			designOverlay.attr('src', '').prop('hidden', true).removeAttr('style');
 			selectedDesignSourceUrl = '';
+			currentOverlayConfig = null;
 		};
 
 		const applyOverlayStyle = function (cfg) {
+			currentOverlayConfig = {
+				top: Number(cfg.top),
+				left: Number(cfg.left),
+				width: Number(cfg.width),
+			};
 			designOverlay.css({
-				top: Number(cfg.top).toFixed(2) + '%',
-				left: Number(cfg.left).toFixed(2) + '%',
-				width: Number(cfg.width).toFixed(2) + '%',
+				top: currentOverlayConfig.top.toFixed(2) + '%',
+				left: currentOverlayConfig.left.toFixed(2) + '%',
+				width: currentOverlayConfig.width.toFixed(2) + '%',
 				transform: 'translate(-50%, -50%)',
 				background: 'transparent'
 			});
 		};
 
 		const getOverlayConfig = function () {
-			const top = parseFloat(String(designOverlay.css('top') || '').replace('%', ''));
-			const left = parseFloat(String(designOverlay.css('left') || '').replace('%', ''));
-			const width = parseFloat(String(designOverlay.css('width') || '').replace('%', ''));
-			if (Number.isFinite(top) && Number.isFinite(left) && Number.isFinite(width)) {
-				return { top: top, left: left, width: width };
+			if (currentOverlayConfig) {
+				return {
+					top: currentOverlayConfig.top,
+					left: currentOverlayConfig.left,
+					width: currentOverlayConfig.width,
+				};
 			}
 			return null;
 		};
@@ -234,7 +305,7 @@ jQuery(function ($) {
 			const cfg = configOverride || {
 				top: preset.top,
 				left: preset.left,
-				width: selectedBaseWidthPct * sliderPercent,
+				width: selectedBaseWidthPct * overlayRenderScale * sliderPercent,
 			};
 
 			designOverlay.attr('src', url);
@@ -257,6 +328,7 @@ jQuery(function ($) {
 			selectedDesignName = saved.designName || selectedDesignName;
 			selectedDesignNameEl.text((selectedDesignName || 'No design selected').toUpperCase());
 			selectedBaseWidthPct = Number(saved.baseWidth || selectedBaseWidthPct);
+			selectedDesignAspectRatio = Number(saved.designRatio || selectedDesignAspectRatio || 1);
 			sizeSlider.val(saved.sliderValue || 100);
 			applySelectedDesign(saved.url, { top: saved.top, left: saved.left, width: saved.width });
 		};
@@ -276,6 +348,7 @@ jQuery(function ($) {
 			selectedPlacementBox.text('Placement');
 			selectedDesignNameEl.text('No design selected');
 			Object.keys(savedPlacementsByAngle).forEach(function (angle) { savedPlacementsByAngle[angle] = {}; });
+			clearAngleOverlays();
 			hideOverlay();
 			updateSizeReading();
 		};
@@ -315,16 +388,60 @@ jQuery(function ($) {
 				const title = String((design && design.title) || '').trim() || 'Design';
 				const svg = String((design && design.svg) || '').trim();
 				const preview = String((design && design.preview) || '').trim();
-				const displayImage = svg || preview;
+				const mockup = String((design && design.mockup) || '').trim();
+				const ratio = Number((design && design.ratio) || 0);
+				const displayImage = mockup || preview || svg;
 				const option = $('<button type="button" class="threaddesk-layout-viewer__design-option"></button>')
 					.attr('data-threaddesk-layout-design-name', title)
 					.attr('data-threaddesk-layout-design-svg', svg)
-					.attr('data-threaddesk-layout-design-preview', preview);
+					.attr('data-threaddesk-layout-design-preview', preview)
+					.attr('data-threaddesk-layout-design-mockup', mockup)
+					.attr('data-threaddesk-layout-design-ratio', ratio > 0 ? String(ratio) : '');
 				if (displayImage) {
 					option.append($('<img class="threaddesk-layout-viewer__design-option-image" alt="" aria-hidden="true" />').attr('src', displayImage));
 				}
 				option.append($('<span class="threaddesk-layout-viewer__design-option-title"></span>').text(title));
 				designList.append(option);
+			});
+		};
+
+		const getPlacementAngleTarget = function (placementKey) {
+			switch (String(placementKey || '').trim()) {
+				case 'left_chest':
+				case 'right_chest':
+				case 'full_chest':
+					return 'front';
+				case 'left_sleeve':
+					return 'left';
+				case 'right_sleeve':
+					return 'right';
+				case 'back':
+					return 'back';
+				default:
+					return currentAngle || 'front';
+			}
+		};
+
+		const clearAngleOverlays = function () {
+			layoutModal.find('.threaddesk-layout-viewer__angle-overlay').remove();
+		};
+
+		const applyPlacementOverlayToAngle = function (targetAngle, placementKey, sourceUrl, cfg) {
+			const angleButton = angleButtonsByKey[targetAngle];
+			if (!angleButton || !angleButton.length) { return; }
+			const imageWrap = angleButton.find('.threaddesk-layout-viewer__angle-image-wrap');
+			if (!imageWrap.length) { return; }
+			const placementToken = String(placementKey || '').trim();
+			let overlay = imageWrap.find('.threaddesk-layout-viewer__angle-overlay[data-threaddesk-placement-key="' + placementToken + '"]');
+			if (!overlay.length) {
+				overlay = $('<img class="threaddesk-layout-viewer__angle-overlay" alt="" aria-hidden="true" />')
+					.attr('data-threaddesk-placement-key', placementToken);
+				imageWrap.append(overlay);
+			}
+			overlay.attr('src', sourceUrl).css({
+				top: Number(cfg.top).toFixed(2) + '%',
+				left: Number(cfg.left).toFixed(2) + '%',
+				width: Number(cfg.width).toFixed(2) + '%'
 			});
 		};
 
@@ -404,9 +521,11 @@ jQuery(function ($) {
 			selectedPlacementLabel = String($(this).attr('data-threaddesk-layout-placement-label') || '').trim();
 			selectedPlacementKey = String($(this).attr('data-threaddesk-layout-placement-key') || '').trim();
 			if (!selectedPlacementLabel) { selectedPlacementLabel = 'Placement'; }
+			setMainImage(getPlacementAngleTarget(selectedPlacementKey));
 			designHeading.text('Choose Design for ' + selectedPlacementLabel);
 			sizeSlider.val(100);
 			selectedDesignName = '';
+			selectedDesignAspectRatio = 1;
 			selectedDesignNameEl.text('No design selected');
 			selectedPlacementBox.text(selectedPlacementLabel.toUpperCase());
 			renderDesignOptions();
@@ -419,11 +538,12 @@ jQuery(function ($) {
 		$(document).on('click', '[data-threaddesk-layout-back-to-designs]', function () { setPanelStep('designs'); });
 
 		$(document).on('input change', '[data-threaddesk-layout-size-slider]', function () {
+			if (!isAdjustMode) { return; }
 			if (!selectedDesignSourceUrl) { updateSizeReading(); return; }
 			const overlayCfg = getOverlayConfig();
 			if (overlayCfg) {
 				const sliderPercent = Number(sizeSlider.val() || 100) / 100;
-				overlayCfg.width = selectedBaseWidthPct * sliderPercent;
+				overlayCfg.width = selectedBaseWidthPct * overlayRenderScale * sliderPercent;
 				applySelectedDesign(selectedDesignSourceUrl, overlayCfg);
 			}
 		});
@@ -432,13 +552,17 @@ jQuery(function ($) {
 			const name = String($(this).attr('data-threaddesk-layout-design-name') || '').trim() || 'Design';
 			const svgUrl = String($(this).attr('data-threaddesk-layout-design-svg') || '').trim();
 			const previewUrl = String($(this).attr('data-threaddesk-layout-design-preview') || '').trim();
-			const url = previewUrl || svgUrl;
+			const mockupUrl = String($(this).attr('data-threaddesk-layout-design-mockup') || '').trim();
+			const url = mockupUrl || previewUrl || svgUrl;
+			const ratioAttr = parseFloat(String($(this).attr('data-threaddesk-layout-design-ratio') || '').trim());
+			selectedDesignAspectRatio = (Number.isFinite(ratioAttr) && ratioAttr > 0) ? ratioAttr : 1;
 			const preset = placementStyleMap[selectedPlacementKey] || placementStyleMap.full_chest;
 			selectedBaseWidthPct = Number(preset.width) || 34;
 			selectedDesignName = name;
 			selectedPlacementBox.text((selectedPlacementLabel || 'Placement').toUpperCase());
 			selectedDesignNameEl.text(selectedDesignName.toUpperCase());
 			applySelectedDesign(url);
+			setDesignRatioFromUrl(url);
 			setPanelStep('adjust');
 		});
 
@@ -454,6 +578,7 @@ jQuery(function ($) {
 		};
 
 		const startDrag = function (event) {
+			if (!isAdjustMode) { return; }
 			if (!selectedDesignSourceUrl) { return; }
 			dragState = { active: true };
 			designOverlay.addClass('is-dragging');
@@ -483,7 +608,8 @@ jQuery(function ($) {
 			if (!selectedDesignSourceUrl || !selectedPlacementKey) { return; }
 			const cfg = getOverlayConfig();
 			if (!cfg) { return; }
-			savedPlacementsByAngle[currentAngle][selectedPlacementKey] = {
+			const targetAngle = getPlacementAngleTarget(selectedPlacementKey);
+			savedPlacementsByAngle[targetAngle][selectedPlacementKey] = {
 				url: selectedDesignSourceUrl,
 				designName: selectedDesignName,
 				top: cfg.top,
@@ -491,7 +617,19 @@ jQuery(function ($) {
 				width: cfg.width,
 				baseWidth: selectedBaseWidthPct,
 				sliderValue: Number(sizeSlider.val() || 100),
+				designRatio: Number(selectedDesignAspectRatio || 1),
 			};
+			applyPlacementOverlayToAngle(targetAngle, selectedPlacementKey, selectedDesignSourceUrl, cfg);
+			updatePlacementOptionStatus(selectedPlacementKey, selectedPlacementLabel, selectedDesignSourceUrl, selectedDesignName);
+			selectedPlacementLabel = '';
+			selectedPlacementKey = '';
+			selectedDesignName = '';
+			sizeSlider.val(100);
+			selectedPlacementBox.text('Placement');
+			selectedDesignNameEl.text('No design selected');
+			hideOverlay();
+			updateSizeReading();
+			setPanelStep('placements');
 			const button = $(this);
 			button.text('Placement Saved');
 			setTimeout(function () { button.text('Save Placement'); }, 1400);
@@ -1835,6 +1973,20 @@ jQuery(function ($) {
 		});
 
 
+		const getCurrentMockupPngData = function () {
+			if (previewCanvas.length) {
+				const canvasEl = previewCanvas.get(0);
+				if (canvasEl && canvasEl.width > 0 && canvasEl.height > 0) {
+					try {
+						return canvasEl.toDataURL('image/png');
+					} catch (error) {
+						return '';
+					}
+				}
+			}
+			return '';
+		};
+
 		if (designForm.length) {
 			designForm.on('submit', async function (event) {
 				if (designForm.data('threaddeskSubmitting')) {
@@ -1842,6 +1994,7 @@ jQuery(function ($) {
 				}
 				event.preventDefault();
 				const svgField = designForm.find('[data-threaddesk-design-svg-markup]');
+				const mockupPngField = designForm.find('[data-threaddesk-design-mockup-png]');
 				if (!svgField.length) {
 					designForm.data('threaddeskSubmitting', true);
 					designForm.get(0).submit();
@@ -1868,6 +2021,9 @@ jQuery(function ($) {
 					}
 				}
 				svgField.val(svgMarkup || '');
+				if (mockupPngField.length) {
+					mockupPngField.val(getCurrentMockupPngData());
+				}
 				designForm.data('threaddeskSubmitting', true);
 				designForm.get(0).submit();
 			});
