@@ -127,6 +127,15 @@ jQuery(function ($) {
 		};
 		const placementList = layoutModal.find('[data-threaddesk-layout-placement-list]');
 		const placementEmpty = layoutModal.find('[data-threaddesk-layout-placement-empty]');
+		const placementPanelStep = layoutModal.find('[data-threaddesk-layout-panel-step="placements"]');
+		const designPanelStep = layoutModal.find('[data-threaddesk-layout-panel-step="designs"]');
+		const designList = layoutModal.find('[data-threaddesk-layout-design-list]');
+		const designEmpty = layoutModal.find('[data-threaddesk-layout-design-empty]');
+		const designHeading = layoutModal.find('[data-threaddesk-layout-design-heading]');
+		const layoutDesignsRaw = layoutModal.attr('data-threaddesk-layout-designs') || '[]';
+		let layoutDesigns = [];
+		try { layoutDesigns = JSON.parse(layoutDesignsRaw); } catch (e) { layoutDesigns = []; }
+		let selectedPlacementLabel = '';
 		let currentAngles = { front: '', left: '', back: '', right: '' };
 		let visibleAngles = ['front', 'left', 'back', 'right'];
 		let sideConfiguredAsRight = false;
@@ -136,6 +145,9 @@ jQuery(function ($) {
 			viewerStep.removeClass('is-active').prop('hidden', true).attr('aria-hidden', 'true');
 			placementList.empty();
 			placementEmpty.hide();
+			designList.empty();
+			designEmpty.hide();
+			selectedPlacementLabel = '';
 		};
 
 		const showViewerStep = function () {
@@ -158,7 +170,9 @@ jQuery(function ($) {
 				if (!label) {
 					return;
 				}
-				const btn = $('<button type="button" class="threaddesk-layout-viewer__placement-option"></button>').text(label.toUpperCase());
+				const btn = $('<button type="button" class="threaddesk-layout-viewer__placement-option"></button>')
+					.text(label.toUpperCase())
+					.attr('data-threaddesk-layout-placement-label', label);
 				placementList.append(btn);
 			});
 
@@ -167,17 +181,51 @@ jQuery(function ($) {
 			}
 		};
 
+		const showPlacementPanel = function () {
+			placementPanelStep.prop('hidden', false);
+			designPanelStep.prop('hidden', true);
+		};
+
+		const showDesignPanel = function () {
+			placementPanelStep.prop('hidden', true);
+			designPanelStep.prop('hidden', false);
+		};
+
+		const renderDesignOptions = function () {
+			designList.empty();
+			const items = Array.isArray(layoutDesigns) ? layoutDesigns : [];
+
+			if (!items.length) {
+				designEmpty.show();
+				return;
+			}
+
+			designEmpty.hide();
+			items.forEach(function (design) {
+				const title = String((design && design.title) || '').trim() || 'Design';
+				const preview = String((design && design.preview) || '').trim();
+				const option = $('<button type="button" class="threaddesk-layout-viewer__design-option"></button>');
+				if (preview) {
+					option.append($('<img class="threaddesk-layout-viewer__design-option-image" alt="" aria-hidden="true" />').attr('src', preview));
+				}
+				option.append($('<span class="threaddesk-layout-viewer__design-option-title"></span>').text(title));
+				designList.append(option);
+			});
+		};
+
 		const openLayoutModal = function (triggerEl) {
 			lastLayoutTrigger = triggerEl || document.activeElement || lastLayoutTrigger;
 			layoutModal.addClass('is-active').attr('aria-hidden', 'false');
 			$('body').addClass('threaddesk-modal-open');
 			showChooserStep();
+			showPlacementPanel();
 		};
 
 		const closeLayoutModal = function () {
 			layoutModal.removeClass('is-active').attr('aria-hidden', 'true');
 			$('body').removeClass('threaddesk-modal-open');
 			showChooserStep();
+			showPlacementPanel();
 			if (lastLayoutTrigger && typeof lastLayoutTrigger.focus === 'function') {
 				try { lastLayoutTrigger.focus(); } catch (e) {}
 			}
@@ -256,8 +304,23 @@ jQuery(function ($) {
 			angleImages.right.attr('src', currentAngles.right).css('transform', sideIsRight ? 'none' : 'scaleX(-1)');
 
 			renderPlacementOptions(placements);
+			showPlacementPanel();
 			showViewerStep();
 			setMainImage('front');
+		});
+
+		$(document).on('click', '.threaddesk-layout-viewer__placement-option', function () {
+			selectedPlacementLabel = String($(this).attr('data-threaddesk-layout-placement-label') || '').trim();
+			if (!selectedPlacementLabel) {
+				selectedPlacementLabel = 'Placement';
+			}
+			designHeading.text('Choose Design for ' + selectedPlacementLabel);
+			renderDesignOptions();
+			showDesignPanel();
+		});
+
+		$(document).on('click', '[data-threaddesk-layout-back-to-placements]', function () {
+			showPlacementPanel();
 		});
 
 		$(document).on('keyup', function (event) {
