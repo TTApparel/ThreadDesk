@@ -36,6 +36,17 @@ class TTA_ThreadDesk {
 		add_action( 'admin_init', array( $this, 'register_settings' ) );
 		add_action( 'admin_enqueue_scripts', array( $this, 'enqueue_admin_assets' ) );
 		add_action( 'add_meta_boxes', array( $this, 'register_admin_meta_boxes' ) );
+		add_action( 'save_post', array( $this, 'maybe_assign_internal_reference' ), 10, 3 );
+		add_filter( 'manage_edit-tta_quote_columns', array( $this, 'filter_quote_admin_columns' ) );
+		add_filter( 'manage_edit-tta_design_columns', array( $this, 'filter_design_admin_columns' ) );
+		add_filter( 'manage_edit-tta_layout_columns', array( $this, 'filter_layout_admin_columns' ) );
+		add_action( 'manage_tta_quote_posts_custom_column', array( $this, 'render_custom_admin_columns' ), 10, 2 );
+		add_action( 'manage_tta_design_posts_custom_column', array( $this, 'render_custom_admin_columns' ), 10, 2 );
+		add_action( 'manage_tta_layout_posts_custom_column', array( $this, 'render_custom_admin_columns' ), 10, 2 );
+		add_filter( 'manage_edit-tta_quote_sortable_columns', array( $this, 'filter_quote_sortable_columns' ) );
+		add_filter( 'manage_edit-tta_design_sortable_columns', array( $this, 'filter_design_sortable_columns' ) );
+		add_filter( 'manage_edit-tta_layout_sortable_columns', array( $this, 'filter_layout_sortable_columns' ) );
+		add_action( 'pre_get_posts', array( $this, 'handle_admin_sorting_queries' ) );
 		add_action( 'admin_post_tta_threaddesk_generate_demo', array( $this, 'handle_generate_demo' ) );
 		add_action( 'admin_post_tta_threaddesk_request_order', array( $this, 'handle_request_order' ) );
 		add_action( 'admin_post_tta_threaddesk_reorder', array( $this, 'handle_reorder' ) );
@@ -1722,6 +1733,140 @@ class TTA_ThreadDesk {
 		}
 		$out .= '</ul>';
 		return $out;
+	}
+
+
+	private function get_internal_reference_counter_option_key( $post_type ) {
+		return 'tta_threaddesk_ref_counter_' . sanitize_key( (string) $post_type );
+	}
+
+	private function assign_internal_reference( $post_id, $post_type ) {
+		$post_id   = absint( $post_id );
+		$post_type = sanitize_key( (string) $post_type );
+		if ( ! $post_id || '' === $post_type ) {
+			return '';
+		}
+		$existing = (string) get_post_meta( $post_id, 'tta_internal_ref', true );
+		if ( '' !== $existing ) {
+			return $existing;
+		}
+		$counter_key = $this->get_internal_reference_counter_option_key( $post_type );
+		$next_ref    = absint( get_option( $counter_key, 0 ) ) + 1;
+		update_option( $counter_key, $next_ref, false );
+		update_post_meta( $post_id, 'tta_internal_ref', (string) $next_ref );
+		return (string) $next_ref;
+	}
+
+	public function maybe_assign_internal_reference( $post_id, $post, $update ) {
+		unset( $update );
+		if ( ! $post instanceof WP_Post ) {
+			return;
+		}
+		if ( wp_is_post_autosave( $post_id ) || wp_is_post_revision( $post_id ) ) {
+			return;
+		}
+		if ( ! in_array( $post->post_type, array( 'tta_quote', 'tta_design', 'tta_layout' ), true ) ) {
+			return;
+		}
+		$this->assign_internal_reference( $post_id, $post->post_type );
+	}
+
+	private function filter_entity_admin_columns( $columns ) {
+		$columns = is_array( $columns ) ? $columns : array();
+		$new_columns = array();
+		if ( isset( $columns['cb'] ) ) {
+			$new_columns['cb'] = $columns['cb'];
+		}
+		$new_columns['tta_internal_ref'] = __( 'Reference #', 'threaddesk' );
+		$new_columns['title']            = __( 'Title', 'threaddesk' );
+		$new_columns['tta_owner']        = __( 'User', 'threaddesk' );
+		foreach ( $columns as $key => $label ) {
+			if ( in_array( $key, array( 'cb', 'title', 'author' ), true ) ) {
+				continue;
+			}
+			$new_columns[ $key ] = $label;
+		}
+		if ( ! isset( $new_columns['date'] ) ) {
+			$new_columns['date'] = __( 'Date', 'threaddesk' );
+		}
+		return $new_columns;
+	}
+
+	public function filter_quote_admin_columns( $columns ) {
+		return $this->filter_entity_admin_columns( $columns );
+	}
+
+	public function filter_design_admin_columns( $columns ) {
+		return $this->filter_entity_admin_columns( $columns );
+	}
+
+	public function filter_layout_admin_columns( $columns ) {
+		return $this->filter_entity_admin_columns( $columns );
+	}
+
+	public function render_custom_admin_columns( $column, $post_id ) {
+		$post = get_post( $post_id );
+		if ( ! $post || ! in_array( $post->post_type, array( 'tta_quote', 'tta_design', 'tta_layout' ), true ) ) {
+			return;
+		}
+		if ( 'tta_internal_ref' === $column ) {
+			echo esc_html( $this->assign_internal_reference( $post_id, $post->post_type ) );
+			return;
+		}
+		if ( 'tta_owner' === $column ) {
+			$owner = get_userdata( (int) $post->post_author );
+			if ( ! $owner ) {
+				echo esc_html__( 'Unknown', 'threaddesk' );
+				return;
+			}
+			$url = add_query_arg(
+				array(
+					'post_type' => $post->post_type,
+					'author'    => (int) $owner->ID,
+				),
+				admin_url( 'edit.php' )
+			);
+			echo '<a href="' . esc_url( $url ) . '">' . esc_html( $owner->display_name ) . '</a>';
+			return;
+		}
+	}
+
+	private function filter_entity_sortable_columns( $columns ) {
+		$columns = is_array( $columns ) ? $columns : array();
+		$columns['tta_internal_ref'] = 'tta_internal_ref';
+		$columns['tta_owner'] = 'tta_owner';
+		return $columns;
+	}
+
+	public function filter_quote_sortable_columns( $columns ) {
+		return $this->filter_entity_sortable_columns( $columns );
+	}
+
+	public function filter_design_sortable_columns( $columns ) {
+		return $this->filter_entity_sortable_columns( $columns );
+	}
+
+	public function filter_layout_sortable_columns( $columns ) {
+		return $this->filter_entity_sortable_columns( $columns );
+	}
+
+	public function handle_admin_sorting_queries( $query ) {
+		if ( ! is_admin() || ! $query instanceof WP_Query || ! $query->is_main_query() ) {
+			return;
+		}
+		$post_type = (string) $query->get( 'post_type' );
+		if ( ! in_array( $post_type, array( 'tta_quote', 'tta_design', 'tta_layout' ), true ) ) {
+			return;
+		}
+		$orderby = (string) $query->get( 'orderby' );
+		if ( 'tta_internal_ref' === $orderby ) {
+			$query->set( 'meta_key', 'tta_internal_ref' );
+			$query->set( 'orderby', 'meta_value_num' );
+			return;
+		}
+		if ( 'tta_owner' === $orderby ) {
+			$query->set( 'orderby', 'author' );
+		}
 	}
 
 	public function handle_auth_login() {
