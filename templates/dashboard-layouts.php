@@ -92,6 +92,10 @@ if ( ! empty( $context['designs'] ) && is_array( $context['designs'] ) ) {
 		$design_svg_url    = get_post_meta( $design->ID, 'design_svg_file_url', true );
 		$design_preview    = get_post_meta( $design->ID, 'design_preview_url', true );
 		$design_mockup_url = get_post_meta( $design->ID, 'design_mockup_file_url', true );
+		$design_file_name  = (string) get_post_meta( $design->ID, 'design_file_name', true );
+		$design_palette    = (string) get_post_meta( $design->ID, 'design_palette', true );
+		$design_settings   = (string) get_post_meta( $design->ID, 'design_analysis_settings', true );
+		$design_svg_name   = (string) get_post_meta( $design->ID, 'design_svg_file_name', true );
 		$design_ratio = $resolve_image_ratio( $design_mockup_url );
 		if ( $design_ratio <= 0 ) {
 			$design_ratio = $resolve_image_ratio( $design_preview );
@@ -108,6 +112,10 @@ if ( ! empty( $context['designs'] ) && is_array( $context['designs'] ) ) {
 			'preview' => $design_preview ? esc_url_raw( $design_preview ) : '',
 			'mockup'  => $design_mockup_url ? esc_url_raw( $design_mockup_url ) : '',
 			'ratio'   => $design_ratio > 0 ? $design_ratio : 0,
+			'fileName'=> $design_file_name,
+			'palette' => $design_palette ? $design_palette : '[]',
+			'settings'=> $design_settings ? $design_settings : '{}',
+			'svgName' => $design_svg_name,
 		);
 	}
 }
@@ -321,7 +329,7 @@ if ( taxonomy_exists( 'product_cat' ) && is_array( $layout_category_settings ) )
 						<h4 data-threaddesk-layout-adjust-heading><?php echo esc_html__( 'Adjust Placement', 'threaddesk' ); ?></h4>
 						<p class="threaddesk-layout-viewer__selection-name" data-threaddesk-layout-selected-design><?php echo esc_html__( 'No design selected', 'threaddesk' ); ?></p>
 						<button type="button" class="threaddesk-layout-viewer__back-button" data-threaddesk-layout-back-to-designs><?php echo esc_html__( '← Change design', 'threaddesk' ); ?></button>
-						<div class="threaddesk-layout-viewer__selection-placement" data-threaddesk-layout-selected-placement><?php echo esc_html__( 'Placement', 'threaddesk' ); ?></div>
+						<div class="threaddesk-layout-viewer__adjust-palette" data-threaddesk-layout-adjust-palette hidden></div>
 						<label class="threaddesk-layout-viewer__size-label" for="threaddesk-layout-size-slider"><?php echo esc_html__( 'Size', 'threaddesk' ); ?></label>
 						<input id="threaddesk-layout-size-slider" type="range" min="60" max="140" value="100" class="threaddesk-layout-viewer__size-slider" data-threaddesk-layout-size-slider />
 						<p class="threaddesk-layout-viewer__size-reading" data-threaddesk-layout-size-reading><?php echo esc_html__( 'Approx. size: --', 'threaddesk' ); ?></p>
