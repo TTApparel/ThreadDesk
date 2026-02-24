@@ -138,6 +138,18 @@ class TTA_ThreadDesk {
 	}
 
 
+
+	private function get_available_placement_slots() {
+		return array(
+			'left_chest'  => __( 'Left Chest', 'threaddesk' ),
+			'right_chest' => __( 'Right Chest', 'threaddesk' ),
+			'full_chest'  => __( 'Full Chest', 'threaddesk' ),
+			'left_sleeve' => __( 'Left Sleeve', 'threaddesk' ),
+			'right_sleeve'=> __( 'Right Sleeve', 'threaddesk' ),
+			'back'        => __( 'Back', 'threaddesk' ),
+		);
+	}
+
 	private function render_media_picker_field( $name, $value ) {
 		$value = $value ? esc_url( $value ) : '';
 		?>
@@ -219,6 +231,7 @@ class TTA_ThreadDesk {
 		}
 
 		$sortable = array();
+		$placement_slots = $this->get_available_placement_slots();
 
 		foreach ( $value as $term_id => $row ) {
 			$term_id = absint( $term_id );
@@ -227,6 +240,19 @@ class TTA_ThreadDesk {
 			}
 
 			$order = isset( $row['order'] ) ? absint( $row['order'] ) : 9999;
+			$placements = array();
+			if ( ! empty( $row['placements'] ) && is_array( $row['placements'] ) ) {
+				foreach ( $row['placements'] as $placement_key => $enabled ) {
+					$placement_key = sanitize_key( $placement_key );
+					if ( isset( $placement_slots[ $placement_key ] ) && $enabled ) {
+						$placements[] = $placement_key;
+					}
+				}
+			}
+			if ( empty( $placements ) ) {
+				$placements = array_keys( $placement_slots );
+			}
+
 			$sortable[] = array(
 				'term_id' => $term_id,
 				'order'   => $order,
@@ -237,6 +263,7 @@ class TTA_ThreadDesk {
 					'back_image'  => isset( $row['back_image'] ) ? esc_url_raw( $row['back_image'] ) : '',
 					'side_image'  => isset( $row['side_image'] ) ? esc_url_raw( $row['side_image'] ) : '',
 					'side_label'  => isset( $row['side_label'] ) && 'right' === sanitize_key( $row['side_label'] ) ? 'right' : 'left',
+					'placements'  => $placements,
 				),
 			);
 		}
@@ -296,6 +323,7 @@ class TTA_ThreadDesk {
 				}
 			);
 		}
+		$placement_slots     = $this->get_available_placement_slots();
 		$nonce              = wp_create_nonce( 'tta_threaddesk_generate_demo' );
 		?>
 		<div class="wrap">
@@ -334,6 +362,7 @@ class TTA_ThreadDesk {
 												<th><?php echo esc_html__( 'Back Image', 'threaddesk' ); ?></th>
 												<th><?php echo esc_html__( 'Side Image', 'threaddesk' ); ?></th>
 												<th><?php echo esc_html__( 'Side', 'threaddesk' ); ?></th>
+												<th><?php echo esc_html__( 'Placements', 'threaddesk' ); ?></th>
 											</tr>
 										</thead>
 										<tbody data-threaddesk-placement-sortable>
@@ -342,6 +371,7 @@ class TTA_ThreadDesk {
 												<?php $front_image = isset( $configured['front_image'] ) ? $configured['front_image'] : ''; ?>
 												<?php $back_image = isset( $configured['back_image'] ) ? $configured['back_image'] : ''; ?>
 												<?php $side_image = isset( $configured['side_image'] ) ? $configured['side_image'] : ''; ?>
+												<?php $configured_placements = isset( $configured['placements'] ) && is_array( $configured['placements'] ) ? $configured['placements'] : array_keys( $placement_slots ); ?>
 												<?php $row_order = isset( $configured['order'] ) ? absint( $configured['order'] ) : ( $index + 1 ); ?>
 												<tr data-threaddesk-placement-row>
 													<td><span class="dashicons dashicons-move" aria-hidden="true"></span><input type="hidden" data-threaddesk-placement-order name="tta_threaddesk_layout_categories[<?php echo esc_attr( $term->term_id ); ?>][order]" value="<?php echo esc_attr( $row_order ); ?>" /></td>
@@ -355,6 +385,15 @@ class TTA_ThreadDesk {
 															<option value="left" <?php selected( isset( $configured['side_label'] ) ? $configured['side_label'] : 'left', 'left' ); ?>><?php echo esc_html__( 'Left', 'threaddesk' ); ?></option>
 															<option value="right" <?php selected( isset( $configured['side_label'] ) ? $configured['side_label'] : 'left', 'right' ); ?>><?php echo esc_html__( 'Right', 'threaddesk' ); ?></option>
 														</select>
+													</td>
+
+													<td>
+														<?php foreach ( $placement_slots as $placement_key => $placement_label ) : ?>
+															<label style="display:block; margin:0 0 4px;">
+																<input type="checkbox" name="tta_threaddesk_layout_categories[<?php echo esc_attr( $term->term_id ); ?>][placements][<?php echo esc_attr( $placement_key ); ?>]" value="1" <?php checked( in_array( $placement_key, $configured_placements, true ) ); ?> />
+																<?php echo esc_html( $placement_label ); ?>
+															</label>
+														<?php endforeach; ?>
 													</td>
 												</tr>
 											<?php endforeach; ?>

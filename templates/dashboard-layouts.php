@@ -41,6 +41,14 @@ $profile_username = $user ? $user->user_login : __( 'Username', 'threaddesk' );
 $nav_base = trailingslashit( wc_get_account_endpoint_url( 'thread-desk' ) );
 
 $layout_category_settings = get_option( 'tta_threaddesk_layout_categories', array() );
+$placement_slot_labels = array(
+	'left_chest'  => __( 'Left Chest', 'threaddesk' ),
+	'right_chest' => __( 'Right Chest', 'threaddesk' ),
+	'full_chest'  => __( 'Full Chest', 'threaddesk' ),
+	'left_sleeve' => __( 'Left Sleeve', 'threaddesk' ),
+	'right_sleeve'=> __( 'Right Sleeve', 'threaddesk' ),
+	'back'        => __( 'Back', 'threaddesk' ),
+);
 $placement_categories    = array();
 
 if ( taxonomy_exists( 'product_cat' ) && is_array( $layout_category_settings ) ) {
@@ -71,6 +79,17 @@ if ( taxonomy_exists( 'product_cat' ) && is_array( $layout_category_settings ) )
 		$back_image   = ! empty( $settings['back_image'] ) ? esc_url_raw( $settings['back_image'] ) : '';
 		$side_image   = ! empty( $settings['side_image'] ) ? esc_url_raw( $settings['side_image'] ) : '';
 		$side_label   = isset( $settings['side_label'] ) && 'right' === $settings['side_label'] ? 'right' : 'left';
+		$configured_placements = isset( $settings['placements'] ) && is_array( $settings['placements'] ) ? $settings['placements'] : array_keys( $placement_slot_labels );
+		$placements = array();
+		foreach ( $configured_placements as $placement_key ) {
+			$placement_key = sanitize_key( $placement_key );
+			if ( isset( $placement_slot_labels[ $placement_key ] ) ) {
+				$placements[] = array(
+					'key'   => $placement_key,
+					'label' => $placement_slot_labels[ $placement_key ],
+				);
+			}
+		}
 
 		$placement_categories[] = array(
 			'label'       => $term->name,
@@ -79,6 +98,7 @@ if ( taxonomy_exists( 'product_cat' ) && is_array( $layout_category_settings ) )
 			'back_image'  => $back_image,
 			'side_image'  => $side_image,
 			'side_label'  => $side_label,
+			'placements'  => $placements,
 			'term_id'     => (int) $term->term_id,
 			'term_slug'   => $term->slug,
 		);
@@ -162,7 +182,8 @@ if ( taxonomy_exists( 'product_cat' ) && is_array( $layout_category_settings ) )
 								data-threaddesk-layout-front-image="<?php echo esc_url( $placement_category['front_image'] ); ?>"
 								data-threaddesk-layout-back-image="<?php echo esc_url( $placement_category['back_image'] ); ?>"
 								data-threaddesk-layout-side-image="<?php echo esc_url( $placement_category['side_image'] ); ?>"
-								data-threaddesk-layout-side-label="<?php echo esc_attr( $placement_category['side_label'] ); ?>">
+								data-threaddesk-layout-side-label="<?php echo esc_attr( $placement_category['side_label'] ); ?>"
+								data-threaddesk-layout-placements="<?php echo esc_attr( wp_json_encode( $placement_category['placements'] ) ); ?>">
 								<span class="threaddesk-layout-modal__image-wrap">
 									<?php if ( ! empty( $placement_category['image_url'] ) ) : ?>
 										<img src="<?php echo esc_url( $placement_category['image_url'] ); ?>" alt="<?php echo esc_attr( $placement_category['label'] ); ?>" class="threaddesk-layout-modal__image" />
@@ -204,9 +225,9 @@ if ( taxonomy_exists( 'product_cat' ) && is_array( $layout_category_settings ) )
 					</div>
 				</div>
 				<div class="threaddesk-layout-viewer__design-panel">
-					<h4><?php echo esc_html__( 'Choose Design', 'threaddesk' ); ?></h4>
-					<button type="button" class="threaddesk-layout-viewer__choose-button"><?php echo esc_html__( 'Choose image', 'threaddesk' ); ?></button>
-					<p><?php echo esc_html__( 'No saved placements yet.', 'threaddesk' ); ?></p>
+					<h4><?php echo esc_html__( 'Choose Placement', 'threaddesk' ); ?></h4>
+					<div class="threaddesk-layout-viewer__placement-list" data-threaddesk-layout-placement-list></div>
+					<p class="threaddesk-layout-viewer__placement-empty" data-threaddesk-layout-placement-empty><?php echo esc_html__( 'No placements available for this category.', 'threaddesk' ); ?></p>
 				</div>
 			</div>
 		</div>

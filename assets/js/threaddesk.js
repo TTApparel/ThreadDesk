@@ -125,6 +125,8 @@ jQuery(function ($) {
 			back: layoutModal.find('[data-threaddesk-layout-angle-image="back"]'),
 			right: layoutModal.find('[data-threaddesk-layout-angle-image="right"]'),
 		};
+		const placementList = layoutModal.find('[data-threaddesk-layout-placement-list]');
+		const placementEmpty = layoutModal.find('[data-threaddesk-layout-placement-empty]');
 		let currentAngles = { front: '', left: '', back: '', right: '' };
 		let visibleAngles = ['front', 'left', 'back', 'right'];
 		let sideConfiguredAsRight = false;
@@ -132,11 +134,37 @@ jQuery(function ($) {
 		const showChooserStep = function () {
 			chooserStep.addClass('is-active').prop('hidden', false).attr('aria-hidden', 'false');
 			viewerStep.removeClass('is-active').prop('hidden', true).attr('aria-hidden', 'true');
+			placementList.empty();
+			placementEmpty.hide();
 		};
 
 		const showViewerStep = function () {
 			chooserStep.removeClass('is-active').prop('hidden', true).attr('aria-hidden', 'true');
 			viewerStep.addClass('is-active').prop('hidden', false).attr('aria-hidden', 'false');
+		};
+
+
+		const renderPlacementOptions = function (placements) {
+			placementList.empty();
+			const items = Array.isArray(placements) ? placements : [];
+			if (!items.length) {
+				placementEmpty.show();
+				return;
+			}
+
+			placementEmpty.hide();
+			items.forEach(function (placement) {
+				const label = String((placement && placement.label) || '').trim();
+				if (!label) {
+					return;
+				}
+				const btn = $('<button type="button" class="threaddesk-layout-viewer__placement-option"></button>').text(label.toUpperCase());
+				placementList.append(btn);
+			});
+
+			if (!placementList.children().length) {
+				placementEmpty.show();
+			}
 		};
 
 		const openLayoutModal = function (triggerEl) {
@@ -195,6 +223,8 @@ jQuery(function ($) {
 			const rawBack = $(this).data('threaddesk-layout-back-image') || '';
 			const rawSide = $(this).data('threaddesk-layout-side-image') || '';
 			const sideLabel = String($(this).data('threaddesk-layout-side-label') || 'left').toLowerCase();
+			let placements = $(this).attr('data-threaddesk-layout-placements') || '[]';
+			try { placements = JSON.parse(placements); } catch (e) { placements = []; }
 			const sideIsRight = sideLabel === 'right';
 			sideConfiguredAsRight = sideIsRight;
 
@@ -225,6 +255,7 @@ jQuery(function ($) {
 			angleImages.left.attr('src', currentAngles.left).css('transform', sideIsRight ? 'scaleX(-1)' : 'none');
 			angleImages.right.attr('src', currentAngles.right).css('transform', sideIsRight ? 'none' : 'scaleX(-1)');
 
+			renderPlacementOptions(placements);
 			showViewerStep();
 			setMainImage('front');
 		});

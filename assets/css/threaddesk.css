@@ -1236,6 +1236,32 @@ body.threaddesk-modal-open {
 	letter-spacing: .08em;
 }
 
+
+.threaddesk-layout-viewer__placement-list {
+	display: grid;
+	gap: 10px;
+}
+
+.threaddesk-layout-viewer__placement-option {
+	width: 100%;
+	padding: 10px;
+	border: 1px solid #555;
+	background: #fff;
+	cursor: pointer;
+	text-transform: uppercase;
+	letter-spacing: .04em;
+}
+
+.threaddesk-layout-viewer__placement-option:hover,
+.threaddesk-layout-viewer__placement-option:focus-visible {
+	border-color: #111;
+	outline: none;
+}
+
+.threaddesk-layout-viewer__placement-empty {
+	display: none;
+}
+
 .threaddesk-layout-viewer__choose-button {
 	width: 100%;
 	padding: 10px;
