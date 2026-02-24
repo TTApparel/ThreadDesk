@@ -35,6 +35,7 @@ class TTA_ThreadDesk {
 		add_action( 'admin_menu', array( $this, 'register_settings_page' ) );
 		add_action( 'admin_init', array( $this, 'register_settings' ) );
 		add_action( 'admin_enqueue_scripts', array( $this, 'enqueue_admin_assets' ) );
+		add_action( 'add_meta_boxes', array( $this, 'register_admin_meta_boxes' ) );
 		add_action( 'admin_post_tta_threaddesk_generate_demo', array( $this, 'handle_generate_demo' ) );
 		add_action( 'admin_post_tta_threaddesk_request_order', array( $this, 'handle_request_order' ) );
 		add_action( 'admin_post_tta_threaddesk_reorder', array( $this, 'handle_reorder' ) );
@@ -65,7 +66,7 @@ class TTA_ThreadDesk {
 		$common_args = array(
 			'public'              => false,
 			'show_ui'             => true,
-			'show_in_menu'        => true,
+			'show_in_menu'        => 'tta-threaddesk',
 			'supports'            => array( 'title' ),
 			'capability_type'     => 'post',
 			'map_meta_cap'        => true,
@@ -117,19 +118,65 @@ class TTA_ThreadDesk {
 	}
 
 	public function register_settings_page() {
-		add_submenu_page(
-			'woocommerce',
+		add_menu_page(
 			__( 'ThreadDesk', 'threaddesk' ),
 			__( 'ThreadDesk', 'threaddesk' ),
 			'manage_woocommerce',
 			'tta-threaddesk',
+			array( $this, 'render_admin_quotes_page' ),
+			'dashicons-screenoptions',
+			56
+		);
+
+		add_submenu_page(
+			'tta-threaddesk',
+			__( 'Quotes', 'threaddesk' ),
+			__( 'Quotes', 'threaddesk' ),
+			'manage_woocommerce',
+			'edit.php?post_type=tta_quote'
+		);
+
+		add_submenu_page(
+			'tta-threaddesk',
+			__( 'Designs', 'threaddesk' ),
+			__( 'Designs', 'threaddesk' ),
+			'manage_woocommerce',
+			'edit.php?post_type=tta_design'
+		);
+
+		add_submenu_page(
+			'tta-threaddesk',
+			__( 'Layouts', 'threaddesk' ),
+			__( 'Layouts', 'threaddesk' ),
+			'manage_woocommerce',
+			'edit.php?post_type=tta_layout'
+		);
+
+		add_submenu_page(
+			'tta-threaddesk',
+			__( 'Users', 'threaddesk' ),
+			__( 'Users', 'threaddesk' ),
+			'manage_woocommerce',
+			'tta-threaddesk-users',
+			array( $this, 'render_admin_users_page' )
+		);
+
+		add_submenu_page(
+			'tta-threaddesk',
+			__( 'Settings', 'threaddesk' ),
+			__( 'Settings', 'threaddesk' ),
+			'manage_woocommerce',
+			'tta-threaddesk-settings',
 			array( $this, 'render_settings_page' )
 		);
+
+		remove_submenu_page( 'tta-threaddesk', 'tta-threaddesk' );
+		remove_submenu_page( 'woocommerce', 'tta-threaddesk' );
 	}
 
 
 	public function enqueue_admin_assets( $hook ) {
-		if ( 'woocommerce_page_tta-threaddesk' !== $hook ) {
+		if ( 'toplevel_page_tta-threaddesk' !== $hook && false === strpos( (string) $hook, 'tta-threaddesk-settings' ) ) {
 			return;
 		}
 
@@ -1513,6 +1560,177 @@ class TTA_ThreadDesk {
 		}
 
 		$this->auth_notice = __( 'Registration successful. Please check your email for confirmation.', 'threaddesk' );
+	}
+
+
+	public function render_admin_quotes_page() {
+		wp_safe_redirect( admin_url( 'edit.php?post_type=tta_quote' ) );
+		exit;
+	}
+
+	public function render_admin_users_page() {
+		if ( ! current_user_can( 'manage_woocommerce' ) ) {
+			wp_die( esc_html__( 'Unauthorized.', 'threaddesk' ) );
+		}
+		$selected_user_id = isset( $_GET['user_id'] ) ? absint( $_GET['user_id'] ) : 0;
+		$users = get_users( array( 'orderby' => 'display_name', 'order' => 'ASC' ) );
+		echo '<div class="wrap"><h1>' . esc_html__( 'ThreadDesk Users', 'threaddesk' ) . '</h1>';
+		echo '<table class="widefat striped"><thead><tr><th>' . esc_html__( 'User', 'threaddesk' ) . '</th><th>' . esc_html__( 'Email', 'threaddesk' ) . '</th><th>' . esc_html__( 'Designs', 'threaddesk' ) . '</th><th>' . esc_html__( 'Layouts', 'threaddesk' ) . '</th><th>' . esc_html__( 'Quotes', 'threaddesk' ) . '</th></tr></thead><tbody>';
+		foreach ( $users as $user ) {
+			$designs = count_user_posts( $user->ID, 'tta_design' );
+			$layouts = count_user_posts( $user->ID, 'tta_layout' );
+			$quotes  = count_user_posts( $user->ID, 'tta_quote' );
+			$link = add_query_arg( array( 'page' => 'tta-threaddesk-users', 'user_id' => $user->ID ), admin_url( 'admin.php' ) );
+			echo '<tr><td><a href="' . esc_url( $link ) . '">' . esc_html( $user->display_name ) . '</a></td><td>' . esc_html( $user->user_email ) . '</td><td>' . esc_html( (string) $designs ) . '</td><td>' . esc_html( (string) $layouts ) . '</td><td>' . esc_html( (string) $quotes ) . '</td></tr>';
+		}
+		echo '</tbody></table>';
+		if ( $selected_user_id ) {
+			$this->render_selected_user_detail( $selected_user_id );
+		}
+		echo '</div>';
+	}
+
+	private function render_selected_user_detail( $user_id ) {
+		$user = get_userdata( $user_id );
+		if ( ! $user ) { return; }
+		echo '<h2>' . sprintf( esc_html__( 'User Detail: %s', 'threaddesk' ), esc_html( $user->display_name ) ) . '</h2>';
+		$post_types = array( 'tta_design' => __( 'Designs', 'threaddesk' ), 'tta_layout' => __( 'Layouts', 'threaddesk' ), 'tta_quote' => __( 'Quotes', 'threaddesk' ) );
+		foreach ( $post_types as $post_type => $label ) {
+			$posts = get_posts( array( 'post_type' => $post_type, 'author' => $user_id, 'numberposts' => 50, 'post_status' => array( 'publish', 'draft', 'pending', 'private' ) ) );
+			echo '<h3>' . esc_html( $label ) . '</h3>';
+			if ( empty( $posts ) ) { echo '<p>' . esc_html__( 'None found.', 'threaddesk' ) . '</p>'; continue; }
+			echo '<ul>';
+			foreach ( $posts as $post_item ) {
+				echo '<li><a href="' . esc_url( get_edit_post_link( $post_item->ID ) ) . '">' . esc_html( $post_item->post_title ?: ('#' . $post_item->ID) ) . '</a></li>';
+			}
+			echo '</ul>';
+		}
+	}
+
+	public function register_admin_meta_boxes() {
+		add_meta_box( 'threaddesk_design_detail', __( 'ThreadDesk Design Details', 'threaddesk' ), array( $this, 'render_design_admin_meta_box' ), 'tta_design', 'normal', 'high' );
+		add_meta_box( 'threaddesk_layout_detail', __( 'ThreadDesk Layout Details', 'threaddesk' ), array( $this, 'render_layout_admin_meta_box' ), 'tta_layout', 'normal', 'high' );
+	}
+
+	public function render_design_admin_meta_box( $post ) {
+		$original_url = (string) get_post_meta( $post->ID, 'design_original_file_url', true );
+		$svg_url = (string) get_post_meta( $post->ID, 'design_svg_file_url', true );
+		$preview_url = (string) get_post_meta( $post->ID, 'design_preview_url', true );
+		$palette_raw = (string) get_post_meta( $post->ID, 'design_palette', true );
+		$palette = json_decode( $palette_raw, true );
+		if ( ! is_array( $palette ) ) { $palette = array(); }
+		$color_count = absint( get_post_meta( $post->ID, 'design_color_count', true ) );
+		$uploaded_at = (string) get_post_meta( $post->ID, 'created_at', true );
+		$owner = get_userdata( (int) $post->post_author );
+		$dimensions = $this->get_image_dimensions_from_url( $preview_url );
+		echo '<p><strong>' . esc_html__( 'Owner', 'threaddesk' ) . ':</strong> ' . esc_html( $owner ? $owner->display_name : __( 'Unknown', 'threaddesk' ) ) . '</p>';
+		echo '<p><strong>' . esc_html__( 'Uploaded', 'threaddesk' ) . ':</strong> ' . esc_html( $uploaded_at ?: $post->post_date ) . '</p>';
+		echo '<p><strong>' . esc_html__( 'Color count', 'threaddesk' ) . ':</strong> ' . esc_html( (string) $color_count ) . '</p>';
+		echo '<p><strong>' . esc_html__( 'Palette (Pantone/Hex)', 'threaddesk' ) . ':</strong> ' . esc_html( implode( ', ', array_map( 'strval', $palette ) ) ) . '</p>';
+		echo '<p><strong>' . esc_html__( 'PNG ratio (W:H)', 'threaddesk' ) . ':</strong> ' . esc_html( $dimensions ) . '</p>';
+		if ( $original_url ) { echo '<p><strong>' . esc_html__( 'Original image', 'threaddesk' ) . ':</strong><br><img style="max-width:280px;height:auto;" src="' . esc_url( $original_url ) . '" alt="" /></p>'; }
+		if ( $svg_url ) { echo '<p><strong>' . esc_html__( 'Created SVG', 'threaddesk' ) . ':</strong> <a href="' . esc_url( $svg_url ) . '" target="_blank" rel="noopener">' . esc_html__( 'Open SVG', 'threaddesk' ) . '</a></p>'; }
+		if ( $preview_url ) { echo '<p><strong>' . esc_html__( 'Generated display PNG', 'threaddesk' ) . ':</strong><br><img style="max-width:280px;height:auto;" src="' . esc_url( $preview_url ) . '" alt="" /></p>'; }
+		$related_layouts = $this->find_related_posts_by_id_in_meta( $post->ID, 'tta_layout' );
+		$related_quotes = $this->find_related_posts_by_id_in_meta( $post->ID, 'tta_quote' );
+		$related_invoices = $this->find_related_posts_by_id_in_meta( $post->ID, 'shop_order' );
+		echo '<p><strong>' . esc_html__( 'Used on layouts/quotes/invoices', 'threaddesk' ) . ':</strong></p>';
+		echo $this->render_related_post_links_list( $related_layouts, __( 'Layouts', 'threaddesk' ) );
+		echo $this->render_related_post_links_list( $related_quotes, __( 'Quotes', 'threaddesk' ) );
+		echo $this->render_related_post_links_list( $related_invoices, __( 'Invoices', 'threaddesk' ) );
+	}
+
+	public function render_layout_admin_meta_box( $post ) {
+		$owner = get_userdata( (int) $post->post_author );
+		$category = (string) get_post_meta( $post->ID, 'layout_category', true );
+		$created = (string) get_post_meta( $post->ID, 'created_at', true );
+		echo '<p><strong>' . esc_html__( 'User', 'threaddesk' ) . ':</strong> ' . esc_html( $owner ? $owner->display_name : __( 'Unknown', 'threaddesk' ) ) . '</p>';
+		echo '<p><strong>' . esc_html__( 'Category', 'threaddesk' ) . ':</strong> ' . esc_html( $category ?: __( 'Not set', 'threaddesk' ) ) . '</p>';
+		echo '<p><strong>' . esc_html__( 'Created', 'threaddesk' ) . ':</strong> ' . esc_html( $created ?: $post->post_date ) . '</p>';
+		echo '<p><strong>' . esc_html__( 'Last edited', 'threaddesk' ) . ':</strong> ' . esc_html( $post->post_modified ) . '</p>';
+		$meta = get_post_meta( $post->ID );
+		echo '<p><strong>' . esc_html__( 'Design + placement/sizing data', 'threaddesk' ) . ':</strong></p><ul>';
+		foreach ( $meta as $key => $values ) {
+			if ( false === strpos( $key, 'design' ) && false === strpos( $key, 'placement' ) && false === strpos( $key, 'layout' ) && false === strpos( $key, 'size' ) ) { continue; }
+			$value = isset( $values[0] ) ? maybe_unserialize( $values[0] ) : '';
+			if ( is_array( $value ) || is_object( $value ) ) { $value = wp_json_encode( $value ); }
+			echo '<li><code>' . esc_html( $key ) . '</code>: ' . esc_html( (string) $value ) . '</li>';
+		}
+		echo '</ul>';
+		$related_designs = $this->find_related_posts_by_id_in_meta( $post->ID, 'tta_design', true );
+		$related_quotes = $this->find_related_posts_by_id_in_meta( $post->ID, 'tta_quote' );
+		$related_invoices = $this->find_related_posts_by_id_in_meta( $post->ID, 'shop_order' );
+		echo '<p><strong>' . esc_html__( 'Related items', 'threaddesk' ) . ':</strong></p>';
+		echo $this->render_related_post_links_list( $related_designs, __( 'Designs', 'threaddesk' ) );
+		echo $this->render_related_post_links_list( $related_quotes, __( 'Quotes', 'threaddesk' ) );
+		echo $this->render_related_post_links_list( $related_invoices, __( 'Invoices', 'threaddesk' ) );
+	}
+
+	private function get_image_dimensions_from_url( $url ) {
+		if ( ! $url ) { return __( 'Unknown', 'threaddesk' ); }
+		$uploads = wp_upload_dir();
+		$baseurl = isset( $uploads['baseurl'] ) ? (string) $uploads['baseurl'] : '';
+		$basedir = isset( $uploads['basedir'] ) ? (string) $uploads['basedir'] : '';
+		$path = '';
+		if ( $baseurl && 0 === strpos( $url, $baseurl ) ) {
+			$path = $basedir . substr( $url, strlen( $baseurl ) );
+		}
+		if ( ! $path || ! file_exists( $path ) ) { return __( 'Unknown', 'threaddesk' ); }
+		$size = @getimagesize( $path );
+		if ( ! is_array( $size ) || empty( $size[0] ) || empty( $size[1] ) ) { return __( 'Unknown', 'threaddesk' ); }
+		return (int) $size[0] . ':' . (int) $size[1];
+	}
+
+	private function find_related_posts_by_id_in_meta( $id, $post_type, $reverse = false ) {
+		global $wpdb;
+		$id = absint( $id );
+		if ( ! $id ) { return array(); }
+		if ( $reverse && 'tta_design' === $post_type ) {
+			// Find designs referenced by current layout meta values.
+			$meta = get_post_meta( $id );
+			$ids = array();
+			foreach ( $meta as $vals ) {
+				foreach ( (array) $vals as $v ) {
+					preg_match_all( '/\b(\d{1,10})\b/', (string) $v, $m );
+					if ( ! empty( $m[1] ) ) { $ids = array_merge( $ids, array_map( 'absint', $m[1] ) ); }
+				}
+			}
+			$ids = array_values( array_unique( array_filter( $ids ) ) );
+			if ( empty( $ids ) ) { return array(); }
+			return get_posts( array( 'post_type' => 'tta_design', 'post__in' => $ids, 'numberposts' => 20 ) );
+		}
+		$sql = $wpdb->prepare(
+			"SELECT DISTINCT p.ID FROM {$wpdb->posts} p INNER JOIN {$wpdb->postmeta} pm ON p.ID = pm.post_id WHERE p.post_type = %s AND p.post_status <> 'trash' AND pm.meta_value LIKE %s ORDER BY p.post_date DESC LIMIT 20",
+			$post_type,
+			'%' . $wpdb->esc_like( (string) $id ) . '%'
+		);
+		$rows = $wpdb->get_col( $sql );
+		if ( empty( $rows ) ) { return array(); }
+		$filtered = array();
+		foreach ( $rows as $row_id ) {
+			$meta = get_post_meta( (int) $row_id );
+			$found = false;
+			foreach ( $meta as $vals ) {
+				foreach ( (array) $vals as $v ) {
+					if ( preg_match( '/\b' . preg_quote( (string) $id, '/' ) . '\b/', (string) $v ) ) { $found = true; break 2; }
+				}
+			}
+			if ( $found ) { $filtered[] = get_post( (int) $row_id ); }
+		}
+		return array_filter( $filtered );
+	}
+
+	private function render_related_post_links_list( $posts, $label ) {
+		if ( empty( $posts ) ) {
+			return '<p><em>' . esc_html( $label ) . ': ' . esc_html__( 'None', 'threaddesk' ) . '</em></p>';
+		}
+		$out = '<p><strong>' . esc_html( $label ) . ':</strong></p><ul>';
+		foreach ( $posts as $item ) {
+			if ( ! $item instanceof WP_Post ) { continue; }
+			$out .= '<li><a href="' . esc_url( get_edit_post_link( $item->ID ) ) . '">' . esc_html( $item->post_title ?: ('#' . $item->ID) ) . '</a></li>';
+		}
+		$out .= '</ul>';
+		return $out;
 	}
 
 	public function handle_auth_login() {
