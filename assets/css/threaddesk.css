@@ -1216,6 +1216,7 @@ body.threaddesk-modal-open {
 	display: grid;
 	grid-template-rows: minmax(0, 1fr) auto;
 	row-gap: 14px;
+	height: 100%;
 }
 
 .threaddesk-layout-viewer__design-panel {
@@ -1225,6 +1226,8 @@ body.threaddesk-modal-open {
 	width: 240px;
 	background: #fff;
 	height: 100%;
+	min-height: 300px;
+	align-self: stretch;
 	display: flex;
 	flex-direction: column;
 }
@@ -1250,6 +1253,7 @@ body.threaddesk-modal-open {
 	cursor: pointer;
 	text-transform: uppercase;
 	letter-spacing: .04em;
+	font-size: 12px;
 }
 
 .threaddesk-layout-viewer__placement-option:hover,
