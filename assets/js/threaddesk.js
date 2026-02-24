@@ -196,7 +196,9 @@ jQuery(function ($) {
 			}
 		};
 
-		const getDesignFileName = function (designUrl, fallbackName) {
+		const getDesignDisplayName = function (designUrl, fallbackName) {
+			const fallback = String(fallbackName || '').trim();
+			if (fallback) { return fallback; }
 			const raw = String(designUrl || '').trim();
 			if (raw) {
 				const path = raw.split('#')[0].split('?')[0];
@@ -204,8 +206,7 @@ jQuery(function ($) {
 				const file = parts.length ? decodeURIComponent(parts[parts.length - 1]) : '';
 				if (file) { return file; }
 			}
-			const fallback = String(fallbackName || '').trim();
-			return fallback || 'Design';
+			return 'Design';
 		};
 
 		const updatePlacementOptionStatus = function (placementKey, placementLabel, designUrl, fallbackName) {
@@ -214,11 +215,11 @@ jQuery(function ($) {
 			const option = placementList.find('.threaddesk-layout-viewer__placement-option[data-threaddesk-layout-placement-key="' + key + '"]');
 			if (!option.length) { return; }
 			const abbr = getPlacementAbbreviation(placementLabel, key);
-			const fileName = getDesignFileName(designUrl, fallbackName);
+			const displayName = getDesignDisplayName(designUrl, fallbackName);
 			option
 				.addClass('is-complete')
 				.attr('data-threaddesk-layout-placement-complete', '1')
-				.html('<span class="threaddesk-layout-viewer__placement-abbr">' + $('<div>').text(abbr).html() + '</span><span class="threaddesk-layout-viewer__placement-file">' + $('<div>').text(fileName).html() + '</span>');
+				.html('<span class="threaddesk-layout-viewer__placement-abbr">' + $('<div>').text(abbr).html() + '</span><span class="threaddesk-layout-viewer__placement-file">' + $('<div>').text(displayName).html() + '</span>');
 		};
 
 		const setDesignRatioFromUrl = function (url) {
