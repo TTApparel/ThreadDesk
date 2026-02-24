@@ -141,6 +141,7 @@ jQuery(function ($) {
 		const sizeReading = layoutModal.find('[data-threaddesk-layout-size-reading]');
 		const selectedPlacementBox = layoutModal.find('[data-threaddesk-layout-selected-placement]');
 		const selectedDesignNameEl = layoutModal.find('[data-threaddesk-layout-selected-design]');
+		const adjustHeading = layoutModal.find('[data-threaddesk-layout-adjust-heading]');
 		const layoutDesignsRaw = layoutModal.attr('data-threaddesk-layout-designs') || '[]';
 		let layoutDesigns = [];
 		try { layoutDesigns = JSON.parse(layoutDesignsRaw); } catch (e) { layoutDesigns = []; }
@@ -380,6 +381,7 @@ jQuery(function ($) {
 			sizeSlider.val(100);
 			selectedPlacementBox.text('Placement');
 			selectedDesignNameEl.text('No design selected');
+			adjustHeading.text('Adjust Placement');
 			Object.keys(savedPlacementsByAngle).forEach(function (angle) { savedPlacementsByAngle[angle] = {}; });
 			clearAngleOverlays();
 			clearStageSavedOverlays();
@@ -564,6 +566,7 @@ jQuery(function ($) {
 			sizeSlider.val(100);
 			selectedDesignName = '';
 			selectedDesignAspectRatio = 1;
+			adjustHeading.text('Adjust ' + selectedPlacementLabel.toUpperCase() + ' Placement');
 			selectedDesignNameEl.text('No design selected');
 			selectedPlacementBox.text(selectedPlacementLabel.toUpperCase());
 			renderDesignOptions();

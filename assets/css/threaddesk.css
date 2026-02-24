@@ -1253,8 +1253,16 @@ body.threaddesk-modal-open {
 	width: 240px;
 	background: #fff;
 	min-height: 300px;
+	height: 100%;
 	display: flex;
 	flex-direction: column;
+}
+
+.threaddesk-layout-viewer__panel-step:not([hidden]) {
+	display: flex;
+	flex-direction: column;
+	flex: 1 1 auto;
+	height: 100%;
 }
 
 .threaddesk-layout-viewer__panel-step:not([hidden]) {
@@ -1473,6 +1481,7 @@ body.threaddesk-modal-open {
 .threaddesk-layout-viewer__adjust-actions {
 	display: grid;
 	gap: 8px;
+	margin-top: auto;
 }
 
 .threaddesk-layout-viewer__save-button {

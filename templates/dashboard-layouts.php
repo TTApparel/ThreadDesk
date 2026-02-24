@@ -318,9 +318,9 @@ if ( taxonomy_exists( 'product_cat' ) && is_array( $layout_category_settings ) )
 						<button type="button" class="threaddesk-layout-viewer__add-design-button" data-threaddesk-design-open><?php echo esc_html__( 'Add New Design', 'threaddesk' ); ?></button>
 					</div>
 					<div class="threaddesk-layout-viewer__panel-step" data-threaddesk-layout-panel-step="adjust" hidden>
-						<h4><?php echo esc_html__( 'Adjust Placement', 'threaddesk' ); ?></h4>
-						<button type="button" class="threaddesk-layout-viewer__back-button" data-threaddesk-layout-back-to-designs><?php echo esc_html__( '← Change design', 'threaddesk' ); ?></button>
+						<h4 data-threaddesk-layout-adjust-heading><?php echo esc_html__( 'Adjust Placement', 'threaddesk' ); ?></h4>
 						<p class="threaddesk-layout-viewer__selection-name" data-threaddesk-layout-selected-design><?php echo esc_html__( 'No design selected', 'threaddesk' ); ?></p>
+						<button type="button" class="threaddesk-layout-viewer__back-button" data-threaddesk-layout-back-to-designs><?php echo esc_html__( '← Change design', 'threaddesk' ); ?></button>
 						<div class="threaddesk-layout-viewer__selection-placement" data-threaddesk-layout-selected-placement><?php echo esc_html__( 'Placement', 'threaddesk' ); ?></div>
 						<label class="threaddesk-layout-viewer__size-label" for="threaddesk-layout-size-slider"><?php echo esc_html__( 'Size', 'threaddesk' ); ?></label>
 						<input id="threaddesk-layout-size-slider" type="range" min="60" max="140" value="100" class="threaddesk-layout-viewer__size-slider" data-threaddesk-layout-size-slider />
