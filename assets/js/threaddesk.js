@@ -168,6 +168,7 @@ jQuery(function ($) {
 		let selectedDesignName = '';
 		let selectedBaseWidthPct = 34;
 		let selectedDesignSourceUrl = '';
+		let selectedDesignAspectRatio = 1;
 		let currentAngle = 'front';
 		let currentAngles = { front: '', left: '', back: '', right: '' };
 		let visibleAngles = ['front', 'left', 'back', 'right'];
@@ -175,6 +176,8 @@ jQuery(function ($) {
 		let dragState = null;
 		let currentOverlayConfig = null;
 		const savedPlacementsByAngle = { front: {}, left: {}, back: {}, right: {} };
+		const overlayRenderScale = 0.85;
+		const designRatioCache = {};
 
 		const placementStyleMap = {
 			left_chest: { top: 36, left: 40, width: 18, approx: 4.5 },
@@ -190,11 +193,44 @@ jQuery(function ($) {
 			designPanelStep.prop('hidden', panel !== 'designs');
 			adjustPanelStep.prop('hidden', panel !== 'adjust');
 		};
+
+		const setDesignRatioFromUrl = function (url) {
+			const source = String(url || '').trim();
+			if (!source) { return; }
+			if (Object.prototype.hasOwnProperty.call(designRatioCache, source)) {
+				selectedDesignAspectRatio = Number(designRatioCache[source]) > 0 ? Number(designRatioCache[source]) : 1;
+				updateSizeReading();
+				return;
+			}
+			const img = new Image();
+			img.onload = function () {
+				const w = Number(img.naturalWidth || 0);
+				const h = Number(img.naturalHeight || 0);
+				const ratio = (w > 0 && h > 0) ? (w / h) : 1;
+				designRatioCache[source] = ratio;
+				selectedDesignAspectRatio = ratio > 0 ? ratio : 1;
+				updateSizeReading();
+			};
+			img.onerror = function () {
+				designRatioCache[source] = 1;
+				selectedDesignAspectRatio = 1;
+				updateSizeReading();
+			};
+			img.src = source;
+		};
 		const updateSizeReading = function () {
 			const sliderPercent = Number(sizeSlider.val() || 100) / 100;
 			const preset = placementStyleMap[selectedPlacementKey] || placementStyleMap.full_chest;
-			const inches = (preset.approx * sliderPercent).toFixed(1);
-			sizeReading.text('Approx. size: ' + inches + '" W x ' + inches + '" H');
+			const ratio = Number(selectedDesignAspectRatio || 1);
+			const maxDimension = preset.approx * overlayRenderScale * sliderPercent;
+			let widthInches = maxDimension;
+			let heightInches = maxDimension;
+			if (ratio > 1) {
+				heightInches = maxDimension / ratio;
+			} else if (ratio > 0 && ratio < 1) {
+				widthInches = maxDimension * ratio;
+			}
+			sizeReading.text('Approx. size: ' + widthInches.toFixed(1) + '" W x ' + heightInches.toFixed(1) + '" H');
 		};
 
 		const hideOverlay = function () {
@@ -241,7 +277,7 @@ jQuery(function ($) {
 			const cfg = configOverride || {
 				top: preset.top,
 				left: preset.left,
-				width: selectedBaseWidthPct * sliderPercent,
+				width: selectedBaseWidthPct * overlayRenderScale * sliderPercent,
 			};
 
 			designOverlay.attr('src', url);
@@ -264,6 +300,7 @@ jQuery(function ($) {
 			selectedDesignName = saved.designName || selectedDesignName;
 			selectedDesignNameEl.text((selectedDesignName || 'No design selected').toUpperCase());
 			selectedBaseWidthPct = Number(saved.baseWidth || selectedBaseWidthPct);
+			selectedDesignAspectRatio = Number(saved.designRatio || selectedDesignAspectRatio || 1);
 			sizeSlider.val(saved.sliderValue || 100);
 			applySelectedDesign(saved.url, { top: saved.top, left: saved.left, width: saved.width });
 		};
@@ -323,12 +360,14 @@ jQuery(function ($) {
 				const svg = String((design && design.svg) || '').trim();
 				const preview = String((design && design.preview) || '').trim();
 				const mockup = String((design && design.mockup) || '').trim();
+				const ratio = Number((design && design.ratio) || 0);
 				const displayImage = mockup || preview || svg;
 				const option = $('<button type="button" class="threaddesk-layout-viewer__design-option"></button>')
 					.attr('data-threaddesk-layout-design-name', title)
 					.attr('data-threaddesk-layout-design-svg', svg)
 					.attr('data-threaddesk-layout-design-preview', preview)
-					.attr('data-threaddesk-layout-design-mockup', mockup);
+					.attr('data-threaddesk-layout-design-mockup', mockup)
+					.attr('data-threaddesk-layout-design-ratio', ratio > 0 ? String(ratio) : '');
 				if (displayImage) {
 					option.append($('<img class="threaddesk-layout-viewer__design-option-image" alt="" aria-hidden="true" />').attr('src', displayImage));
 				}
@@ -416,6 +455,7 @@ jQuery(function ($) {
 			designHeading.text('Choose Design for ' + selectedPlacementLabel);
 			sizeSlider.val(100);
 			selectedDesignName = '';
+			selectedDesignAspectRatio = 1;
 			selectedDesignNameEl.text('No design selected');
 			selectedPlacementBox.text(selectedPlacementLabel.toUpperCase());
 			renderDesignOptions();
@@ -432,7 +472,7 @@ jQuery(function ($) {
 			const overlayCfg = getOverlayConfig();
 			if (overlayCfg) {
 				const sliderPercent = Number(sizeSlider.val() || 100) / 100;
-				overlayCfg.width = selectedBaseWidthPct * sliderPercent;
+				overlayCfg.width = selectedBaseWidthPct * overlayRenderScale * sliderPercent;
 				applySelectedDesign(selectedDesignSourceUrl, overlayCfg);
 			}
 		});
@@ -443,12 +483,15 @@ jQuery(function ($) {
 			const previewUrl = String($(this).attr('data-threaddesk-layout-design-preview') || '').trim();
 			const mockupUrl = String($(this).attr('data-threaddesk-layout-design-mockup') || '').trim();
 			const url = mockupUrl || previewUrl || svgUrl;
+			const ratioAttr = parseFloat(String($(this).attr('data-threaddesk-layout-design-ratio') || '').trim());
+			selectedDesignAspectRatio = (Number.isFinite(ratioAttr) && ratioAttr > 0) ? ratioAttr : 1;
 			const preset = placementStyleMap[selectedPlacementKey] || placementStyleMap.full_chest;
 			selectedBaseWidthPct = Number(preset.width) || 34;
 			selectedDesignName = name;
 			selectedPlacementBox.text((selectedPlacementLabel || 'Placement').toUpperCase());
 			selectedDesignNameEl.text(selectedDesignName.toUpperCase());
 			applySelectedDesign(url);
+			setDesignRatioFromUrl(url);
 			setPanelStep('adjust');
 		});
 
@@ -501,6 +544,7 @@ jQuery(function ($) {
 				width: cfg.width,
 				baseWidth: selectedBaseWidthPct,
 				sliderValue: Number(sizeSlider.val() || 100),
+				designRatio: Number(selectedDesignAspectRatio || 1),
 			};
 			const button = $(this);
 			button.text('Placement Saved');

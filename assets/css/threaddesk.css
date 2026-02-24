@@ -1363,6 +1363,39 @@ body.threaddesk-modal-open {
 .threaddesk-layout-viewer__size-slider {
 	width: 100%;
 	margin: 0;
+	accent-color: #111;
+}
+
+.threaddesk-layout-viewer__size-slider::-webkit-slider-runnable-track {
+	height: 4px;
+	background: #111;
+	border-radius: 999px;
+}
+
+.threaddesk-layout-viewer__size-slider::-webkit-slider-thumb {
+	-webkit-appearance: none;
+	appearance: none;
+	width: 14px;
+	height: 14px;
+	border-radius: 50%;
+	background: #111;
+	border: 0;
+	margin-top: -5px;
+}
+
+.threaddesk-layout-viewer__size-slider::-moz-range-track {
+	height: 4px;
+	background: #111;
+	border-radius: 999px;
+	border: 0;
+}
+
+.threaddesk-layout-viewer__size-slider::-moz-range-thumb {
+	width: 14px;
+	height: 14px;
+	border-radius: 50%;
+	background: #111;
+	border: 0;
 }
 
 .threaddesk-layout-viewer__size-reading {

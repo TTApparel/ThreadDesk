@@ -2,7 +2,7 @@
 /**
  * Plugin Name: ThreadDesk
  * Description: Customer portal inside WooCommerce My Account for quotes, invoices, designs, and layouts.
- * Version: 1.0.5
+ * Version: 1.0.6
  * Author: ThreadDesk
  * Text Domain: threaddesk
  * Domain Path: /languages
@@ -15,7 +15,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 if ( ! defined( 'THREDDESK_VERSION' ) ) {
-	define( 'THREDDESK_VERSION', '1.0.5' );
+	define( 'THREDDESK_VERSION', '1.0.6' );
 }
 
 if ( ! defined( 'THREDDESK_PATH' ) ) {
