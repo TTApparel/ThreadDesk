@@ -46,15 +46,6 @@ jQuery(function ($) {
 
 
 
-		$(document).on('click', '[data-threaddesk-layout-save-placement]', function () {
-			if (!designOverlay.attr('src')) {
-				return;
-			}
-			const button = $(this);
-			button.text('Placement Saved');
-			setTimeout(function () { button.text('Save Placement'); }, 1400);
-		});
-
 		$(document).on('keyup', function (event) {
 			if (event.key === 'Escape') {
 				closeModal();
@@ -112,6 +103,8 @@ jQuery(function ($) {
 			if (!designOverlay.attr('src')) {
 				return;
 			}
+			const targetAngle = getPlacementAngleTarget(selectedPlacementKey);
+			applyPlacementOverlayToAngle(targetAngle, selectedPlacementKey, selectedDesignSourceUrl, cfg);
 			const button = $(this);
 			button.text('Placement Saved');
 			setTimeout(function () { button.text('Save Placement'); }, 1400);
@@ -176,7 +169,7 @@ jQuery(function ($) {
 		let dragState = null;
 		let currentOverlayConfig = null;
 		const savedPlacementsByAngle = { front: {}, left: {}, back: {}, right: {} };
-		const overlayRenderScale = 0.75;
+		const overlayRenderScale = 0.7;
 		const designRatioCache = {};
 
 		const placementStyleMap = {
@@ -320,6 +313,7 @@ jQuery(function ($) {
 			selectedPlacementBox.text('Placement');
 			selectedDesignNameEl.text('No design selected');
 			Object.keys(savedPlacementsByAngle).forEach(function (angle) { savedPlacementsByAngle[angle] = {}; });
+			clearAngleOverlays();
 			hideOverlay();
 			updateSizeReading();
 		};
@@ -373,6 +367,46 @@ jQuery(function ($) {
 				}
 				option.append($('<span class="threaddesk-layout-viewer__design-option-title"></span>').text(title));
 				designList.append(option);
+			});
+		};
+
+		const getPlacementAngleTarget = function (placementKey) {
+			switch (String(placementKey || '').trim()) {
+				case 'left_chest':
+				case 'right_chest':
+				case 'full_chest':
+					return 'front';
+				case 'left_sleeve':
+					return 'left';
+				case 'right_sleeve':
+					return 'right';
+				case 'back':
+					return 'back';
+				default:
+					return currentAngle || 'front';
+			}
+		};
+
+		const clearAngleOverlays = function () {
+			layoutModal.find('.threaddesk-layout-viewer__angle-overlay').remove();
+		};
+
+		const applyPlacementOverlayToAngle = function (targetAngle, placementKey, sourceUrl, cfg) {
+			const angleButton = angleButtonsByKey[targetAngle];
+			if (!angleButton || !angleButton.length) { return; }
+			const imageWrap = angleButton.find('.threaddesk-layout-viewer__angle-image-wrap');
+			if (!imageWrap.length) { return; }
+			const placementToken = String(placementKey || '').trim();
+			let overlay = imageWrap.find('.threaddesk-layout-viewer__angle-overlay[data-threaddesk-placement-key="' + placementToken + '"]');
+			if (!overlay.length) {
+				overlay = $('<img class="threaddesk-layout-viewer__angle-overlay" alt="" aria-hidden="true" />')
+					.attr('data-threaddesk-placement-key', placementToken);
+				imageWrap.append(overlay);
+			}
+			overlay.attr('src', sourceUrl).css({
+				top: Number(cfg.top).toFixed(2) + '%',
+				left: Number(cfg.left).toFixed(2) + '%',
+				width: Number(cfg.width).toFixed(2) + '%'
 			});
 		};
 

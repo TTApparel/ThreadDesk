@@ -1463,10 +1463,25 @@ body.threaddesk-modal-open {
 	cursor: pointer;
 }
 
-.threaddesk-layout-viewer__angle img {
+.threaddesk-layout-viewer__angle-image-wrap {
+	position: relative;
 	width: 50px;
 	height: 70px;
+}
+
+.threaddesk-layout-viewer__angle-image-wrap > img[data-threaddesk-layout-angle-image] {
+	width: 100%;
+	height: 100%;
 	object-fit: contain;
+	display: block;
+}
+
+.threaddesk-layout-viewer__angle-overlay {
+	position: absolute;
+	height: auto;
+	pointer-events: none;
+	transform: translate(-50%, -50%);
+	z-index: 2;
 }
 
 .threaddesk-layout-viewer__angle span {
