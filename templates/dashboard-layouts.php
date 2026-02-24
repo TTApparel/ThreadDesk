@@ -52,14 +52,42 @@ $placement_slot_labels = array(
 $placement_categories    = array();
 $saved_designs           = array();
 
+$resolve_image_ratio = function ( $url ) {
+	$url = is_string( $url ) ? trim( $url ) : '';
+	if ( '' === $url ) {
+		return 0;
+	}
+	$uploads = wp_upload_dir();
+	$baseurl = isset( $uploads['baseurl'] ) ? (string) $uploads['baseurl'] : '';
+	$basedir = isset( $uploads['basedir'] ) ? (string) $uploads['basedir'] : '';
+	if ( '' === $baseurl || '' === $basedir || 0 !== strpos( $url, $baseurl ) ) {
+		return 0;
+	}
+	$path = $basedir . substr( $url, strlen( $baseurl ) );
+	if ( ! file_exists( $path ) ) {
+		return 0;
+	}
+	$size = @getimagesize( $path );
+	if ( ! is_array( $size ) || empty( $size[0] ) || empty( $size[1] ) ) {
+		return 0;
+	}
+	return (float) $size[0] / (float) $size[1];
+};
+
+
 if ( ! empty( $context['designs'] ) && is_array( $context['designs'] ) ) {
 	foreach ( $context['designs'] as $design ) {
 		if ( ! ( $design instanceof WP_Post ) ) {
 			continue;
 		}
 
-		$design_svg_url = get_post_meta( $design->ID, 'design_svg_file_url', true );
-		$design_preview = get_post_meta( $design->ID, 'design_preview_url', true );
+		$design_svg_url    = get_post_meta( $design->ID, 'design_svg_file_url', true );
+		$design_preview    = get_post_meta( $design->ID, 'design_preview_url', true );
+		$design_mockup_url = get_post_meta( $design->ID, 'design_mockup_file_url', true );
+		$design_ratio = $resolve_image_ratio( $design_mockup_url );
+		if ( $design_ratio <= 0 ) {
+			$design_ratio = $resolve_image_ratio( $design_preview );
+		}
 		$design_title   = trim( (string) $design->post_title );
 		if ( '' === $design_title ) {
 			$design_title = __( 'Design', 'threaddesk' );
@@ -70,6 +98,8 @@ if ( ! empty( $context['designs'] ) && is_array( $context['designs'] ) ) {
 			'title'   => $design_title,
 			'svg'     => $design_svg_url ? esc_url_raw( $design_svg_url ) : '',
 			'preview' => $design_preview ? esc_url_raw( $design_preview ) : '',
+			'mockup'  => $design_mockup_url ? esc_url_raw( $design_mockup_url ) : '',
+			'ratio'   => $design_ratio > 0 ? $design_ratio : 0,
 		);
 	}
 }
@@ -265,8 +295,8 @@ if ( taxonomy_exists( 'product_cat' ) && is_array( $layout_category_settings ) )
 						<p class="threaddesk-layout-viewer__placement-empty" data-threaddesk-layout-placement-empty><?php echo esc_html__( 'No placements available for this category.', 'threaddesk' ); ?></p>
 					</div>
 					<div class="threaddesk-layout-viewer__panel-step" data-threaddesk-layout-panel-step="designs" hidden>
-						<button type="button" class="threaddesk-layout-viewer__back-button" data-threaddesk-layout-back-to-placements><?php echo esc_html__( '← Back to placements', 'threaddesk' ); ?></button>
 						<h4 data-threaddesk-layout-design-heading><?php echo esc_html__( 'Choose Design', 'threaddesk' ); ?></h4>
+						<button type="button" class="threaddesk-layout-viewer__back-button" data-threaddesk-layout-back-to-placements><?php echo esc_html__( '← Back to placements', 'threaddesk' ); ?></button>
 						<div class="threaddesk-layout-viewer__design-list" data-threaddesk-layout-design-list></div>
 						<p class="threaddesk-layout-viewer__placement-empty" data-threaddesk-layout-design-empty><?php echo esc_html__( 'No saved designs yet. Add designs from the Designs panel first.', 'threaddesk' ); ?></p>
 					</div>
