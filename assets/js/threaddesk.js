@@ -325,8 +325,10 @@ jQuery(function ($) {
 				const displayImage = preview || svg;
 				const option = $('<button type="button" class="threaddesk-layout-viewer__design-option"></button>')
 					.attr('data-threaddesk-layout-design-name', title)
-					.attr('data-threaddesk-layout-design-svg', svg)
-					.attr('data-threaddesk-layout-design-preview', preview);
+					.attr('data-threaddesk-layout-design-svg', preferredSvg)
+					.attr('data-threaddesk-layout-design-preview', preview)
+					.attr('data-threaddesk-layout-design-version', version)
+					.attr('data-threaddesk-layout-design-has-transparent', hasTransparent ? '1' : '0');
 				if (displayImage) {
 					option.append($('<img class="threaddesk-layout-viewer__design-option-image" alt="" aria-hidden="true" />').attr('src', displayImage));
 				}
@@ -439,7 +441,13 @@ jQuery(function ($) {
 			const name = String($(this).attr('data-threaddesk-layout-design-name') || '').trim() || 'Design';
 			const svgUrl = String($(this).attr('data-threaddesk-layout-design-svg') || '').trim();
 			const previewUrl = String($(this).attr('data-threaddesk-layout-design-preview') || '').trim();
-			const url = previewUrl || svgUrl;
+			const version = Number($(this).attr('data-threaddesk-layout-design-version') || 0);
+			const hasTransparent = $(this).attr('data-threaddesk-layout-design-has-transparent') === '1';
+			let url = svgUrl || previewUrl;
+			if (hasTransparent && svgUrl) {
+				url = svgUrl;
+			}
+			url = withVersion(url, version);
 			const preset = placementStyleMap[selectedPlacementKey] || placementStyleMap.full_chest;
 			selectedBaseWidthPct = Number(preset.width) || 34;
 			selectedDesignName = name;
