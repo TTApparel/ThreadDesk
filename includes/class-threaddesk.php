@@ -2563,6 +2563,8 @@ class TTA_ThreadDesk {
 		} else {
 			delete_post_meta( $post_id, 'design_rejection_reason' );
 		}
+		$status = $this->sanitize_design_status( wp_unslash( $_POST['threaddesk_design_status'] ) );
+		update_post_meta( $post_id, 'design_status', $status );
 	}
 
 	public function handle_auth_login() {
