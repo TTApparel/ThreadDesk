@@ -64,6 +64,7 @@ class TTA_ThreadDesk {
 		add_action( 'admin_post_tta_threaddesk_delete_design', array( $this, 'handle_delete_design' ) );
 		add_action( 'admin_post_tta_threaddesk_rename_layout', array( $this, 'handle_rename_layout' ) );
 		add_action( 'admin_post_tta_threaddesk_delete_layout', array( $this, 'handle_delete_layout' ) );
+		add_action( 'admin_post_tta_threaddesk_admin_save_user', array( $this, 'handle_admin_save_user' ) );
 		add_action( 'user_register', array( $this, 'handle_user_register' ) );
 		add_action( 'init', array( $this, 'handle_auth_login' ) );
 		add_action( 'init', array( $this, 'handle_auth_register' ) );
@@ -162,6 +163,15 @@ class TTA_ThreadDesk {
 
 		add_submenu_page(
 			'tta-threaddesk',
+			__( 'User Detail', 'threaddesk' ),
+			__( 'User Detail', 'threaddesk' ),
+			'manage_woocommerce',
+			'tta-threaddesk-user-detail',
+			array( $this, 'render_admin_user_detail_page' )
+		);
+
+		add_submenu_page(
+			'tta-threaddesk',
 			__( 'Settings', 'threaddesk' ),
 			__( 'Settings', 'threaddesk' ),
 			'manage_woocommerce',
@@ -170,6 +180,7 @@ class TTA_ThreadDesk {
 		);
 
 		remove_submenu_page( 'tta-threaddesk', 'tta-threaddesk' );
+		remove_submenu_page( 'tta-threaddesk', 'tta-threaddesk-user-detail' );
 		remove_submenu_page( 'woocommerce', 'tta-threaddesk' );
 	}
 
@@ -1954,39 +1965,201 @@ class TTA_ThreadDesk {
 		if ( ! current_user_can( 'manage_woocommerce' ) ) {
 			wp_die( esc_html__( 'Unauthorized.', 'threaddesk' ) );
 		}
-		$selected_user_id = isset( $_GET['user_id'] ) ? absint( $_GET['user_id'] ) : 0;
+
 		$users = get_users( array( 'orderby' => 'display_name', 'order' => 'ASC' ) );
+
 		echo '<div class="wrap"><h1>' . esc_html__( 'ThreadDesk Users', 'threaddesk' ) . '</h1>';
-		echo '<table class="widefat striped"><thead><tr><th>' . esc_html__( 'User', 'threaddesk' ) . '</th><th>' . esc_html__( 'Email', 'threaddesk' ) . '</th><th>' . esc_html__( 'Designs', 'threaddesk' ) . '</th><th>' . esc_html__( 'Layouts', 'threaddesk' ) . '</th><th>' . esc_html__( 'Quotes', 'threaddesk' ) . '</th></tr></thead><tbody>';
+		echo '<table class="widefat striped"><thead><tr><th>' . esc_html__( 'User/Company', 'threaddesk' ) . '</th><th>' . esc_html__( 'Email', 'threaddesk' ) . '</th><th>' . esc_html__( 'Designs', 'threaddesk' ) . '</th><th>' . esc_html__( 'Layouts', 'threaddesk' ) . '</th><th>' . esc_html__( 'Quotes', 'threaddesk' ) . '</th></tr></thead><tbody>';
 		foreach ( $users as $user ) {
 			$designs = count_user_posts( $user->ID, 'tta_design' );
 			$layouts = count_user_posts( $user->ID, 'tta_layout' );
 			$quotes  = count_user_posts( $user->ID, 'tta_quote' );
-			$link = add_query_arg( array( 'page' => 'tta-threaddesk-users', 'user_id' => $user->ID ), admin_url( 'admin.php' ) );
-			echo '<tr><td><a href="' . esc_url( $link ) . '">' . esc_html( $user->display_name ) . '</a></td><td>' . esc_html( $user->user_email ) . '</td><td>' . esc_html( (string) $designs ) . '</td><td>' . esc_html( (string) $layouts ) . '</td><td>' . esc_html( (string) $quotes ) . '</td></tr>';
+			$company = $this->get_user_company_label( $user->ID );
+			$link = add_query_arg( array( 'page' => 'tta-threaddesk-user-detail', 'user_id' => $user->ID ), admin_url( 'admin.php' ) );
+			$user_label = '<strong>' . esc_html( $user->display_name ) . '</strong>';
+			if ( $company && $company !== $user->display_name ) {
+				$user_label .= '<br /><small>' . esc_html( $company ) . '</small>';
+			}
+			echo '<tr><td><a href="' . esc_url( $link ) . '">' . $user_label . '</a></td><td>' . esc_html( $user->user_email ) . '</td><td>' . esc_html( (string) $designs ) . '</td><td>' . esc_html( (string) $layouts ) . '</td><td>' . esc_html( (string) $quotes ) . '</td></tr>';
 		}
+		echo '</tbody></table></div>';
+	}
+
+	public function render_admin_user_detail_page() {
+		if ( ! current_user_can( 'manage_woocommerce' ) ) {
+			wp_die( esc_html__( 'Unauthorized.', 'threaddesk' ) );
+		}
+
+		$user_id = isset( $_GET['user_id'] ) ? absint( $_GET['user_id'] ) : 0;
+		$user = $user_id ? get_userdata( $user_id ) : false;
+
+		echo '<div class="wrap">';
+		echo '<h1>' . esc_html__( 'ThreadDesk User Profile', 'threaddesk' ) . '</h1>';
+
+		if ( isset( $_GET['updated'] ) && '1' === sanitize_text_field( wp_unslash( $_GET['updated'] ) ) ) {
+			echo '<div class="notice notice-success is-dismissible"><p>' . esc_html__( 'User details updated.', 'threaddesk' ) . '</p></div>';
+		}
+
+		if ( ! $user ) {
+			echo '<p>' . esc_html__( 'Select a valid ThreadDesk user from the Users list.', 'threaddesk' ) . '</p>';
+			echo '</div>';
+			return;
+		}
+
+		$avatar_id = (int) get_user_meta( $user_id, 'tta_threaddesk_avatar_id', true );
+		$avatar_url = $avatar_id ? wp_get_attachment_image_url( $avatar_id, 'thumbnail' ) : '';
+		if ( ! $avatar_url && function_exists( 'get_avatar_url' ) ) {
+			$avatar_url = get_avatar_url( $user_id, array( 'size' => 120 ) );
+		}
+
+		$billing = $this->data->get_user_address( $user_id, 'billing' );
+		$shipping = $this->data->get_user_address( $user_id, 'shipping' );
+		$stats = $this->data->get_order_stats( $user_id );
+		$company = $this->get_user_company_label( $user_id );
+		$outstanding = $this->data->get_outstanding_total( $user_id );
+
+		echo '<p><a href="' . esc_url( admin_url( 'admin.php?page=tta-threaddesk-users' ) ) . '">&larr; ' . esc_html__( 'Back to Users', 'threaddesk' ) . '</a></p>';
+		echo '<h2>' . esc_html( $user->display_name ) . '</h2>';
+		echo '<p><strong>' . esc_html__( 'Company/Username', 'threaddesk' ) . ':</strong> ' . esc_html( $company ? $company : $user->user_login ) . '</p>';
+
+		echo '<table class="widefat striped" style="max-width:980px;margin-bottom:16px;"><tbody>';
+		echo '<tr><th>' . esc_html__( 'Designs', 'threaddesk' ) . '</th><td>' . esc_html( (string) count_user_posts( $user_id, 'tta_design' ) ) . '</td><th>' . esc_html__( 'Layouts', 'threaddesk' ) . '</th><td>' . esc_html( (string) count_user_posts( $user_id, 'tta_layout' ) ) . '</td></tr>';
+		echo '<tr><th>' . esc_html__( 'Quotes', 'threaddesk' ) . '</th><td>' . esc_html( (string) count_user_posts( $user_id, 'tta_quote' ) ) . '</td><th>' . esc_html__( 'Outstanding Total', 'threaddesk' ) . '</th><td>' . esc_html( function_exists( 'wc_price' ) ? wp_strip_all_tags( wc_price( $outstanding ) ) : number_format_i18n( (float) $outstanding, 2 ) ) . '</td></tr>';
+		echo '<tr><th>' . esc_html__( 'Orders', 'threaddesk' ) . '</th><td>' . esc_html( isset( $stats['order_count'] ) ? (string) (int) $stats['order_count'] : '0' ) . '</td><th>' . esc_html__( 'Last Order', 'threaddesk' ) . '</th><td>' . esc_html( isset( $stats['last_order'] ) ? (string) $stats['last_order'] : __( 'No orders yet', 'threaddesk' ) ) . '</td></tr>';
+		echo '<tr><th>' . esc_html__( 'Average Order', 'threaddesk' ) . '</th><td>' . esc_html( function_exists( 'wc_price' ) ? wp_strip_all_tags( wc_price( isset( $stats['avg_order'] ) ? (float) $stats['avg_order'] : 0 ) ) : number_format_i18n( isset( $stats['avg_order'] ) ? (float) $stats['avg_order'] : 0, 2 ) ) . '</td><th>' . esc_html__( 'Lifetime Value', 'threaddesk' ) . '</th><td>' . esc_html( function_exists( 'wc_price' ) ? wp_strip_all_tags( wc_price( isset( $stats['lifetime'] ) ? (float) $stats['lifetime'] : 0 ) ) : number_format_i18n( isset( $stats['lifetime'] ) ? (float) $stats['lifetime'] : 0, 2 ) ) . '</td></tr>';
 		echo '</tbody></table>';
-		if ( $selected_user_id ) {
-			$this->render_selected_user_detail( $selected_user_id );
+
+		echo '<form method="post" action="' . esc_url( admin_url( 'admin-post.php' ) ) . '" style="max-width:980px;">';
+		echo '<input type="hidden" name="action" value="tta_threaddesk_admin_save_user" />';
+		echo '<input type="hidden" name="user_id" value="' . esc_attr( (string) $user_id ) . '" />';
+		wp_nonce_field( 'tta_threaddesk_admin_save_user', 'tta_threaddesk_admin_save_user_nonce' );
+
+		echo '<h2>' . esc_html__( 'Profile', 'threaddesk' ) . '</h2>';
+		echo '<table class="form-table" role="presentation"><tbody>';
+		echo '<tr><th><label for="tta_td_first_name">' . esc_html__( 'First Name', 'threaddesk' ) . '</label></th><td><input name="first_name" id="tta_td_first_name" type="text" class="regular-text" value="' . esc_attr( (string) $user->first_name ) . '" /></td></tr>';
+		echo '<tr><th><label for="tta_td_last_name">' . esc_html__( 'Last Name', 'threaddesk' ) . '</label></th><td><input name="last_name" id="tta_td_last_name" type="text" class="regular-text" value="' . esc_attr( (string) $user->last_name ) . '" /></td></tr>';
+		echo '<tr><th><label for="tta_td_user_email">' . esc_html__( 'Email', 'threaddesk' ) . '</label></th><td><input name="user_email" id="tta_td_user_email" type="email" class="regular-text" value="' . esc_attr( (string) $user->user_email ) . '" /></td></tr>';
+		echo '<tr><th><label for="tta_td_user_login">' . esc_html__( 'Username', 'threaddesk' ) . '</label></th><td><input id="tta_td_user_login" type="text" class="regular-text" value="' . esc_attr( (string) $user->user_login ) . '" readonly /></td></tr>';
+		echo '<tr><th><label for="tta_td_company">' . esc_html__( 'Company', 'threaddesk' ) . '</label></th><td><input name="company" id="tta_td_company" type="text" class="regular-text" value="' . esc_attr( $company ) . '" /></td></tr>';
+		echo '<tr><th><label for="tta_td_avatar_id">' . esc_html__( 'Profile Photo (Attachment ID)', 'threaddesk' ) . '</label></th><td><input name="avatar_id" id="tta_td_avatar_id" type="number" min="0" class="small-text" value="' . esc_attr( (string) $avatar_id ) . '" />';
+		if ( $avatar_url ) {
+			echo '<p><img src="' . esc_url( $avatar_url ) . '" alt="" style="max-width:80px;height:auto;border-radius:8px;border:1px solid #ddd;" /></p>';
 		}
+		echo '</td></tr>';
+		echo '</tbody></table>';
+
+		$this->render_admin_user_address_fields( 'billing', __( 'Billing Details', 'threaddesk' ), $billing );
+		$this->render_admin_user_address_fields( 'shipping', __( 'Shipping Details', 'threaddesk' ), $shipping );
+
+		echo '<h2>' . esc_html__( 'Account Details', 'threaddesk' ) . '</h2>';
+		echo '<p>' . esc_html__( 'Username is read-only in this screen. You can update name, email, company, avatar, and billing/shipping fields.', 'threaddesk' ) . '</p>';
+
+		submit_button( __( 'Save User Profile', 'threaddesk' ) );
+		echo '</form>';
 		echo '</div>';
 	}
 
-	private function render_selected_user_detail( $user_id ) {
-		$user = get_userdata( $user_id );
-		if ( ! $user ) { return; }
-		echo '<h2>' . sprintf( esc_html__( 'User Detail: %s', 'threaddesk' ), esc_html( $user->display_name ) ) . '</h2>';
-		$post_types = array( 'tta_design' => __( 'Designs', 'threaddesk' ), 'tta_layout' => __( 'Layouts', 'threaddesk' ), 'tta_quote' => __( 'Quotes', 'threaddesk' ) );
-		foreach ( $post_types as $post_type => $label ) {
-			$posts = get_posts( array( 'post_type' => $post_type, 'author' => $user_id, 'numberposts' => 50, 'post_status' => array( 'publish', 'draft', 'pending', 'private' ) ) );
-			echo '<h3>' . esc_html( $label ) . '</h3>';
-			if ( empty( $posts ) ) { echo '<p>' . esc_html__( 'None found.', 'threaddesk' ) . '</p>'; continue; }
-			echo '<ul>';
-			foreach ( $posts as $post_item ) {
-				echo '<li><a href="' . esc_url( get_edit_post_link( $post_item->ID ) ) . '">' . esc_html( $post_item->post_title ?: ('#' . $post_item->ID) ) . '</a></li>';
-			}
-			echo '</ul>';
+	private function render_admin_user_address_fields( $type, $heading, $address ) {
+		$address = is_array( $address ) ? $address : array();
+		$fields = array(
+			'address_1' => __( 'Address Line 1', 'threaddesk' ),
+			'address_2' => __( 'Address Line 2', 'threaddesk' ),
+			'city'      => __( 'City', 'threaddesk' ),
+			'state'     => __( 'State/Province', 'threaddesk' ),
+			'postcode'  => __( 'Postcode', 'threaddesk' ),
+			'country'   => __( 'Country', 'threaddesk' ),
+			'phone'     => __( 'Phone', 'threaddesk' ),
+			'email'     => __( 'Email', 'threaddesk' ),
+		);
+
+		echo '<h2>' . esc_html( $heading ) . '</h2>';
+		echo '<table class="form-table" role="presentation"><tbody>';
+		foreach ( $fields as $field_key => $field_label ) {
+			$value = isset( $address[ $field_key ] ) ? (string) $address[ $field_key ] : '';
+			$name = $type . '_' . $field_key;
+			echo '<tr><th><label for="tta_td_' . esc_attr( $name ) . '">' . esc_html( $field_label ) . '</label></th><td><input name="' . esc_attr( $name ) . '" id="tta_td_' . esc_attr( $name ) . '" type="text" class="regular-text" value="' . esc_attr( $value ) . '" /></td></tr>';
 		}
+		echo '</tbody></table>';
+	}
+
+	private function get_user_company_label( $user_id ) {
+		$company = (string) get_user_meta( $user_id, 'billing_company', true );
+		if ( '' === $company ) {
+			$company = (string) get_user_meta( $user_id, 'shipping_company', true );
+		}
+		if ( '' === $company ) {
+			$user = get_userdata( $user_id );
+			$company = $user ? (string) $user->user_login : '';
+		}
+
+		return $company;
+	}
+
+	public function handle_admin_save_user() {
+		if ( ! current_user_can( 'manage_woocommerce' ) ) {
+			wp_die( esc_html__( 'Unauthorized.', 'threaddesk' ) );
+		}
+
+		$nonce = isset( $_POST['tta_threaddesk_admin_save_user_nonce'] ) ? sanitize_text_field( wp_unslash( $_POST['tta_threaddesk_admin_save_user_nonce'] ) ) : '';
+		if ( ! wp_verify_nonce( $nonce, 'tta_threaddesk_admin_save_user' ) ) {
+			wp_die( esc_html__( 'Security check failed.', 'threaddesk' ) );
+		}
+
+		$user_id = isset( $_POST['user_id'] ) ? absint( $_POST['user_id'] ) : 0;
+		$user = $user_id ? get_userdata( $user_id ) : false;
+		if ( ! $user ) {
+			wp_die( esc_html__( 'User not found.', 'threaddesk' ) );
+		}
+
+		$first_name = isset( $_POST['first_name'] ) ? sanitize_text_field( wp_unslash( $_POST['first_name'] ) ) : '';
+		$last_name  = isset( $_POST['last_name'] ) ? sanitize_text_field( wp_unslash( $_POST['last_name'] ) ) : '';
+		$user_email = isset( $_POST['user_email'] ) ? sanitize_email( wp_unslash( $_POST['user_email'] ) ) : '';
+		$company    = isset( $_POST['company'] ) ? sanitize_text_field( wp_unslash( $_POST['company'] ) ) : '';
+		$avatar_id  = isset( $_POST['avatar_id'] ) ? absint( $_POST['avatar_id'] ) : 0;
+
+		$update_user_args = array(
+			'ID'         => $user_id,
+			'first_name' => $first_name,
+			'last_name'  => $last_name,
+			'display_name' => trim( $first_name . ' ' . $last_name ) ? trim( $first_name . ' ' . $last_name ) : $user->display_name,
+		);
+		if ( '' !== $user_email ) {
+			$update_user_args['user_email'] = $user_email;
+		}
+		wp_update_user( $update_user_args );
+
+		if ( $avatar_id ) {
+			update_user_meta( $user_id, 'tta_threaddesk_avatar_id', $avatar_id );
+		} else {
+			delete_user_meta( $user_id, 'tta_threaddesk_avatar_id' );
+		}
+
+		update_user_meta( $user_id, 'billing_company', $company );
+		update_user_meta( $user_id, 'shipping_company', $company );
+
+		$address_fields = array( 'address_1', 'address_2', 'city', 'state', 'postcode', 'country', 'phone', 'email' );
+		foreach ( array( 'billing', 'shipping' ) as $type ) {
+			foreach ( $address_fields as $field ) {
+				$key = $type . '_' . $field;
+				$value = isset( $_POST[ $key ] ) ? sanitize_text_field( wp_unslash( $_POST[ $key ] ) ) : '';
+				if ( 'email' === $field ) {
+					$value = sanitize_email( $value );
+				}
+				update_user_meta( $user_id, $key, $value );
+			}
+		}
+
+		wp_safe_redirect(
+			add_query_arg(
+				array(
+					'page'    => 'tta-threaddesk-user-detail',
+					'user_id' => $user_id,
+					'updated' => '1',
+				),
+				admin_url( 'admin.php' )
+			)
+		);
+		exit;
 	}
 
 	public function register_admin_meta_boxes() {
