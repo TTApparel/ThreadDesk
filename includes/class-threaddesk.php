@@ -43,6 +43,12 @@ class TTA_ThreadDesk {
 		add_action( 'manage_tta_quote_posts_custom_column', array( $this, 'render_custom_admin_columns' ), 10, 2 );
 		add_action( 'manage_tta_design_posts_custom_column', array( $this, 'render_custom_admin_columns' ), 10, 2 );
 		add_action( 'manage_tta_layout_posts_custom_column', array( $this, 'render_custom_admin_columns' ), 10, 2 );
+		add_action( 'quick_edit_custom_box', array( $this, 'render_design_quick_edit_status_field' ), 10, 2 );
+		add_action( 'quick_edit_custom_box', array( $this, 'render_layout_quick_edit_status_field' ), 10, 2 );
+		add_action( 'admin_footer-edit.php', array( $this, 'render_design_quick_edit_status_script' ) );
+		add_action( 'admin_footer-edit.php', array( $this, 'render_layout_quick_edit_status_script' ) );
+		add_action( 'save_post_tta_design', array( $this, 'handle_design_status_save' ), 10, 2 );
+		add_action( 'save_post_tta_layout', array( $this, 'handle_layout_status_save' ), 10, 2 );
 		add_filter( 'manage_edit-tta_quote_sortable_columns', array( $this, 'filter_quote_sortable_columns' ) );
 		add_filter( 'manage_edit-tta_design_sortable_columns', array( $this, 'filter_design_sortable_columns' ) );
 		add_filter( 'manage_edit-tta_layout_sortable_columns', array( $this, 'filter_layout_sortable_columns' ) );
@@ -56,6 +62,9 @@ class TTA_ThreadDesk {
 		add_action( 'admin_post_tta_threaddesk_save_layout', array( $this, 'handle_save_layout' ) );
 		add_action( 'admin_post_tta_threaddesk_rename_design', array( $this, 'handle_rename_design' ) );
 		add_action( 'admin_post_tta_threaddesk_delete_design', array( $this, 'handle_delete_design' ) );
+		add_action( 'admin_post_tta_threaddesk_rename_layout', array( $this, 'handle_rename_layout' ) );
+		add_action( 'admin_post_tta_threaddesk_delete_layout', array( $this, 'handle_delete_layout' ) );
+		add_action( 'admin_post_tta_threaddesk_admin_save_user', array( $this, 'handle_admin_save_user' ) );
 		add_action( 'user_register', array( $this, 'handle_user_register' ) );
 		add_action( 'init', array( $this, 'handle_auth_login' ) );
 		add_action( 'init', array( $this, 'handle_auth_register' ) );
@@ -154,6 +163,15 @@ class TTA_ThreadDesk {
 
 		add_submenu_page(
 			'tta-threaddesk',
+			__( 'User Detail', 'threaddesk' ),
+			__( 'User Detail', 'threaddesk' ),
+			'manage_woocommerce',
+			'tta-threaddesk-user-detail',
+			array( $this, 'render_admin_user_detail_page' )
+		);
+
+		add_submenu_page(
+			'tta-threaddesk',
 			__( 'Settings', 'threaddesk' ),
 			__( 'Settings', 'threaddesk' ),
 			'manage_woocommerce',
@@ -167,7 +185,7 @@ class TTA_ThreadDesk {
 
 
 	public function enqueue_admin_assets( $hook ) {
-		if ( 'toplevel_page_tta-threaddesk' !== $hook && false === strpos( (string) $hook, 'tta-threaddesk-settings' ) ) {
+		if ( 'toplevel_page_tta-threaddesk' !== $hook && false === strpos( (string) $hook, 'tta-threaddesk-settings' ) && false === strpos( (string) $hook, 'tta-threaddesk-user-detail' ) ) {
 			return;
 		}
 
@@ -186,6 +204,73 @@ class TTA_ThreadDesk {
 			'right_sleeve'=> __( 'Right Sleeve', 'threaddesk' ),
 			'back'        => __( 'Back', 'threaddesk' ),
 		);
+	}
+
+	private function get_design_status_options() {
+		return array(
+			'pending'  => __( 'Pending', 'threaddesk' ),
+			'approved' => __( 'Approved', 'threaddesk' ),
+			'rejected' => __( 'Rejected', 'threaddesk' ),
+		);
+	}
+
+	private function get_design_rejection_reason_options() {
+		return array(
+			'low_resolution' => __( 'The design file is of too low a resolution to proceed to printing.', 'threaddesk' ),
+			'copyright_risk' => __( 'The design is copyrighted and is at risk of infringement.', 'threaddesk' ),
+			'detail_concerns' => __( 'Gradients/Transparencies/Fine detail concerns', 'threaddesk' ),
+			'other'          => __( 'Other (a representative will be in contact with you in the coming days)', 'threaddesk' ),
+		);
+	}
+
+	private function sanitize_design_rejection_reason( $reason ) {
+		$reason  = sanitize_key( (string) $reason );
+		$options = $this->get_design_rejection_reason_options();
+		return isset( $options[ $reason ] ) ? $reason : '';
+	}
+
+	private function sanitize_design_status( $status ) {
+		$status  = sanitize_key( (string) $status );
+		$options = $this->get_design_status_options();
+		return isset( $options[ $status ] ) ? $status : 'pending';
+	}
+
+	private function get_design_status( $design_id ) {
+		$stored = get_post_meta( (int) $design_id, 'design_status', true );
+		return $this->sanitize_design_status( $stored );
+	}
+
+	private function get_layout_status_options() {
+		return array(
+			'pending'  => __( 'Pending', 'threaddesk' ),
+			'approved' => __( 'Approved', 'threaddesk' ),
+			'rejected' => __( 'Rejected', 'threaddesk' ),
+		);
+	}
+
+	private function get_layout_rejection_reason_options() {
+		return array(
+			'placement_restrictions' => __( 'Placement restrictions (too close to seams, on zippers, pockets or off garment)', 'threaddesk' ),
+			'overlapping_designs'    => __( 'Overlapping designs', 'threaddesk' ),
+			'other'                  => __( 'Other', 'threaddesk' ),
+		);
+	}
+
+	private function sanitize_layout_status( $status ) {
+		$status  = sanitize_key( (string) $status );
+		$options = $this->get_layout_status_options();
+		return isset( $options[ $status ] ) ? $status : 'pending';
+	}
+
+	private function sanitize_layout_rejection_reason( $reason ) {
+		$reason  = sanitize_key( (string) $reason );
+		$options = $this->get_layout_rejection_reason_options();
+		return isset( $options[ $reason ] ) ? $reason : '';
+	}
+
+	private function get_layout_status( $layout_id ) {
+		$stored = get_post_meta( (int) $layout_id, 'layout_status', true );
+		return $this->sanitize_layout_status( $stored );
 	}
 
 	private function render_media_picker_field( $name, $value ) {
@@ -542,7 +627,9 @@ class TTA_ThreadDesk {
 		);
 
 		if ( $layout_id ) {
+			if ( ! $is_update ) {
 			update_post_meta( $layout_id, 'created_at', current_time( 'mysql' ) );
+		}
 		}
 
 		wp_safe_redirect( wp_get_referer() ? wp_get_referer() : admin_url( 'admin.php?page=tta-threaddesk' ) );
@@ -671,6 +758,12 @@ class TTA_ThreadDesk {
 
 	private function get_user_design_storage( $user_id ) {
 		$uploads = wp_upload_dir();
+		$basedir = isset( $uploads['basedir'] ) ? (string) $uploads['basedir'] : '';
+		$baseurl = isset( $uploads['baseurl'] ) ? (string) $uploads['baseurl'] : '';
+		if ( '' === $basedir || '' === $baseurl ) {
+			return null;
+		}
+
 		$user    = get_userdata( $user_id );
 		$login   = $user ? $user->user_login : 'user-' . (string) $user_id;
 		$folder  = sanitize_file_name( $login );
@@ -678,8 +771,8 @@ class TTA_ThreadDesk {
 			$folder = 'user-' . (string) $user_id;
 		}
 
-		$base_dir = trailingslashit( $uploads['basedir'] ) . 'ThreadDesk/Designs/' . $folder;
-		$base_url = trailingslashit( $uploads['baseurl'] ) . 'ThreadDesk/Designs/' . rawurlencode( $folder );
+		$base_dir = trailingslashit( $basedir ) . 'ThreadDesk/Designs/' . $folder;
+		$base_url = trailingslashit( $baseurl ) . 'ThreadDesk/Designs/' . rawurlencode( $folder );
 
 		if ( ! wp_mkdir_p( $base_dir ) ) {
 			return null;
@@ -830,6 +923,7 @@ class TTA_ThreadDesk {
 		check_admin_referer( 'tta_threaddesk_save_layout' );
 
 		$current_user_id = get_current_user_id();
+		$layout_id_input = isset( $_POST['threaddesk_layout_id'] ) ? absint( $_POST['threaddesk_layout_id'] ) : 0;
 		$category_slug   = isset( $_POST['threaddesk_layout_category'] ) ? sanitize_key( wp_unslash( $_POST['threaddesk_layout_category'] ) ) : '';
 		$category_id     = isset( $_POST['threaddesk_layout_category_id'] ) ? absint( $_POST['threaddesk_layout_category_id'] ) : 0;
 		$payload_raw     = isset( $_POST['threaddesk_layout_payload'] ) ? wp_unslash( $_POST['threaddesk_layout_payload'] ) : '';
@@ -849,7 +943,12 @@ class TTA_ThreadDesk {
 				if ( ! is_array( $entry ) ) {
 					continue;
 				}
-				if ( ! empty( $entry['url'] ) ) {
+				$raw_url = isset( $entry['url'] ) ? (string) $entry['url'] : '';
+				$url     = esc_url_raw( $raw_url );
+				if ( '' === $url && preg_match( '#^data:image\/(png|jpe?g|webp);base64,#i', $raw_url ) ) {
+					$url = $raw_url;
+				}
+				if ( '' !== $url ) {
 					$has_any_placement = true;
 				}
 				$design_id = isset( $entry['designId'] ) ? absint( $entry['designId'] ) : 0;
@@ -857,7 +956,7 @@ class TTA_ThreadDesk {
 					$related_design_ids[] = $design_id;
 				}
 				$placements_by_angle[ $angle ][ $placement_key ] = array(
-					'url'            => isset( $entry['url'] ) ? esc_url_raw( (string) $entry['url'] ) : '',
+					'url'            => $url,
 					'baseUrl'        => isset( $entry['baseUrl'] ) ? esc_url_raw( (string) $entry['baseUrl'] ) : '',
 					'designId'       => $design_id,
 					'designName'     => isset( $entry['designName'] ) ? sanitize_text_field( (string) $entry['designName'] ) : '',
@@ -895,17 +994,65 @@ class TTA_ThreadDesk {
 			$category_label = __( 'Layout', 'threaddesk' );
 		}
 
-		$layout_title = sprintf( __( '%1$s Layout %2$s', 'threaddesk' ), $category_label, date_i18n( 'Y-m-d H:i' ) );
-		$layout_id    = wp_insert_post(
-			array(
-				'post_type'   => 'tta_layout',
-				'post_status' => 'private',
-				'post_title'  => $layout_title,
-				'post_author' => $current_user_id,
-			)
-		);
+		$default_layout_design_name = '';
+		foreach ( $placements_by_angle as $angle_entries ) {
+			if ( ! is_array( $angle_entries ) ) {
+				continue;
+			}
+			foreach ( $angle_entries as $entry ) {
+				if ( ! is_array( $entry ) ) {
+					continue;
+				}
+				$entry_design_name = isset( $entry['designName'] ) ? trim( (string) $entry['designName'] ) : '';
+				if ( '' === $entry_design_name ) {
+					$entry_url = isset( $entry['url'] ) ? trim( (string) $entry['url'] ) : '';
+					if ( '' !== $entry_url ) {
+						$path = wp_parse_url( $entry_url, PHP_URL_PATH );
+						if ( is_string( $path ) && '' !== $path ) {
+							$entry_design_name = pathinfo( basename( $path ), PATHINFO_FILENAME );
+						}
+					}
+				}
+				$entry_design_name = sanitize_text_field( (string) $entry_design_name );
+				if ( '' !== $entry_design_name ) {
+					$default_layout_design_name = $entry_design_name;
+					break 2;
+				}
+			}
+		}
 
-		if ( ! $layout_id || is_wp_error( $layout_id ) ) {
+		$layout_title = sprintf( __( '%1$s Layout %2$s', 'threaddesk' ), $category_label, date_i18n( 'Y-m-d H:i' ) );
+		if ( '' !== $default_layout_design_name ) {
+			$layout_title = trim( $default_layout_design_name . ' ' . $category_label );
+		}
+		$layout_title = sanitize_text_field( $layout_title );
+		if ( '' === $layout_title ) {
+			$layout_title = __( 'Layout', 'threaddesk' );
+		}
+
+		$layout_id    = 0;
+		$is_update    = false;
+
+		if ( $layout_id_input > 0 ) {
+			$existing_layout = get_post( $layout_id_input );
+			if ( $existing_layout && 'tta_layout' === $existing_layout->post_type && (int) $existing_layout->post_author === $current_user_id ) {
+				$layout_id = (int) $existing_layout->ID;
+				$is_update = true;
+			}
+		}
+
+		if ( $layout_id <= 0 ) {
+			$layout_id = wp_insert_post(
+				array(
+					'post_type'   => 'tta_layout',
+					'post_status' => 'private',
+					'post_title'  => $layout_title,
+					'post_author' => $current_user_id,
+				)
+			);
+		}
+
+			if ( ! $layout_id || is_wp_error( $layout_id ) ) {
 			if ( function_exists( 'wc_add_notice' ) ) {
 				wc_add_notice( __( 'Unable to save layout right now.', 'threaddesk' ), 'error' );
 			}
@@ -923,10 +1070,12 @@ class TTA_ThreadDesk {
 		update_post_meta( $layout_id, 'layout_payload', wp_json_encode( $payload ) );
 		update_post_meta( $layout_id, 'layout_placements', wp_json_encode( $placements_by_angle ) );
 		update_post_meta( $layout_id, 'layout_related_design_ids', wp_json_encode( $payload['relatedDesignIds'] ) );
-		update_post_meta( $layout_id, 'created_at', current_time( 'mysql' ) );
+		if ( ! $is_update ) {
+			update_post_meta( $layout_id, 'created_at', current_time( 'mysql' ) );
+		}
 
 		if ( function_exists( 'wc_add_notice' ) ) {
-			wc_add_notice( __( 'Layout saved successfully.', 'threaddesk' ), 'success' );
+			wc_add_notice( $is_update ? __( 'Layout updated successfully.', 'threaddesk' ) : __( 'Layout saved successfully.', 'threaddesk' ), 'success' );
 		}
 
 		wp_safe_redirect( $this->get_layouts_redirect_url() );
@@ -978,6 +1127,7 @@ class TTA_ThreadDesk {
 				$design_id = $existing_design_id;
 				$file_name = (string) get_post_meta( $design_id, 'design_file_name', true );
 			}
+			update_post_meta( $layout_id, 'layout_status', 'pending' );
 		}
 
 		$old_original_path = $design_id ? (string) get_post_meta( $design_id, 'design_original_file_path', true ) : '';
@@ -1027,6 +1177,8 @@ class TTA_ThreadDesk {
 				wp_safe_redirect( $redirect_url );
 				exit;
 			}
+
+			update_post_meta( $design_id, 'design_status', 'pending' );
 		}
 
 		$palette_raw = isset( $_POST['threaddesk_design_palette'] ) ? wp_unslash( $_POST['threaddesk_design_palette'] ) : '[]';
@@ -1291,6 +1443,76 @@ class TTA_ThreadDesk {
 			wc_add_notice( __( 'Design deleted.', 'threaddesk' ), 'success' );
 		}
 		wp_safe_redirect( $this->get_designs_redirect_url() );
+		exit;
+	}
+
+	public function handle_rename_layout() {
+		if ( ! is_user_logged_in() ) {
+			wp_die( esc_html__( 'Unauthorized.', 'threaddesk' ) );
+		}
+
+		check_admin_referer( 'tta_threaddesk_rename_layout' );
+
+		$layout_id = isset( $_POST['layout_id'] ) ? absint( $_POST['layout_id'] ) : 0;
+		$title     = isset( $_POST['layout_title'] ) ? sanitize_text_field( wp_unslash( $_POST['layout_title'] ) ) : '';
+		$title     = trim( (string) $title );
+		$layout    = get_post( $layout_id );
+
+		if ( ! $layout || 'tta_layout' !== $layout->post_type || (int) $layout->post_author !== get_current_user_id() ) {
+			if ( function_exists( 'wc_add_notice' ) ) {
+				wc_add_notice( __( 'Invalid layout.', 'threaddesk' ), 'error' );
+			}
+			wp_safe_redirect( $this->get_layouts_redirect_url() );
+			exit;
+		}
+
+		if ( '' === $title ) {
+			if ( function_exists( 'wc_add_notice' ) ) {
+				wc_add_notice( __( 'Please enter a placement layout name.', 'threaddesk' ), 'error' );
+			}
+			wp_safe_redirect( $this->get_layouts_redirect_url() );
+			exit;
+		}
+
+		wp_update_post(
+			array(
+				'ID'         => $layout_id,
+				'post_title' => $title,
+			)
+		);
+
+		if ( function_exists( 'wc_add_notice' ) ) {
+			wc_add_notice( __( 'Placement layout name updated.', 'threaddesk' ), 'success' );
+		}
+
+		wp_safe_redirect( $this->get_layouts_redirect_url() );
+		exit;
+	}
+
+	public function handle_delete_layout() {
+		if ( ! is_user_logged_in() ) {
+			wp_die( esc_html__( 'Unauthorized.', 'threaddesk' ) );
+		}
+
+		check_admin_referer( 'tta_threaddesk_delete_layout' );
+
+		$layout_id = isset( $_POST['layout_id'] ) ? absint( $_POST['layout_id'] ) : 0;
+		$layout    = get_post( $layout_id );
+
+		if ( ! $layout || 'tta_layout' !== $layout->post_type || (int) $layout->post_author !== get_current_user_id() ) {
+			if ( function_exists( 'wc_add_notice' ) ) {
+				wc_add_notice( __( 'Invalid layout.', 'threaddesk' ), 'error' );
+			}
+			wp_safe_redirect( $this->get_layouts_redirect_url() );
+			exit;
+		}
+
+		wp_delete_post( $layout_id, true );
+		if ( function_exists( 'wc_add_notice' ) ) {
+			wc_add_notice( __( 'Placement layout deleted.', 'threaddesk' ), 'success' );
+		}
+
+		wp_safe_redirect( $this->get_layouts_redirect_url() );
 		exit;
 	}
 
@@ -1748,45 +1970,388 @@ class TTA_ThreadDesk {
 		if ( ! current_user_can( 'manage_woocommerce' ) ) {
 			wp_die( esc_html__( 'Unauthorized.', 'threaddesk' ) );
 		}
-		$selected_user_id = isset( $_GET['user_id'] ) ? absint( $_GET['user_id'] ) : 0;
+
 		$users = get_users( array( 'orderby' => 'display_name', 'order' => 'ASC' ) );
+
 		echo '<div class="wrap"><h1>' . esc_html__( 'ThreadDesk Users', 'threaddesk' ) . '</h1>';
-		echo '<table class="widefat striped"><thead><tr><th>' . esc_html__( 'User', 'threaddesk' ) . '</th><th>' . esc_html__( 'Email', 'threaddesk' ) . '</th><th>' . esc_html__( 'Designs', 'threaddesk' ) . '</th><th>' . esc_html__( 'Layouts', 'threaddesk' ) . '</th><th>' . esc_html__( 'Quotes', 'threaddesk' ) . '</th></tr></thead><tbody>';
+		echo '<table class="widefat striped"><thead><tr><th>' . esc_html__( 'User/Company', 'threaddesk' ) . '</th><th>' . esc_html__( 'Email', 'threaddesk' ) . '</th><th>' . esc_html__( 'Designs', 'threaddesk' ) . '</th><th>' . esc_html__( 'Layouts', 'threaddesk' ) . '</th><th>' . esc_html__( 'Quotes', 'threaddesk' ) . '</th></tr></thead><tbody>';
 		foreach ( $users as $user ) {
 			$designs = count_user_posts( $user->ID, 'tta_design' );
 			$layouts = count_user_posts( $user->ID, 'tta_layout' );
 			$quotes  = count_user_posts( $user->ID, 'tta_quote' );
-			$link = add_query_arg( array( 'page' => 'tta-threaddesk-users', 'user_id' => $user->ID ), admin_url( 'admin.php' ) );
-			echo '<tr><td><a href="' . esc_url( $link ) . '">' . esc_html( $user->display_name ) . '</a></td><td>' . esc_html( $user->user_email ) . '</td><td>' . esc_html( (string) $designs ) . '</td><td>' . esc_html( (string) $layouts ) . '</td><td>' . esc_html( (string) $quotes ) . '</td></tr>';
+			$company = $this->get_user_company_label( $user->ID );
+			$link = add_query_arg( array( 'page' => 'tta-threaddesk-user-detail', 'user_id' => $user->ID ), admin_url( 'admin.php' ) );
+			$user_label = '<strong>' . esc_html( $user->display_name ) . '</strong>';
+			if ( $company && $company !== $user->display_name ) {
+				$user_label .= '<br /><small>' . esc_html( $company ) . '</small>';
+			}
+			echo '<tr><td><a href="' . esc_url( $link ) . '">' . $user_label . '</a></td><td>' . esc_html( $user->user_email ) . '</td><td>' . esc_html( (string) $designs ) . '</td><td>' . esc_html( (string) $layouts ) . '</td><td>' . esc_html( (string) $quotes ) . '</td></tr>';
 		}
+		echo '</tbody></table></div>';
+	}
+
+	public function render_admin_user_detail_page() {
+		if ( ! current_user_can( 'manage_woocommerce' ) ) {
+			wp_die( esc_html__( 'Unauthorized.', 'threaddesk' ) );
+		}
+
+		$user_id = isset( $_GET['user_id'] ) ? absint( $_GET['user_id'] ) : 0;
+		$user = $user_id ? get_userdata( $user_id ) : false;
+		$active_section = isset( $_GET['td_user_section'] ) ? sanitize_key( wp_unslash( $_GET['td_user_section'] ) ) : '';
+
+		echo '<div class="wrap">';
+		echo '<h1>' . esc_html__( 'ThreadDesk User Profile', 'threaddesk' ) . '</h1>';
+
+		if ( isset( $_GET['updated'] ) && '1' === sanitize_text_field( wp_unslash( $_GET['updated'] ) ) ) {
+			echo '<div class="notice notice-success is-dismissible"><p>' . esc_html__( 'User details updated.', 'threaddesk' ) . '</p></div>';
+		}
+
+		if ( ! $user ) {
+			echo '<p>' . esc_html__( 'Select a valid ThreadDesk user from the Users list.', 'threaddesk' ) . '</p>';
+			echo '</div>';
+			return;
+		}
+
+		$avatar_id = (int) get_user_meta( $user_id, 'tta_threaddesk_avatar_id', true );
+		$avatar_url = $avatar_id ? wp_get_attachment_image_url( $avatar_id, 'thumbnail' ) : '';
+		if ( ! $avatar_url && function_exists( 'get_avatar_url' ) ) {
+			$avatar_url = get_avatar_url( $user_id, array( 'size' => 120 ) );
+		}
+
+		$billing = $this->data->get_user_address( $user_id, 'billing' );
+		$shipping = $this->data->get_user_address( $user_id, 'shipping' );
+		$stats = $this->data->get_order_stats( $user_id );
+		$company = $this->get_user_company_label( $user_id );
+		$outstanding = $this->data->get_outstanding_total( $user_id );
+
+		$design_count = (int) count_user_posts( $user_id, 'tta_design' );
+		$layout_count = (int) count_user_posts( $user_id, 'tta_layout' );
+		$quote_count = (int) count_user_posts( $user_id, 'tta_quote' );
+		$order_count = isset( $stats['order_count'] ) ? (int) $stats['order_count'] : 0;
+
+		$base_detail_url = add_query_arg(
+			array(
+				'page'    => 'tta-threaddesk-user-detail',
+				'user_id' => $user_id,
+			),
+			admin_url( 'admin.php' )
+		);
+
+		echo '<p><a href="' . esc_url( admin_url( 'admin.php?page=tta-threaddesk-users' ) ) . '">&larr; ' . esc_html__( 'Back to Users', 'threaddesk' ) . '</a></p>';
+		echo '<h2>' . esc_html( $user->display_name ) . '</h2>';
+		echo '<p><strong>' . esc_html__( 'Company/Username', 'threaddesk' ) . ':</strong> ' . esc_html( $company ? $company : $user->user_login ) . '</p>';
+
+		echo '<table class="widefat striped" style="max-width:980px;margin-bottom:16px;"><thead><tr><th>' . esc_html__( 'Activity', 'threaddesk' ) . '</th><th>' . esc_html__( 'Account Totals', 'threaddesk' ) . '</th></tr></thead><tbody>';
+		echo '<tr><td><a href="' . esc_url( add_query_arg( 'td_user_section', 'designs', $base_detail_url ) ) . '">' . esc_html__( 'Designs', 'threaddesk' ) . '</a>: ' . esc_html( (string) $design_count ) . '</td><td>' . esc_html__( 'Outstanding Total', 'threaddesk' ) . ': ' . esc_html( function_exists( 'wc_price' ) ? wp_strip_all_tags( wc_price( $outstanding ) ) : number_format_i18n( (float) $outstanding, 2 ) ) . '</td></tr>';
+		echo '<tr><td><a href="' . esc_url( add_query_arg( 'td_user_section', 'layouts', $base_detail_url ) ) . '">' . esc_html__( 'Layouts', 'threaddesk' ) . '</a>: ' . esc_html( (string) $layout_count ) . '</td><td>' . esc_html__( 'Last Order', 'threaddesk' ) . ': ' . esc_html( isset( $stats['last_order'] ) ? (string) $stats['last_order'] : __( 'No orders yet', 'threaddesk' ) ) . '</td></tr>';
+		echo '<tr><td><a href="' . esc_url( add_query_arg( 'td_user_section', 'quotes', $base_detail_url ) ) . '">' . esc_html__( 'Quotes', 'threaddesk' ) . '</a>: ' . esc_html( (string) $quote_count ) . '</td><td>' . esc_html__( 'Average Order', 'threaddesk' ) . ': ' . esc_html( function_exists( 'wc_price' ) ? wp_strip_all_tags( wc_price( isset( $stats['avg_order'] ) ? (float) $stats['avg_order'] : 0 ) ) : number_format_i18n( isset( $stats['avg_order'] ) ? (float) $stats['avg_order'] : 0, 2 ) ) . '</td></tr>';
+		echo '<tr><td><a href="' . esc_url( add_query_arg( 'td_user_section', 'orders', $base_detail_url ) ) . '">' . esc_html__( 'Orders', 'threaddesk' ) . '</a>: ' . esc_html( (string) $order_count ) . '</td><td>' . esc_html__( 'Lifetime Value', 'threaddesk' ) . ': ' . esc_html( function_exists( 'wc_price' ) ? wp_strip_all_tags( wc_price( isset( $stats['lifetime'] ) ? (float) $stats['lifetime'] : 0 ) ) : number_format_i18n( isset( $stats['lifetime'] ) ? (float) $stats['lifetime'] : 0, 2 ) ) . '</td></tr>';
 		echo '</tbody></table>';
-		if ( $selected_user_id ) {
-			$this->render_selected_user_detail( $selected_user_id );
+
+		if ( in_array( $active_section, array( 'designs', 'layouts', 'quotes', 'orders' ), true ) ) {
+			$this->render_admin_user_related_items( $user_id, $active_section, $base_detail_url );
 		}
+
+		echo '<form method="post" action="' . esc_url( admin_url( 'admin-post.php' ) ) . '" style="max-width:980px;">';
+		echo '<input type="hidden" name="action" value="tta_threaddesk_admin_save_user" />';
+		echo '<input type="hidden" name="user_id" value="' . esc_attr( (string) $user_id ) . '" />';
+		wp_nonce_field( 'tta_threaddesk_admin_save_user', 'tta_threaddesk_admin_save_user_nonce' );
+
+		echo '<h2>' . esc_html__( 'Profile', 'threaddesk' ) . '</h2>';
+		echo '<table class="form-table" role="presentation"><tbody>';
+		echo '<tr><th><label for="tta_td_first_name">' . esc_html__( 'First Name', 'threaddesk' ) . '</label></th><td><input name="first_name" id="tta_td_first_name" type="text" class="regular-text" value="' . esc_attr( (string) $user->first_name ) . '" /></td></tr>';
+		echo '<tr><th><label for="tta_td_last_name">' . esc_html__( 'Last Name', 'threaddesk' ) . '</label></th><td><input name="last_name" id="tta_td_last_name" type="text" class="regular-text" value="' . esc_attr( (string) $user->last_name ) . '" /></td></tr>';
+		echo '<tr><th><label for="tta_td_user_email">' . esc_html__( 'Email', 'threaddesk' ) . '</label></th><td><input name="user_email" id="tta_td_user_email" type="email" class="regular-text" value="' . esc_attr( (string) $user->user_email ) . '" /></td></tr>';
+		echo '<tr><th><label for="tta_td_user_login">' . esc_html__( 'Username', 'threaddesk' ) . '</label></th><td><input id="tta_td_user_login" type="text" class="regular-text" value="' . esc_attr( (string) $user->user_login ) . '" readonly /></td></tr>';
+		echo '<tr><th><label for="tta_td_company">' . esc_html__( 'Company', 'threaddesk' ) . '</label></th><td><input name="company" id="tta_td_company" type="text" class="regular-text" value="' . esc_attr( $company ) . '" /></td></tr>';
+		echo '<tr><th><label for="tta_td_avatar_id">' . esc_html__( 'Profile Photo', 'threaddesk' ) . '</label></th><td>';
+		echo '<input name="avatar_id" id="tta_td_avatar_id" type="hidden" value="' . esc_attr( (string) $avatar_id ) . '" />';
+		echo '<button type="button" class="button" id="tta_td_avatar_select">' . esc_html__( 'Select / Change Photo', 'threaddesk' ) . '</button> ';
+		echo '<button type="button" class="button-link" id="tta_td_avatar_remove">' . esc_html__( 'Remove', 'threaddesk' ) . '</button>';
+		echo '<div><img id="tta_td_avatar_preview" src="' . esc_url( $avatar_url ) . '" alt="" style="margin-top:8px;max-width:80px;height:auto;border-radius:8px;border:1px solid #ddd;' . ( $avatar_url ? '' : 'display:none;' ) . '" /></div>';
+		echo '</td></tr>';
+		echo '</tbody></table>';
+
+		echo '<div style="display:flex;gap:20px;align-items:flex-start;flex-wrap:wrap;">';
+		echo '<div style="flex:1 1 420px;min-width:320px;">';
+		$this->render_admin_user_address_fields( 'billing', __( 'Billing Details', 'threaddesk' ), $billing );
+		echo '</div>';
+		echo '<div style="flex:1 1 420px;min-width:320px;">';
+		$this->render_admin_user_address_fields( 'shipping', __( 'Shipping Details', 'threaddesk' ), $shipping );
+		echo '</div>';
+		echo '</div>';
+
+		echo '<h2>' . esc_html__( 'Account Details', 'threaddesk' ) . '</h2>';
+		echo '<p>' . esc_html__( 'Username is read-only in this screen. You can update name, email, company, avatar, and billing/shipping fields.', 'threaddesk' ) . '</p>';
+
+		submit_button( __( 'Save User Profile', 'threaddesk' ) );
+		echo '</form>';
+
+		echo '<script>jQuery(function($){var frame=null;$("#tta_td_avatar_select").on("click",function(e){e.preventDefault();if(frame){frame.open();return;}frame=wp.media({title:"' . esc_js( __( 'Select profile photo', 'threaddesk' ) ) . '",button:{text:"' . esc_js( __( 'Use photo', 'threaddesk' ) ) . '"},multiple:false,library:{type:"image"}});frame.on("select",function(){var a=frame.state().get("selection").first().toJSON();var u=a.url||"";var i=parseInt(a.id||0,10);$("#tta_td_avatar_id").val(i>0?i:"");if(u){$("#tta_td_avatar_preview").attr("src",u).show();}});frame.open();});$("#tta_td_avatar_remove").on("click",function(e){e.preventDefault();$("#tta_td_avatar_id").val("0");$("#tta_td_avatar_preview").attr("src","").hide();});});</script>';
+
 		echo '</div>';
 	}
 
-	private function render_selected_user_detail( $user_id ) {
-		$user = get_userdata( $user_id );
-		if ( ! $user ) { return; }
-		echo '<h2>' . sprintf( esc_html__( 'User Detail: %s', 'threaddesk' ), esc_html( $user->display_name ) ) . '</h2>';
-		$post_types = array( 'tta_design' => __( 'Designs', 'threaddesk' ), 'tta_layout' => __( 'Layouts', 'threaddesk' ), 'tta_quote' => __( 'Quotes', 'threaddesk' ) );
-		foreach ( $post_types as $post_type => $label ) {
-			$posts = get_posts( array( 'post_type' => $post_type, 'author' => $user_id, 'numberposts' => 50, 'post_status' => array( 'publish', 'draft', 'pending', 'private' ) ) );
-			echo '<h3>' . esc_html( $label ) . '</h3>';
-			if ( empty( $posts ) ) { echo '<p>' . esc_html__( 'None found.', 'threaddesk' ) . '</p>'; continue; }
+	private function render_admin_user_related_items( $user_id, $section, $base_detail_url ) {
+		$section_labels = array(
+			'designs' => __( 'Designs', 'threaddesk' ),
+			'layouts' => __( 'Layouts', 'threaddesk' ),
+			'quotes'  => __( 'Quotes', 'threaddesk' ),
+			'orders'  => __( 'Orders', 'threaddesk' ),
+		);
+
+		if ( ! isset( $section_labels[ $section ] ) ) {
+			return;
+		}
+
+		echo '<h2>' . sprintf( esc_html__( '%s for this user', 'threaddesk' ), esc_html( $section_labels[ $section ] ) ) . '</h2>';
+
+		if ( 'orders' === $section ) {
+			if ( ! function_exists( 'wc_get_orders' ) ) {
+				echo '<p>' . esc_html__( 'WooCommerce orders are unavailable.', 'threaddesk' ) . '</p>';
+				return;
+			}
+			$orders = wc_get_orders( array( 'customer_id' => $user_id, 'limit' => 50, 'orderby' => 'date', 'order' => 'DESC' ) );
+			if ( empty( $orders ) ) {
+				echo '<p>' . esc_html__( 'No orders found.', 'threaddesk' ) . '</p>';
+				return;
+			}
 			echo '<ul>';
-			foreach ( $posts as $post_item ) {
-				echo '<li><a href="' . esc_url( get_edit_post_link( $post_item->ID ) ) . '">' . esc_html( $post_item->post_title ?: ('#' . $post_item->ID) ) . '</a></li>';
+			foreach ( $orders as $order ) {
+				$link = admin_url( 'post.php?post=' . absint( $order->get_id() ) . '&action=edit' );
+				echo '<li><a href="' . esc_url( $link ) . '">#' . esc_html( $order->get_order_number() ) . '</a> — ' . esc_html( $order->get_status() ) . '</li>';
 			}
 			echo '</ul>';
+			return;
 		}
+
+		$post_type_map = array(
+			'designs' => 'tta_design',
+			'layouts' => 'tta_layout',
+			'quotes'  => 'tta_quote',
+		);
+		$post_type = $post_type_map[ $section ];
+
+		$posts = get_posts(
+			array(
+				'post_type'      => $post_type,
+				'author'         => $user_id,
+				'posts_per_page' => 50,
+				'post_status'    => array( 'publish', 'draft', 'pending', 'private' ),
+			)
+		);
+
+		if ( in_array( $section, array( 'designs', 'layouts' ), true ) ) {
+			$status_key = 'designs' === $section ? 'design_status' : 'layout_status';
+			$approved = 0;
+			$pending_or_rejected = 0;
+			foreach ( $posts as $item ) {
+				$status = sanitize_key( (string) get_post_meta( $item->ID, $status_key, true ) );
+				if ( 'approved' === $status ) {
+					$approved++;
+				} else {
+					$pending_or_rejected++;
+				}
+			}
+			echo '<p><strong>' . esc_html__( 'Approved', 'threaddesk' ) . ':</strong> ' . esc_html( (string) $approved ) . ' &nbsp; <strong>' . esc_html__( 'Pending/Rejected', 'threaddesk' ) . ':</strong> ' . esc_html( (string) $pending_or_rejected ) . '</p>';
+		}
+
+		if ( empty( $posts ) ) {
+			echo '<p>' . esc_html__( 'None found.', 'threaddesk' ) . '</p>';
+			return;
+		}
+
+		echo '<ul>';
+		foreach ( $posts as $item ) {
+			$title = '' !== trim( (string) $item->post_title ) ? $item->post_title : '#' . $item->ID;
+			echo '<li><a href="' . esc_url( get_edit_post_link( $item->ID ) ) . '">' . esc_html( $title ) . '</a></li>';
+		}
+		echo '</ul>';
+		echo '<p><a href="' . esc_url( remove_query_arg( 'td_user_section', $base_detail_url ) ) . '">' . esc_html__( 'Hide list', 'threaddesk' ) . '</a></p>';
+	}
+
+	private function render_admin_user_address_fields( $type, $heading, $address ) {
+		$address = is_array( $address ) ? $address : array();
+		$fields = array(
+			'address_1' => __( 'Address Line 1', 'threaddesk' ),
+			'address_2' => __( 'Address Line 2', 'threaddesk' ),
+			'city'      => __( 'City', 'threaddesk' ),
+			'state'     => __( 'State/Province', 'threaddesk' ),
+			'postcode'  => __( 'Postcode', 'threaddesk' ),
+			'country'   => __( 'Country', 'threaddesk' ),
+			'phone'     => __( 'Phone', 'threaddesk' ),
+			'email'     => __( 'Email', 'threaddesk' ),
+		);
+
+		echo '<h2>' . esc_html( $heading ) . '</h2>';
+		echo '<table class="form-table" role="presentation"><tbody>';
+		foreach ( $fields as $field_key => $field_label ) {
+			$value = isset( $address[ $field_key ] ) ? (string) $address[ $field_key ] : '';
+			$name = $type . '_' . $field_key;
+			echo '<tr><th><label for="tta_td_' . esc_attr( $name ) . '">' . esc_html( $field_label ) . '</label></th><td><input name="' . esc_attr( $name ) . '" id="tta_td_' . esc_attr( $name ) . '" type="text" class="regular-text" value="' . esc_attr( $value ) . '" /></td></tr>';
+		}
+		echo '</tbody></table>';
+	}
+
+	private function get_user_company_label( $user_id ) {
+		$company = (string) get_user_meta( $user_id, 'billing_company', true );
+		if ( '' === $company ) {
+			$company = (string) get_user_meta( $user_id, 'shipping_company', true );
+		}
+		if ( '' === $company ) {
+			$user = get_userdata( $user_id );
+			$company = $user ? (string) $user->user_login : '';
+		}
+
+		return $company;
+	}
+
+	public function handle_admin_save_user() {
+		if ( ! current_user_can( 'manage_woocommerce' ) ) {
+			wp_die( esc_html__( 'Unauthorized.', 'threaddesk' ) );
+		}
+
+		$nonce = isset( $_POST['tta_threaddesk_admin_save_user_nonce'] ) ? sanitize_text_field( wp_unslash( $_POST['tta_threaddesk_admin_save_user_nonce'] ) ) : '';
+		if ( ! wp_verify_nonce( $nonce, 'tta_threaddesk_admin_save_user' ) ) {
+			wp_die( esc_html__( 'Security check failed.', 'threaddesk' ) );
+		}
+
+		$user_id = isset( $_POST['user_id'] ) ? absint( $_POST['user_id'] ) : 0;
+		$user = $user_id ? get_userdata( $user_id ) : false;
+		if ( ! $user ) {
+			wp_die( esc_html__( 'User not found.', 'threaddesk' ) );
+		}
+
+		$first_name = isset( $_POST['first_name'] ) ? sanitize_text_field( wp_unslash( $_POST['first_name'] ) ) : '';
+		$last_name  = isset( $_POST['last_name'] ) ? sanitize_text_field( wp_unslash( $_POST['last_name'] ) ) : '';
+		$user_email = isset( $_POST['user_email'] ) ? sanitize_email( wp_unslash( $_POST['user_email'] ) ) : '';
+		$company    = isset( $_POST['company'] ) ? sanitize_text_field( wp_unslash( $_POST['company'] ) ) : '';
+		$avatar_id  = isset( $_POST['avatar_id'] ) ? absint( $_POST['avatar_id'] ) : 0;
+
+		$update_user_args = array(
+			'ID'         => $user_id,
+			'first_name' => $first_name,
+			'last_name'  => $last_name,
+			'display_name' => trim( $first_name . ' ' . $last_name ) ? trim( $first_name . ' ' . $last_name ) : $user->display_name,
+		);
+		if ( '' !== $user_email ) {
+			$update_user_args['user_email'] = $user_email;
+		}
+		wp_update_user( $update_user_args );
+
+		if ( $avatar_id ) {
+			update_user_meta( $user_id, 'tta_threaddesk_avatar_id', $avatar_id );
+		} else {
+			delete_user_meta( $user_id, 'tta_threaddesk_avatar_id' );
+		}
+
+		update_user_meta( $user_id, 'billing_company', $company );
+		update_user_meta( $user_id, 'shipping_company', $company );
+
+		$address_fields = array( 'address_1', 'address_2', 'city', 'state', 'postcode', 'country', 'phone', 'email' );
+		foreach ( array( 'billing', 'shipping' ) as $type ) {
+			foreach ( $address_fields as $field ) {
+				$key = $type . '_' . $field;
+				$value = isset( $_POST[ $key ] ) ? sanitize_text_field( wp_unslash( $_POST[ $key ] ) ) : '';
+				if ( 'email' === $field ) {
+					$value = sanitize_email( $value );
+				}
+				update_user_meta( $user_id, $key, $value );
+			}
+		}
+
+		wp_safe_redirect(
+			add_query_arg(
+				array(
+					'page'    => 'tta-threaddesk-user-detail',
+					'user_id' => $user_id,
+					'updated' => '1',
+				),
+				admin_url( 'admin.php' )
+			)
+		);
+		exit;
 	}
 
 	public function register_admin_meta_boxes() {
 		add_meta_box( 'threaddesk_design_detail', __( 'ThreadDesk Design Details', 'threaddesk' ), array( $this, 'render_design_admin_meta_box' ), 'tta_design', 'normal', 'high' );
 		add_meta_box( 'threaddesk_design_usage', __( 'Used Layouts / Quotes / Invoices', 'threaddesk' ), array( $this, 'render_design_usage_admin_meta_box' ), 'tta_design', 'side', 'default' );
+		add_meta_box( 'threaddesk_design_status', __( 'Design Status', 'threaddesk' ), array( $this, 'render_design_status_admin_meta_box' ), 'tta_design', 'side', 'high' );
 		add_meta_box( 'threaddesk_layout_detail', __( 'ThreadDesk Layout Details', 'threaddesk' ), array( $this, 'render_layout_admin_meta_box' ), 'tta_layout', 'normal', 'high' );
+		add_meta_box( 'threaddesk_layout_designs', __( 'Designs', 'threaddesk' ), array( $this, 'render_layout_designs_admin_meta_box' ), 'tta_layout', 'side', 'default' );
+		add_meta_box( 'threaddesk_layout_status', __( 'Layout Status', 'threaddesk' ), array( $this, 'render_layout_status_admin_meta_box' ), 'tta_layout', 'side', 'high' );
+	}
+
+	public function render_layout_status_admin_meta_box( $post ) {
+		$status = $this->get_layout_status( $post->ID );
+		$options = $this->get_layout_status_options();
+		$rejection_reason = $this->sanitize_layout_rejection_reason( get_post_meta( $post->ID, 'layout_rejection_reason', true ) );
+		$rejection_reason_options = $this->get_layout_rejection_reason_options();
+		wp_nonce_field( 'tta_threaddesk_layout_status_meta_box', 'tta_threaddesk_layout_status_meta_nonce' );
+		echo '<label for="threaddesk_layout_status_field" class="screen-reader-text">' . esc_html__( 'Layout status', 'threaddesk' ) . '</label>';
+		echo '<select id="threaddesk_layout_status_field" name="threaddesk_layout_status" style="width:100%;">';
+		foreach ( $options as $value => $label ) {
+			echo '<option value="' . esc_attr( $value ) . '" ' . selected( $status, $value, false ) . '>' . esc_html( $label ) . '</option>';
+		}
+		echo '</select>';
+		echo '<p id="threaddesk_layout_rejection_reason_wrap" style="margin-top:10px;' . ( 'rejected' === $status ? '' : 'display:none;' ) . '">';
+		echo '<label for="threaddesk_layout_rejection_reason_field"><strong>' . esc_html__( 'Rejection reason', 'threaddesk' ) . '</strong></label><br />';
+		echo '<select id="threaddesk_layout_rejection_reason_field" name="threaddesk_layout_rejection_reason" style="width:100%;">';
+		echo '<option value="">' . esc_html__( 'Select a reason', 'threaddesk' ) . '</option>';
+		foreach ( $rejection_reason_options as $value => $label ) {
+			echo '<option value="' . esc_attr( $value ) . '" ' . selected( $rejection_reason, $value, false ) . '>' . esc_html( $label ) . '</option>';
+		}
+		echo '</select>';
+		echo '</p>';
+		?>
+		<script>
+		jQuery(function ($) {
+			const $status = $('#threaddesk_layout_status_field');
+			const $reasonWrap = $('#threaddesk_layout_rejection_reason_wrap');
+			const sync = function () {
+				$reasonWrap.toggle(String($status.val() || '') === 'rejected');
+			};
+			$status.on('change', sync);
+			sync();
+		});
+		</script>
+		<?php
+	}
+
+	public function render_design_status_admin_meta_box( $post ) {
+		$status = $this->get_design_status( $post->ID );
+		$options = $this->get_design_status_options();
+		$rejection_reason = $this->sanitize_design_rejection_reason( get_post_meta( $post->ID, 'design_rejection_reason', true ) );
+		$rejection_reason_options = $this->get_design_rejection_reason_options();
+		wp_nonce_field( 'tta_threaddesk_design_status_meta_box', 'tta_threaddesk_design_status_meta_nonce' );
+		echo '<label for="threaddesk_design_status_field" class="screen-reader-text">' . esc_html__( 'Design status', 'threaddesk' ) . '</label>';
+		echo '<select id="threaddesk_design_status_field" name="threaddesk_design_status" style="width:100%;">';
+		foreach ( $options as $value => $label ) {
+			echo '<option value="' . esc_attr( $value ) . '" ' . selected( $status, $value, false ) . '>' . esc_html( $label ) . '</option>';
+		}
+		echo '</select>';
+		echo '<p id="threaddesk_design_rejection_reason_wrap" style="margin-top:10px;' . ( 'rejected' === $status ? '' : 'display:none;' ) . '">';
+		echo '<label for="threaddesk_design_rejection_reason_field"><strong>' . esc_html__( 'Rejection reason', 'threaddesk' ) . '</strong></label><br />';
+		echo '<select id="threaddesk_design_rejection_reason_field" name="threaddesk_design_rejection_reason" style="width:100%;">';
+		echo '<option value="">' . esc_html__( 'Select a reason', 'threaddesk' ) . '</option>';
+		foreach ( $rejection_reason_options as $value => $label ) {
+			echo '<option value="' . esc_attr( $value ) . '" ' . selected( $rejection_reason, $value, false ) . '>' . esc_html( $label ) . '</option>';
+		}
+		echo '</select>';
+		echo '</p>';
+		?>
+		<script>
+		jQuery(function ($) {
+			const $status = $('#threaddesk_design_status_field');
+			const $reasonWrap = $('#threaddesk_design_rejection_reason_wrap');
+			const sync = function () {
+				$reasonWrap.toggle(String($status.val() || '') === 'rejected');
+			};
+			$status.on('change', sync);
+			sync();
+		});
+		</script>
+		<?php
 	}
 
 	public function render_design_admin_meta_box( $post ) {
@@ -1834,30 +2399,200 @@ class TTA_ThreadDesk {
 		echo $this->render_related_post_links_list( $related_invoices, __( 'Invoices', 'threaddesk' ) );
 	}
 
+
 	public function render_layout_admin_meta_box( $post ) {
 		$owner = get_userdata( (int) $post->post_author );
 		$category = (string) get_post_meta( $post->ID, 'layout_category', true );
 		$created = (string) get_post_meta( $post->ID, 'created_at', true );
+		$layout_payload_raw = (string) get_post_meta( $post->ID, 'layout_payload', true );
+		$layout_payload = json_decode( $layout_payload_raw, true );
+		if ( ! is_array( $layout_payload ) ) {
+			$layout_payload = array();
+		}
+
+		$payload_angles = isset( $layout_payload['angles'] ) && is_array( $layout_payload['angles'] ) ? $layout_payload['angles'] : array();
+		$payload_placements = isset( $layout_payload['placementsByAngle'] ) && is_array( $layout_payload['placementsByAngle'] ) ? $layout_payload['placementsByAngle'] : array();
+		$preview_angles = array(
+			'front' => isset( $payload_angles['front'] ) ? (string) $payload_angles['front'] : '',
+			'left'  => isset( $payload_angles['left'] ) ? (string) $payload_angles['left'] : '',
+			'back'  => isset( $payload_angles['back'] ) ? (string) $payload_angles['back'] : '',
+			'right' => isset( $payload_angles['right'] ) ? (string) $payload_angles['right'] : '',
+		);
+
+		foreach ( $preview_angles as $angle_key => $raw_preview_url ) {
+			$sanitized_preview_url = esc_url_raw( $raw_preview_url );
+			if ( '' === $sanitized_preview_url && preg_match( '#^data:image\/(png|jpe?g|webp);base64,#i', $raw_preview_url ) ) {
+				$sanitized_preview_url = $raw_preview_url;
+			}
+			$preview_angles[ $angle_key ] = $sanitized_preview_url;
+		}
+
+		$has_preview_angles = false;
+		foreach ( $preview_angles as $preview_url ) {
+			if ( '' !== $preview_url ) {
+				$has_preview_angles = true;
+				break;
+			}
+		}
+
+		echo '<div style="width:100%;max-width:100%;box-sizing:border-box;overflow:hidden;">';
 		echo '<p><strong>' . esc_html__( 'User', 'threaddesk' ) . ':</strong> ' . esc_html( $owner ? $owner->display_name : __( 'Unknown', 'threaddesk' ) ) . '</p>';
 		echo '<p><strong>' . esc_html__( 'Category', 'threaddesk' ) . ':</strong> ' . esc_html( $category ?: __( 'Not set', 'threaddesk' ) ) . '</p>';
 		echo '<p><strong>' . esc_html__( 'Created', 'threaddesk' ) . ':</strong> ' . esc_html( $created ?: $post->post_date ) . '</p>';
 		echo '<p><strong>' . esc_html__( 'Last edited', 'threaddesk' ) . ':</strong> ' . esc_html( $post->post_modified ) . '</p>';
+
+		echo '<p><strong>' . esc_html__( 'Placement angles', 'threaddesk' ) . ':</strong></p>';
+		if ( $has_preview_angles ) {
+			echo '<div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;align-items:start;width:100%;max-width:100%;">';
+			$left_preview_url = isset( $preview_angles['left'] ) ? (string) $preview_angles['left'] : '';
+			$right_preview_url = isset( $preview_angles['right'] ) ? (string) $preview_angles['right'] : '';
+			foreach ( $preview_angles as $angle_key => $preview_url ) {
+				$mirror_angle = ( 'right' === $angle_key && '' !== $left_preview_url && $left_preview_url === $right_preview_url );
+				echo '<div style="min-width:0;">';
+				echo '<p style="margin:0 0 6px;"><strong>' . esc_html( strtoupper( $angle_key ) ) . '</strong></p>';
+				echo '<div style="position:relative;width:100%;aspect-ratio:1/1;background:#f6f6f6;border:1px solid #ddd;border-radius:4px;overflow:hidden;">';
+				echo '<div style="position:absolute;inset:0;' . ( $mirror_angle ? 'transform:scaleX(-1);transform-origin:center center;' : '' ) . '">';
+
+				if ( '' !== $preview_url ) {
+					$base_src = preg_match( '#^data:image/#i', $preview_url ) ? esc_attr( $preview_url ) : esc_url( $preview_url );
+					echo '<img src="' . $base_src . '" alt="' . esc_attr( strtoupper( $angle_key ) . ' ' . __( 'view', 'threaddesk' ) ) . '" style="position:absolute;inset:0;display:block;width:100%;height:100%;object-fit:contain;" />';
+				} else {
+					echo '<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#777;font-size:12px;">' . esc_html__( 'No image', 'threaddesk' ) . '</div>';
+				}
+
+				$angle_placements = isset( $payload_placements[ $angle_key ] ) && is_array( $payload_placements[ $angle_key ] ) ? $payload_placements[ $angle_key ] : array();
+				foreach ( $angle_placements as $placement_entry ) {
+					if ( ! is_array( $placement_entry ) ) {
+						continue;
+					}
+					$overlay_url_raw = isset( $placement_entry['url'] ) ? (string) $placement_entry['url'] : '';
+					$overlay_url = esc_url_raw( $overlay_url_raw );
+					if ( '' === $overlay_url && preg_match( '#^data:image\/(png|jpe?g|webp);base64,#i', $overlay_url_raw ) ) {
+						$overlay_url = $overlay_url_raw;
+					}
+					if ( '' === $overlay_url ) {
+						continue;
+					}
+					$overlay_src = preg_match( '#^data:image/#i', $overlay_url ) ? esc_attr( $overlay_url ) : esc_url( $overlay_url );
+					$overlay_top = isset( $placement_entry['top'] ) ? (float) $placement_entry['top'] : 50.0;
+					$overlay_left = isset( $placement_entry['left'] ) ? (float) $placement_entry['left'] : 50.0;
+					$overlay_width = isset( $placement_entry['width'] ) ? (float) $placement_entry['width'] : 25.0;
+						echo '<img src="' . $overlay_src . '" alt="" aria-hidden="true" style="position:absolute;top:' . esc_attr( number_format( $overlay_top, 2, '.', '' ) ) . '%;left:' . esc_attr( number_format( $overlay_left, 2, '.', '' ) ) . '%;width:' . esc_attr( number_format( $overlay_width, 2, '.', '' ) ) . '%;height:auto;transform:translate(-50%,-50%);object-fit:contain;pointer-events:none;" />';
+					}
+
+					echo '</div>';
+					echo '</div>';
+					echo '</div>';
+			}
+			echo '</div>';
+		} else {
+			echo '<p><em>' . esc_html__( 'No angle preview images available in this layout payload.', 'threaddesk' ) . '</em></p>';
+		}
+
 		$meta = get_post_meta( $post->ID );
-		echo '<p><strong>' . esc_html__( 'Design + placement/sizing data', 'threaddesk' ) . ':</strong></p><ul>';
+		echo '<details style="margin-top:12px;max-width:100%;"><summary><strong>' . esc_html__( 'Design + placement/sizing data', 'threaddesk' ) . '</strong></summary><div style="max-width:100%;overflow:auto;"><ul style="margin-top:8px;">';
 		foreach ( $meta as $key => $values ) {
 			if ( false === strpos( $key, 'design' ) && false === strpos( $key, 'placement' ) && false === strpos( $key, 'layout' ) && false === strpos( $key, 'size' ) ) { continue; }
 			$value = isset( $values[0] ) ? maybe_unserialize( $values[0] ) : '';
 			if ( is_array( $value ) || is_object( $value ) ) { $value = wp_json_encode( $value ); }
 			echo '<li><code>' . esc_html( $key ) . '</code>: ' . esc_html( (string) $value ) . '</li>';
 		}
-		echo '</ul>';
-		$related_designs = $this->find_related_posts_by_id_in_meta( $post->ID, 'tta_design', true );
-		$related_quotes = $this->find_related_posts_by_id_in_meta( $post->ID, 'tta_quote' );
-		$related_invoices = $this->find_related_posts_by_id_in_meta( $post->ID, 'shop_order' );
-		echo '<p><strong>' . esc_html__( 'Related items', 'threaddesk' ) . ':</strong></p>';
-		echo $this->render_related_post_links_list( $related_designs, __( 'Designs', 'threaddesk' ) );
-		echo $this->render_related_post_links_list( $related_quotes, __( 'Quotes', 'threaddesk' ) );
-		echo $this->render_related_post_links_list( $related_invoices, __( 'Invoices', 'threaddesk' ) );
+		echo '</ul></div></details>';
+		echo '</div>';
+	}
+
+	public function render_layout_designs_admin_meta_box( $post ) {
+		$layout_payload_raw = (string) get_post_meta( $post->ID, 'layout_payload', true );
+		$layout_payload = json_decode( $layout_payload_raw, true );
+		if ( ! is_array( $layout_payload ) ) {
+			echo '<p><em>' . esc_html__( 'No design usage data available.', 'threaddesk' ) . '</em></p>';
+			return;
+		}
+
+		$placements_by_angle = isset( $layout_payload['placementsByAngle'] ) && is_array( $layout_payload['placementsByAngle'] ) ? $layout_payload['placementsByAngle'] : array();
+		$rows = array();
+		foreach ( $placements_by_angle as $angle_entries ) {
+			if ( ! is_array( $angle_entries ) ) {
+				continue;
+			}
+			foreach ( $angle_entries as $placement_key => $entry ) {
+				if ( ! is_array( $entry ) || empty( $entry['url'] ) ) {
+					continue;
+				}
+				$design_id = isset( $entry['designId'] ) ? absint( $entry['designId'] ) : 0;
+				$design_name = isset( $entry['designName'] ) ? sanitize_text_field( (string) $entry['designName'] ) : __( 'Design', 'threaddesk' );
+				$placement_label = isset( $entry['placementLabel'] ) ? sanitize_text_field( (string) $entry['placementLabel'] ) : ucwords( str_replace( '_', ' ', (string) $placement_key ) );
+				$slider_value = isset( $entry['sliderValue'] ) ? (float) $entry['sliderValue'] : 100;
+				$design_ratio = isset( $entry['designRatio'] ) ? (float) $entry['designRatio'] : 1;
+				$size_label = $this->get_layout_entry_size_label( (string) $placement_key, $slider_value, $design_ratio );
+				$colors = isset( $entry['paletteCurrent'] ) && is_array( $entry['paletteCurrent'] ) ? $entry['paletteCurrent'] : array();
+				$colors = array_values( array_filter( array_map( 'sanitize_text_field', $colors ), function ( $color ) { return '' !== trim( (string) $color ); } ) );
+				$rows[] = array(
+					'design_id' => $design_id,
+					'design_name' => $design_name,
+					'placement' => $placement_label,
+					'size' => $size_label,
+					'colors' => $colors,
+				);
+			}
+		}
+
+		if ( empty( $rows ) ) {
+			echo '<p><em>' . esc_html__( 'No designs are currently used in this layout.', 'threaddesk' ) . '</em></p>';
+			return;
+		}
+
+		echo '<div style="display:flex;flex-direction:column;gap:10px;">';
+		foreach ( $rows as $row ) {
+			echo '<div style="border:1px solid #ddd;border-radius:4px;padding:8px;">';
+			echo '<p style="margin:0 0 6px;"><strong>' . esc_html__( 'Design', 'threaddesk' ) . ':</strong> ' . esc_html( $row['design_name'] ) . '</p>';
+			if ( $row['design_id'] > 0 ) {
+				$edit_link = get_edit_post_link( $row['design_id'] );
+				if ( $edit_link ) {
+					echo '<p style="margin:0 0 6px;"><a href="' . esc_url( $edit_link ) . '">' . esc_html__( 'View design in backend', 'threaddesk' ) . '</a></p>';
+				}
+			}
+			echo '<p style="margin:0 0 4px;"><strong>' . esc_html__( 'Placement', 'threaddesk' ) . ':</strong> ' . esc_html( $row['placement'] ) . '</p>';
+			echo '<p style="margin:0 0 4px;"><strong>' . esc_html__( 'Approx. size', 'threaddesk' ) . ':</strong> ' . esc_html( $row['size'] ) . '</p>';
+			echo '<p style="margin:0;"><strong>' . esc_html__( 'Chosen colors', 'threaddesk' ) . ':</strong> ' . esc_html( empty( $row['colors'] ) ? __( 'None', 'threaddesk' ) : implode( ', ', $row['colors'] ) ) . '</p>';
+			echo '</div>';
+		}
+		echo '</div>';
+	}
+
+	private function get_layout_entry_size_label( $placement_key, $slider_value, $design_ratio ) {
+		$placement_key = sanitize_key( (string) $placement_key );
+		$slider_value = (float) $slider_value;
+		$ratio = (float) $design_ratio;
+		if ( $ratio <= 0 ) {
+			$ratio = 1;
+		}
+		$slider_min = 60;
+		$slider_max = 140;
+		$range_map = array(
+			'full_chest' => array( 'min' => 4.5, 'max' => 12.5 ),
+			'back'       => array( 'min' => 4.5, 'max' => 12.5 ),
+			'left_chest' => array( 'approx' => 4.0 ),
+			'right_chest'=> array( 'approx' => 4.0 ),
+			'left_sleeve'=> array( 'approx' => 4.0 ),
+			'right_sleeve'=> array( 'approx' => 4.0 ),
+		);
+		$range = isset( $range_map[ $placement_key ] ) ? $range_map[ $placement_key ] : array( 'approx' => 4.0 );
+		if ( isset( $range['min'], $range['max'] ) ) {
+			$clamped = max( $slider_min, min( $slider_max, $slider_value ) );
+			$normalized = ( $clamped - $slider_min ) / ( $slider_max - $slider_min );
+			$max_dimension = (float) $range['min'] + ( ( (float) $range['max'] - (float) $range['min'] ) * $normalized );
+		} else {
+			$max_dimension = (float) $range['approx'] * ( $slider_value / 100 );
+		}
+		$width = $max_dimension;
+		$height = $max_dimension;
+		if ( $ratio > 1 ) {
+			$height = $max_dimension / $ratio;
+		} elseif ( $ratio > 0 && $ratio < 1 ) {
+			$width = $max_dimension * $ratio;
+		}
+		return number_format_i18n( $width, 1 ) . '" W × ' . number_format_i18n( $height, 1 ) . '" H';
 	}
 
 	private function get_image_dimensions_from_url( $url ) {
@@ -1989,11 +2724,27 @@ class TTA_ThreadDesk {
 	}
 
 	public function filter_design_admin_columns( $columns ) {
-		return $this->filter_entity_admin_columns( $columns );
+		$columns = $this->filter_entity_admin_columns( $columns );
+		$updated = array();
+		foreach ( $columns as $key => $label ) {
+			$updated[ $key ] = $label;
+			if ( 'tta_internal_ref' === $key ) {
+				$updated['tta_design_status'] = __( 'Status', 'threaddesk' );
+			}
+		}
+		return $updated;
 	}
 
 	public function filter_layout_admin_columns( $columns ) {
-		return $this->filter_entity_admin_columns( $columns );
+		$columns = $this->filter_entity_admin_columns( $columns );
+		$updated = array();
+		foreach ( $columns as $key => $label ) {
+			$updated[ $key ] = $label;
+			if ( 'tta_internal_ref' === $key ) {
+				$updated['tta_layout_status'] = __( 'Status', 'threaddesk' );
+			}
+		}
+		return $updated;
 	}
 
 	public function render_custom_admin_columns( $column, $post_id ) {
@@ -2021,6 +2772,28 @@ class TTA_ThreadDesk {
 			echo '<a href="' . esc_url( $url ) . '">' . esc_html( $owner->display_name ) . '</a>';
 			return;
 		}
+		if ( 'tta_design_status' === $column ) {
+			if ( 'tta_design' !== $post->post_type ) {
+				echo '&mdash;';
+				return;
+			}
+			$status = $this->get_design_status( $post_id );
+			$options = $this->get_design_status_options();
+			$rejection_reason = $this->sanitize_design_rejection_reason( get_post_meta( $post_id, 'design_rejection_reason', true ) );
+			echo '<span class="threaddesk-design-status" data-threaddesk-design-status="' . esc_attr( $status ) . '" data-threaddesk-design-rejection-reason="' . esc_attr( $rejection_reason ) . '">' . esc_html( isset( $options[ $status ] ) ? $options[ $status ] : $options['pending'] ) . '</span>';
+			return;
+		}
+		if ( 'tta_layout_status' === $column ) {
+			if ( 'tta_layout' !== $post->post_type ) {
+				echo '&mdash;';
+				return;
+			}
+			$status = $this->get_layout_status( $post_id );
+			$options = $this->get_layout_status_options();
+			$rejection_reason = $this->sanitize_layout_rejection_reason( get_post_meta( $post_id, 'layout_rejection_reason', true ) );
+			echo '<span class="threaddesk-layout-status" data-threaddesk-layout-status="' . esc_attr( $status ) . '" data-threaddesk-layout-rejection-reason="' . esc_attr( $rejection_reason ) . '">' . esc_html( isset( $options[ $status ] ) ? $options[ $status ] : $options['pending'] ) . '</span>';
+			return;
+		}
 	}
 
 	private function filter_entity_sortable_columns( $columns ) {
@@ -2035,11 +2808,15 @@ class TTA_ThreadDesk {
 	}
 
 	public function filter_design_sortable_columns( $columns ) {
-		return $this->filter_entity_sortable_columns( $columns );
+		$columns = $this->filter_entity_sortable_columns( $columns );
+		$columns['tta_design_status'] = 'tta_design_status';
+		return $columns;
 	}
 
 	public function filter_layout_sortable_columns( $columns ) {
-		return $this->filter_entity_sortable_columns( $columns );
+		$columns = $this->filter_entity_sortable_columns( $columns );
+		$columns['tta_layout_status'] = 'tta_layout_status';
+		return $columns;
 	}
 
 	public function handle_admin_sorting_queries( $query ) {
@@ -2058,6 +2835,218 @@ class TTA_ThreadDesk {
 		}
 		if ( 'tta_owner' === $orderby ) {
 			$query->set( 'orderby', 'author' );
+			return;
+		}
+		if ( 'tta_design_status' === $orderby && 'tta_design' === $post_type ) {
+			$query->set( 'meta_key', 'design_status' );
+			$query->set( 'orderby', 'meta_value' );
+			return;
+		}
+		if ( 'tta_layout_status' === $orderby && 'tta_layout' === $post_type ) {
+			$query->set( 'meta_key', 'layout_status' );
+			$query->set( 'orderby', 'meta_value' );
+		}
+	}
+
+	public function render_design_quick_edit_status_field( $column_name, $post_type ) {
+		if ( 'tta_design_status' !== $column_name || 'tta_design' !== $post_type ) {
+			return;
+		}
+		$options = $this->get_design_status_options();
+		$rejection_reason_options = $this->get_design_rejection_reason_options();
+		wp_nonce_field( 'tta_threaddesk_design_status_quick_edit', 'tta_threaddesk_design_status_nonce' );
+		echo '<fieldset class="inline-edit-col-right">';
+		echo '<div class="inline-edit-col">';
+		echo '<label class="inline-edit-group">';
+		echo '<span class="title">' . esc_html__( 'Design status', 'threaddesk' ) . '</span>';
+		echo '<select name="threaddesk_design_status">';
+		foreach ( $options as $value => $label ) {
+			echo '<option value="' . esc_attr( $value ) . '">' . esc_html( $label ) . '</option>';
+		}
+		echo '</select>';
+		echo '</label>';
+		echo '<label class="inline-edit-group" data-threaddesk-quickedit-reason-wrap style="display:none;">';
+		echo '<span class="title">' . esc_html__( 'Rejection reason', 'threaddesk' ) . '</span>';
+		echo '<select name="threaddesk_design_rejection_reason">';
+		echo '<option value="">' . esc_html__( 'Select a reason', 'threaddesk' ) . '</option>';
+		foreach ( $rejection_reason_options as $value => $label ) {
+			echo '<option value="' . esc_attr( $value ) . '">' . esc_html( $label ) . '</option>';
+		}
+		echo '</select>';
+		echo '</label>';
+		echo '</div>';
+		echo '</fieldset>';
+	}
+
+	public function render_design_quick_edit_status_script() {
+		$screen = function_exists( 'get_current_screen' ) ? get_current_screen() : null;
+		if ( ! $screen || 'edit-tta_design' !== $screen->id ) {
+			return;
+		}
+		?>
+		<script>
+		jQuery(function ($) {
+			const $wpInlineEdit = inlineEditPost.edit;
+			const syncReasonVisibility = function ($row) {
+				const status = String($row.find('select[name="threaddesk_design_status"]').val() || '').toLowerCase();
+				$row.find('[data-threaddesk-quickedit-reason-wrap]').toggle(status === 'rejected');
+			};
+			inlineEditPost.edit = function (postId) {
+				$wpInlineEdit.apply(this, arguments);
+				let id = 0;
+				if (typeof(postId) === 'object') {
+					id = parseInt(this.getId(postId), 10);
+				} else {
+					id = parseInt(postId, 10);
+				}
+				if (!id) { return; }
+				const $editRow = $('#edit-' + id);
+				const $postRow = $('#post-' + id);
+				const rawStatus = String(($postRow.find('.threaddesk-design-status').attr('data-threaddesk-design-status') || 'pending')).toLowerCase();
+				const rawReason = String(($postRow.find('.threaddesk-design-status').attr('data-threaddesk-design-rejection-reason') || '')).toLowerCase();
+				const status = rawStatus === 'approved' || rawStatus === 'rejected' ? rawStatus : 'pending';
+				$editRow.find('select[name="threaddesk_design_status"]').val(status);
+				$editRow.find('select[name="threaddesk_design_rejection_reason"]').val(rawReason);
+				syncReasonVisibility($editRow);
+			};
+
+			$(document).on('change', 'tr.inline-editor select[name="threaddesk_design_status"]', function () {
+				syncReasonVisibility($(this).closest('tr.inline-editor'));
+			});
+		});
+		</script>
+		<?php
+	}
+
+	public function render_layout_quick_edit_status_field( $column_name, $post_type ) {
+		if ( 'tta_layout_status' !== $column_name || 'tta_layout' !== $post_type ) {
+			return;
+		}
+		$options = $this->get_layout_status_options();
+		$rejection_reason_options = $this->get_layout_rejection_reason_options();
+		wp_nonce_field( 'tta_threaddesk_layout_status_quick_edit', 'tta_threaddesk_layout_status_nonce' );
+		echo '<fieldset class="inline-edit-col-right">';
+		echo '<div class="inline-edit-col">';
+		echo '<label class="inline-edit-group">';
+		echo '<span class="title">' . esc_html__( 'Layout status', 'threaddesk' ) . '</span>';
+		echo '<select name="threaddesk_layout_status">';
+		foreach ( $options as $value => $label ) {
+			echo '<option value="' . esc_attr( $value ) . '">' . esc_html( $label ) . '</option>';
+		}
+		echo '</select>';
+		echo '</label>';
+		echo '<label class="inline-edit-group" data-threaddesk-layout-quickedit-reason-wrap style="display:none;">';
+		echo '<span class="title">' . esc_html__( 'Rejection reason', 'threaddesk' ) . '</span>';
+		echo '<select name="threaddesk_layout_rejection_reason">';
+		echo '<option value="">' . esc_html__( 'Select a reason', 'threaddesk' ) . '</option>';
+		foreach ( $rejection_reason_options as $value => $label ) {
+			echo '<option value="' . esc_attr( $value ) . '">' . esc_html( $label ) . '</option>';
+		}
+		echo '</select>';
+		echo '</label>';
+		echo '</div>';
+		echo '</fieldset>';
+	}
+
+	public function render_layout_quick_edit_status_script() {
+		$screen = function_exists( 'get_current_screen' ) ? get_current_screen() : null;
+		if ( ! $screen || 'edit-tta_layout' !== $screen->id ) {
+			return;
+		}
+		?>
+		<script>
+		jQuery(function ($) {
+			const $wpInlineEdit = inlineEditPost.edit;
+			const syncReasonVisibility = function ($row) {
+				const status = String($row.find('select[name="threaddesk_layout_status"]').val() || '').toLowerCase();
+				$row.find('[data-threaddesk-layout-quickedit-reason-wrap]').toggle(status === 'rejected');
+			};
+			inlineEditPost.edit = function (postId) {
+				$wpInlineEdit.apply(this, arguments);
+				let id = 0;
+				if (typeof(postId) === 'object') {
+					id = parseInt(this.getId(postId), 10);
+				} else {
+					id = parseInt(postId, 10);
+				}
+				if (!id) { return; }
+				const $editRow = $('#edit-' + id);
+				const $postRow = $('#post-' + id);
+				const rawStatus = String(($postRow.find('.threaddesk-layout-status').attr('data-threaddesk-layout-status') || 'pending')).toLowerCase();
+				const rawReason = String(($postRow.find('.threaddesk-layout-status').attr('data-threaddesk-layout-rejection-reason') || '')).toLowerCase();
+				const status = rawStatus === 'approved' || rawStatus === 'rejected' ? rawStatus : 'pending';
+				$editRow.find('select[name="threaddesk_layout_status"]').val(status);
+				$editRow.find('select[name="threaddesk_layout_rejection_reason"]').val(rawReason);
+				syncReasonVisibility($editRow);
+			};
+
+			$(document).on('change', 'tr.inline-editor select[name="threaddesk_layout_status"]', function () {
+				syncReasonVisibility($(this).closest('tr.inline-editor'));
+			});
+		});
+		</script>
+		<?php
+	}
+
+	public function handle_design_status_save( $post_id, $post ) {
+		if ( ! $post || 'tta_design' !== $post->post_type ) {
+			return;
+		}
+		if ( defined( 'DOING_AUTOSAVE' ) && DOING_AUTOSAVE ) {
+			return;
+		}
+		if ( ! current_user_can( 'edit_post', $post_id ) ) {
+			return;
+		}
+		if ( ! isset( $_POST['threaddesk_design_status'] ) ) {
+			return;
+		}
+		$has_quick_edit_nonce = isset( $_POST['tta_threaddesk_design_status_nonce'] ) && wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['tta_threaddesk_design_status_nonce'] ) ), 'tta_threaddesk_design_status_quick_edit' );
+		$has_meta_box_nonce   = isset( $_POST['tta_threaddesk_design_status_meta_nonce'] ) && wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['tta_threaddesk_design_status_meta_nonce'] ) ), 'tta_threaddesk_design_status_meta_box' );
+		if ( ! $has_quick_edit_nonce && ! $has_meta_box_nonce ) {
+			return;
+		}
+		$status = $this->sanitize_design_status( wp_unslash( $_POST['threaddesk_design_status'] ) );
+		$reason = isset( $_POST['threaddesk_design_rejection_reason'] ) ? $this->sanitize_design_rejection_reason( wp_unslash( $_POST['threaddesk_design_rejection_reason'] ) ) : '';
+		if ( 'rejected' === $status && '' === $reason ) {
+			return;
+		}
+		update_post_meta( $post_id, 'design_status', $status );
+		if ( 'rejected' === $status ) {
+			update_post_meta( $post_id, 'design_rejection_reason', $reason );
+		} else {
+			delete_post_meta( $post_id, 'design_rejection_reason' );
+		}
+	}
+
+	public function handle_layout_status_save( $post_id, $post ) {
+		if ( ! $post || 'tta_layout' !== $post->post_type ) {
+			return;
+		}
+		if ( defined( 'DOING_AUTOSAVE' ) && DOING_AUTOSAVE ) {
+			return;
+		}
+		if ( ! current_user_can( 'edit_post', $post_id ) ) {
+			return;
+		}
+		if ( ! isset( $_POST['threaddesk_layout_status'] ) ) {
+			return;
+		}
+		$has_quick_edit_nonce = isset( $_POST['tta_threaddesk_layout_status_nonce'] ) && wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['tta_threaddesk_layout_status_nonce'] ) ), 'tta_threaddesk_layout_status_quick_edit' );
+		$has_meta_box_nonce   = isset( $_POST['tta_threaddesk_layout_status_meta_nonce'] ) && wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['tta_threaddesk_layout_status_meta_nonce'] ) ), 'tta_threaddesk_layout_status_meta_box' );
+		if ( ! $has_quick_edit_nonce && ! $has_meta_box_nonce ) {
+			return;
+		}
+		$status = $this->sanitize_layout_status( wp_unslash( $_POST['threaddesk_layout_status'] ) );
+		$reason = isset( $_POST['threaddesk_layout_rejection_reason'] ) ? $this->sanitize_layout_rejection_reason( wp_unslash( $_POST['threaddesk_layout_rejection_reason'] ) ) : '';
+		if ( 'rejected' === $status && '' === $reason ) {
+			return;
+		}
+		update_post_meta( $post_id, 'layout_status', $status );
+		if ( 'rejected' === $status ) {
+			update_post_meta( $post_id, 'layout_rejection_reason', $reason );
+		} else {
+			delete_post_meta( $post_id, 'layout_rejection_reason' );
 		}
 	}
 
