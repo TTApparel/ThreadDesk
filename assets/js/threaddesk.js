@@ -986,13 +986,13 @@ jQuery(function ($) {
 				selectedDesignNameEl.text(selectedDesignName.toUpperCase());
 				layoutPaletteState.recolorCache = {};
 				renderAdjustPaletteDots();
+				setPanelStep('adjust');
 				renderStageSavedOverlays(currentAngle);
 				applySelectedDesign(String(savedForPlacement.url || '').trim(), {
 					top: Number(savedForPlacement.top || 0),
 					left: Number(savedForPlacement.left || 0),
 					width: Number(savedForPlacement.width || 0),
 				});
-				setPanelStep('adjust');
 				return;
 			}
 			designHeading.text('Choose Design for ' + selectedPlacementLabel);
@@ -1010,8 +1010,15 @@ jQuery(function ($) {
 			setPanelStep('designs');
 		});
 
-		$(document).on('click', '[data-threaddesk-layout-back-to-placements]', function () { setPanelStep('placements'); });
-		$(document).on('click', '[data-threaddesk-layout-back-to-designs]', function () { setPanelStep('designs'); });
+		$(document).on('click', '[data-threaddesk-layout-back-to-placements]', function () {
+			setPanelStep('placements');
+			renderStageSavedOverlays(currentAngle);
+		});
+		$(document).on('click', '[data-threaddesk-layout-back-to-designs]', function () {
+			setPanelStep('designs');
+			hideOverlay();
+			renderStageSavedOverlays(currentAngle);
+		});
 
 
 		const resumeLayoutDesignStepFromQuery = function () {
@@ -1095,9 +1102,10 @@ jQuery(function ($) {
 			layoutPaletteState.recolorCache = {};
 			selectedDesignNameEl.text(selectedDesignName.toUpperCase());
 			renderAdjustPaletteDots();
+			setPanelStep('adjust');
+			renderStageSavedOverlays(currentAngle);
 			applySelectedDesign(url);
 			setDesignRatioFromUrl(url);
-			setPanelStep('adjust');
 		});
 
 		const updateDragPosition = function (clientX, clientY) {
