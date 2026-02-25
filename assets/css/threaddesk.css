@@ -1679,7 +1679,7 @@ body.threaddesk-modal-open {
 
 .threaddesk-layout-viewer__angle.is-active {
 	border-color: #111;
-	box-shadow: 0 0 0 2px #111 inset;
+	box-shadow: 0 0 0 1px #111 inset;
 }
 
 
