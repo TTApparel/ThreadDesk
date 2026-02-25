@@ -1253,18 +1253,27 @@ body.threaddesk-modal-open {
 	width: 240px;
 	background: #fff;
 	min-height: 300px;
+	max-height: 100%;
 	display: flex;
 	flex-direction: column;
 }
 
+.threaddesk-layout-viewer__panel-step:not([hidden]) {
+	display: flex;
+	flex-direction: column;
+	flex: 1 1 auto;
+	min-height: 100%;
+}
+
 .threaddesk-layout-viewer__design-panel h4 {
-	margin: 0 0 12px;
+	margin: 0;
 	text-transform: uppercase;
 	font-size: 14px;
 	letter-spacing: .08em;
 }
 
 .threaddesk-layout-viewer__back-button {
+	margin-bottom: 20px;
 	padding: 0;
 	border: 0;
 	background: transparent;
@@ -1276,9 +1285,32 @@ body.threaddesk-modal-open {
 
 
 
+
+.threaddesk-layout-viewer__save-layout-form {
+	margin-top: auto;
+}
+
+.threaddesk-layout-viewer__save-layout-button {
+	width: 100%;
+	padding: 10px;
+	border: 1px solid #111;
+	background: #111;
+	color: #fff;
+	text-transform: uppercase;
+	letter-spacing: .06em;
+	font-size: 12px;
+	cursor: pointer;
+}
+
+.threaddesk-layout-viewer__save-layout-button:hover,
+.threaddesk-layout-viewer__save-layout-button:focus-visible {
+	background: #2d2d2d;
+	outline: none;
+}
+
 .threaddesk-layout-viewer__add-design-button {
 	width: 100%;
-	margin-top: 10px;
+	margin-top: auto;
 	padding: 10px;
 	border: 1px solid #111;
 	background: #111;
@@ -1356,6 +1388,7 @@ body.threaddesk-modal-open {
 .threaddesk-layout-viewer__design-list {
 	display: grid;
 	gap: 10px;
+	margin-bottom: 10px;
 }
 
 .threaddesk-layout-viewer__design-option {
@@ -1399,16 +1432,75 @@ body.threaddesk-modal-open {
 	color: #2e2e2e;
 }
 
-.threaddesk-layout-viewer__selection-placement {
-	padding: 10px;
-	background: #111;
-	color: #fff;
+.threaddesk-layout-viewer__adjust-palette-label {
 	font-size: 12px;
-	text-align: center;
 	text-transform: uppercase;
 	letter-spacing: .06em;
-	font-weight: 700;
-	margin-bottom: 12px;
+	margin-bottom: 6px;
+	color: #2e2e2e;
+}
+
+.threaddesk-layout-viewer__adjust-palette {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px;
+	margin-bottom: 10px;
+}
+
+.threaddesk-layout-viewer__palette-dot {
+	width: 16px;
+	height: 16px;
+	border-radius: 50%;
+	border: 1px solid #cfcfcf;
+	background: var(--threaddesk-layout-palette-color, #111);
+	cursor: pointer;
+	padding: 0;
+}
+
+.threaddesk-layout-viewer__palette-dot:hover,
+.threaddesk-layout-viewer__palette-dot:focus-visible {
+	outline: 1px solid #111;
+	outline-offset: 1px;
+}
+
+.threaddesk-layout-viewer__adjust-palette-options-label {
+	font-size: 12px;
+	text-transform: uppercase;
+	letter-spacing: .06em;
+	margin-bottom: 6px;
+	color: #2e2e2e;
+}
+
+.threaddesk-layout-viewer__adjust-palette-options {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 6px;
+	margin-bottom: 10px;
+}
+
+.threaddesk-layout-viewer__adjust-palette-choice {
+	width: 18px;
+	height: 18px;
+	border-radius: 50%;
+	border: 1px solid #bfbfbf;
+	background: var(--threaddesk-layout-palette-choice-color, #111);
+	cursor: pointer;
+	padding: 0;
+}
+
+.threaddesk-layout-viewer__adjust-palette-choice.is-active,
+.threaddesk-layout-viewer__adjust-palette-choice:hover,
+.threaddesk-layout-viewer__adjust-palette-choice:focus-visible {
+	outline: 2px solid #111;
+	outline-offset: 1px;
+}
+
+.threaddesk-layout-viewer__palette-dot.is-transparent,
+.threaddesk-layout-viewer__adjust-palette-choice.is-transparent {
+	background-image: linear-gradient(45deg, #d7d7d7 25%, transparent 25%), linear-gradient(-45deg, #d7d7d7 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #d7d7d7 75%), linear-gradient(-45deg, transparent 75%, #d7d7d7 75%);
+	background-size: 8px 8px;
+	background-position: 0 0, 0 4px, 4px -4px, -4px 0;
+	background-color: #fff;
 }
 
 .threaddesk-layout-viewer__size-label {
@@ -1421,7 +1513,7 @@ body.threaddesk-modal-open {
 
 .threaddesk-layout-viewer__size-slider {
 	width: 100%;
-	margin: 0;
+	margin: 0 0 4px;
 	accent-color: #111;
 }
 
@@ -1466,9 +1558,11 @@ body.threaddesk-modal-open {
 .threaddesk-layout-viewer__adjust-actions {
 	display: grid;
 	gap: 8px;
+	margin-top: auto;
 }
 
 .threaddesk-layout-viewer__save-button {
+	margin-top: 20px;
 	width: 100%;
 	padding: 10px;
 	border: 1px solid #111;

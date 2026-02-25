@@ -53,6 +53,7 @@ class TTA_ThreadDesk {
 		add_action( 'admin_post_tta_threaddesk_avatar_upload', array( $this, 'handle_avatar_upload' ) );
 		add_action( 'admin_post_tta_threaddesk_update_address', array( $this, 'handle_update_address' ) );
 		add_action( 'admin_post_tta_threaddesk_save_design', array( $this, 'handle_save_design' ) );
+		add_action( 'admin_post_tta_threaddesk_save_layout', array( $this, 'handle_save_layout' ) );
 		add_action( 'admin_post_tta_threaddesk_rename_design', array( $this, 'handle_rename_design' ) );
 		add_action( 'admin_post_tta_threaddesk_delete_design', array( $this, 'handle_delete_design' ) );
 		add_action( 'user_register', array( $this, 'handle_user_register' ) );
@@ -662,6 +663,11 @@ class TTA_ThreadDesk {
 		return add_query_arg( 'td_section', 'designs', trailingslashit( wc_get_account_endpoint_url( 'thread-desk' ) ) );
 	}
 
+	private function get_layouts_redirect_url( $query_args = array() ) {
+		$base = add_query_arg( 'td_section', 'layouts', trailingslashit( wc_get_account_endpoint_url( 'thread-desk' ) ) );
+		return ! empty( $query_args ) && is_array( $query_args ) ? add_query_arg( $query_args, $base ) : $base;
+	}
+
 
 	private function get_user_design_storage( $user_id ) {
 		$uploads = wp_upload_dir();
@@ -815,6 +821,118 @@ class TTA_ThreadDesk {
 		}
 	}
 
+
+	public function handle_save_layout() {
+		if ( ! is_user_logged_in() ) {
+			wp_die( esc_html__( 'Unauthorized.', 'threaddesk' ) );
+		}
+
+		check_admin_referer( 'tta_threaddesk_save_layout' );
+
+		$current_user_id = get_current_user_id();
+		$category_slug   = isset( $_POST['threaddesk_layout_category'] ) ? sanitize_key( wp_unslash( $_POST['threaddesk_layout_category'] ) ) : '';
+		$category_id     = isset( $_POST['threaddesk_layout_category_id'] ) ? absint( $_POST['threaddesk_layout_category_id'] ) : 0;
+		$payload_raw     = isset( $_POST['threaddesk_layout_payload'] ) ? wp_unslash( $_POST['threaddesk_layout_payload'] ) : '';
+		$payload         = json_decode( (string) $payload_raw, true );
+		if ( ! is_array( $payload ) ) {
+			$payload = array();
+		}
+
+		$placements_by_angle = isset( $payload['placementsByAngle'] ) && is_array( $payload['placementsByAngle'] ) ? $payload['placementsByAngle'] : array();
+		$has_any_placement   = false;
+		$related_design_ids  = array();
+		foreach ( $placements_by_angle as $angle => $placements ) {
+			if ( ! is_array( $placements ) ) {
+				continue;
+			}
+			foreach ( $placements as $placement_key => $entry ) {
+				if ( ! is_array( $entry ) ) {
+					continue;
+				}
+				if ( ! empty( $entry['url'] ) ) {
+					$has_any_placement = true;
+				}
+				$design_id = isset( $entry['designId'] ) ? absint( $entry['designId'] ) : 0;
+				if ( $design_id > 0 ) {
+					$related_design_ids[] = $design_id;
+				}
+				$placements_by_angle[ $angle ][ $placement_key ] = array(
+					'url'            => isset( $entry['url'] ) ? esc_url_raw( (string) $entry['url'] ) : '',
+					'baseUrl'        => isset( $entry['baseUrl'] ) ? esc_url_raw( (string) $entry['baseUrl'] ) : '',
+					'designId'       => $design_id,
+					'designName'     => isset( $entry['designName'] ) ? sanitize_text_field( (string) $entry['designName'] ) : '',
+					'placementLabel' => isset( $entry['placementLabel'] ) ? sanitize_text_field( (string) $entry['placementLabel'] ) : '',
+					'placementKey'   => sanitize_key( (string) $placement_key ),
+					'angle'          => sanitize_key( (string) $angle ),
+					'top'            => isset( $entry['top'] ) ? (float) $entry['top'] : 0,
+					'left'           => isset( $entry['left'] ) ? (float) $entry['left'] : 0,
+					'width'          => isset( $entry['width'] ) ? (float) $entry['width'] : 0,
+					'baseWidth'      => isset( $entry['baseWidth'] ) ? (float) $entry['baseWidth'] : 0,
+					'sliderValue'    => isset( $entry['sliderValue'] ) ? (float) $entry['sliderValue'] : 100,
+					'designRatio'    => isset( $entry['designRatio'] ) ? (float) $entry['designRatio'] : 1,
+					'paletteBase'    => isset( $entry['paletteBase'] ) && is_array( $entry['paletteBase'] ) ? array_map( 'sanitize_text_field', $entry['paletteBase'] ) : array(),
+					'paletteCurrent' => isset( $entry['paletteCurrent'] ) && is_array( $entry['paletteCurrent'] ) ? array_map( 'sanitize_text_field', $entry['paletteCurrent'] ) : array(),
+				);
+			}
+		}
+
+		if ( ! $has_any_placement ) {
+			if ( function_exists( 'wc_add_notice' ) ) {
+				wc_add_notice( __( 'Please save at least one placement before saving the layout.', 'threaddesk' ), 'error' );
+			}
+			wp_safe_redirect( $this->get_layouts_redirect_url() );
+			exit;
+		}
+
+		$category_label = $category_slug;
+		if ( $category_id > 0 ) {
+			$term = get_term( $category_id, 'product_cat' );
+			if ( $term && ! is_wp_error( $term ) ) {
+				$category_label = $term->name;
+			}
+		}
+		if ( '' === $category_label ) {
+			$category_label = __( 'Layout', 'threaddesk' );
+		}
+
+		$layout_title = sprintf( __( '%1$s Layout %2$s', 'threaddesk' ), $category_label, date_i18n( 'Y-m-d H:i' ) );
+		$layout_id    = wp_insert_post(
+			array(
+				'post_type'   => 'tta_layout',
+				'post_status' => 'private',
+				'post_title'  => $layout_title,
+				'post_author' => $current_user_id,
+			)
+		);
+
+		if ( ! $layout_id || is_wp_error( $layout_id ) ) {
+			if ( function_exists( 'wc_add_notice' ) ) {
+				wc_add_notice( __( 'Unable to save layout right now.', 'threaddesk' ), 'error' );
+			}
+			wp_safe_redirect( $this->get_layouts_redirect_url() );
+			exit;
+		}
+
+		$payload['placementsByAngle'] = $placements_by_angle;
+		$payload['category']          = $category_slug;
+		$payload['categoryId']        = $category_id;
+		$payload['relatedDesignIds']  = array_values( array_unique( array_filter( array_map( 'absint', $related_design_ids ) ) ) );
+
+		update_post_meta( $layout_id, 'layout_category', $category_slug );
+		update_post_meta( $layout_id, 'layout_category_id', $category_id );
+		update_post_meta( $layout_id, 'layout_payload', wp_json_encode( $payload ) );
+		update_post_meta( $layout_id, 'layout_placements', wp_json_encode( $placements_by_angle ) );
+		update_post_meta( $layout_id, 'layout_related_design_ids', wp_json_encode( $payload['relatedDesignIds'] ) );
+		update_post_meta( $layout_id, 'created_at', current_time( 'mysql' ) );
+
+		if ( function_exists( 'wc_add_notice' ) ) {
+			wc_add_notice( __( 'Layout saved successfully.', 'threaddesk' ), 'success' );
+		}
+
+		wp_safe_redirect( $this->get_layouts_redirect_url() );
+		exit;
+	}
+
 	public function handle_save_design() {
 		if ( ! is_user_logged_in() ) {
 			wp_die( esc_html__( 'Unauthorized.', 'threaddesk' ) );
@@ -829,12 +947,28 @@ class TTA_ThreadDesk {
 		$file_name         = '';
 		$title_input       = isset( $_POST['threaddesk_design_title'] ) ? sanitize_text_field( wp_unslash( $_POST['threaddesk_design_title'] ) ) : '';
 		$storage           = $this->get_user_design_storage( $current_user_id );
+		$return_context   = isset( $_POST['threaddesk_design_return_context'] ) ? sanitize_key( wp_unslash( $_POST['threaddesk_design_return_context'] ) ) : '';
+		$return_category  = isset( $_POST['threaddesk_design_return_layout_category'] ) ? sanitize_key( wp_unslash( $_POST['threaddesk_design_return_layout_category'] ) ) : '';
+		$return_placement = isset( $_POST['threaddesk_design_return_layout_placement'] ) ? sanitize_key( wp_unslash( $_POST['threaddesk_design_return_layout_placement'] ) ) : '';
+		$redirect_url     = $this->get_designs_redirect_url();
+		if ( 'layout_viewer' === $return_context ) {
+			$query_args = array(
+				'td_layout_return' => '1',
+			);
+			if ( '' !== $return_category ) {
+				$query_args['td_layout_category'] = $return_category;
+			}
+			if ( '' !== $return_placement ) {
+				$query_args['td_layout_placement'] = $return_placement;
+			}
+			$redirect_url = $this->get_layouts_redirect_url( $query_args );
+		}
 
 		if ( ! $storage ) {
 			if ( function_exists( 'wc_add_notice' ) ) {
 				wc_add_notice( __( 'Unable to access your design storage directory.', 'threaddesk' ), 'error' );
 			}
-			wp_safe_redirect( $this->get_designs_redirect_url() );
+			wp_safe_redirect( $redirect_url );
 			exit;
 		}
 
@@ -857,7 +991,7 @@ class TTA_ThreadDesk {
 				if ( function_exists( 'wc_add_notice' ) ) {
 					wc_add_notice( __( 'Design upload failed. Please try again.', 'threaddesk' ), 'error' );
 				}
-				wp_safe_redirect( $this->get_designs_redirect_url() );
+				wp_safe_redirect( $redirect_url );
 				exit;
 			}
 			$file_name = sanitize_file_name( wp_basename( $upload['file'] ) );
@@ -868,7 +1002,7 @@ class TTA_ThreadDesk {
 				if ( function_exists( 'wc_add_notice' ) ) {
 					wc_add_notice( __( 'Please choose a design file before saving.', 'threaddesk' ), 'error' );
 				}
-				wp_safe_redirect( $this->get_designs_redirect_url() );
+				wp_safe_redirect( $redirect_url );
 				exit;
 			}
 
@@ -890,7 +1024,7 @@ class TTA_ThreadDesk {
 				if ( function_exists( 'wc_add_notice' ) ) {
 					wc_add_notice( __( 'Unable to save design right now.', 'threaddesk' ), 'error' );
 				}
-				wp_safe_redirect( $this->get_designs_redirect_url() );
+				wp_safe_redirect( $redirect_url );
 				exit;
 			}
 		}
@@ -954,7 +1088,7 @@ class TTA_ThreadDesk {
 				if ( function_exists( 'wc_add_notice' ) ) {
 					wc_add_notice( __( 'Unable to finalize design upload.', 'threaddesk' ), 'error' );
 				}
-				wp_safe_redirect( $this->get_designs_redirect_url() );
+				wp_safe_redirect( $redirect_url );
 				exit;
 			}
 
@@ -1050,7 +1184,7 @@ class TTA_ThreadDesk {
 			wc_add_notice( __( 'Design saved successfully.', 'threaddesk' ), 'success' );
 		}
 
-		wp_safe_redirect( $this->get_designs_redirect_url() );
+		wp_safe_redirect( $redirect_url );
 		exit;
 	}
 

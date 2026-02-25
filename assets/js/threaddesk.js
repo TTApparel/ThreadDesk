@@ -46,6 +46,8 @@ jQuery(function ($) {
 
 
 
+
+
 		$(document).on('keyup', function (event) {
 			if (event.key === 'Escape') {
 				closeModal();
@@ -130,6 +132,10 @@ jQuery(function ($) {
 		};
 		const placementList = layoutModal.find('[data-threaddesk-layout-placement-list]');
 		const placementEmpty = layoutModal.find('[data-threaddesk-layout-placement-empty]');
+		const saveLayoutForm = layoutModal.find('[data-threaddesk-layout-save-layout-form]');
+		const saveLayoutCategoryField = layoutModal.find('[data-threaddesk-layout-save-category]');
+		const saveLayoutCategoryIdField = layoutModal.find('[data-threaddesk-layout-save-category-id]');
+		const saveLayoutPayloadField = layoutModal.find('[data-threaddesk-layout-save-payload]');
 		const placementPanelStep = layoutModal.find('[data-threaddesk-layout-panel-step="placements"]');
 		const designPanelStep = layoutModal.find('[data-threaddesk-layout-panel-step="designs"]');
 		const adjustPanelStep = layoutModal.find('[data-threaddesk-layout-panel-step="adjust"]');
@@ -139,15 +145,23 @@ jQuery(function ($) {
 		const designOverlay = layoutModal.find('[data-threaddesk-layout-design-overlay]');
 		const sizeSlider = layoutModal.find('[data-threaddesk-layout-size-slider]');
 		const sizeReading = layoutModal.find('[data-threaddesk-layout-size-reading]');
-		const selectedPlacementBox = layoutModal.find('[data-threaddesk-layout-selected-placement]');
 		const selectedDesignNameEl = layoutModal.find('[data-threaddesk-layout-selected-design]');
+		const adjustHeading = layoutModal.find('[data-threaddesk-layout-adjust-heading]');
+		const adjustPaletteLabel = layoutModal.find('[data-threaddesk-layout-adjust-palette-label]');
+		const adjustPalette = layoutModal.find('[data-threaddesk-layout-adjust-palette]');
+		const adjustPaletteOptionsLabel = layoutModal.find('[data-threaddesk-layout-adjust-palette-options-label]');
+		const adjustPaletteOptions = layoutModal.find('[data-threaddesk-layout-adjust-palette-options]');
 		const layoutDesignsRaw = layoutModal.attr('data-threaddesk-layout-designs') || '[]';
 		let layoutDesigns = [];
 		try { layoutDesigns = JSON.parse(layoutDesignsRaw); } catch (e) { layoutDesigns = []; }
 
+		let selectedCategorySlug = '';
+		let selectedCategoryId = 0;
 		let selectedPlacementLabel = '';
 		let selectedPlacementKey = '';
 		let selectedDesignName = '';
+		let selectedDesignMeta = null;
+		let selectedDesignBaseSourceUrl = '';
 		let selectedBaseWidthPct = 34;
 		let selectedDesignSourceUrl = '';
 		let selectedDesignAspectRatio = 1;
@@ -161,6 +175,14 @@ jQuery(function ($) {
 		const savedPlacementsByAngle = { front: {}, left: {}, back: {}, right: {} };
 		const overlayRenderScale = 0.7;
 		const designRatioCache = {};
+		const layoutPaletteOptionSet = ['transparent','#FFFFFF','#000000','#FEDB00','#FED141','#FFB81C','#FF6A39','#E38331','#BE531C','#C8102E','#D22730','#BE3A34','#A6192E','#A50034','#FF85BD','#BA9CC5','#512D6D','#833177','#351F65','#10069F','#131F29','#28334A','#002D72','#004C97','#0076A8','#8BBEE8','#0092CB','#00AFD7','#007C80','#007A53','#00AD50','#249E6B','#00664F','#304F42','#4E3629','#7B4D35','#D3BC8D','#D5CB9F','#B1B3B3','#A7A8AA','#F2E9DB'];
+		const layoutPaletteState = {
+			basePalette: [],
+			currentPalette: [],
+			activeIndex: -1,
+			recolorCache: {},
+			optionsVisible: false,
+		};
 
 		const placementStyleMap = {
 			left_chest: { top: 36, left: 40, width: 18, approx: 4.5, readoutApprox: 4 },
@@ -209,6 +231,23 @@ jQuery(function ($) {
 			return 'Design';
 		};
 
+		const updateSaveLayoutVisibility = function () {
+			const hasCompletedPlacements = placementList.find('.threaddesk-layout-viewer__placement-option.is-complete').length > 0;
+			saveLayoutForm.prop('hidden', !hasCompletedPlacements);
+		};
+
+		const buildLayoutPayload = function () {
+			const payload = {
+				category: selectedCategorySlug,
+				categoryId: Number(selectedCategoryId || 0),
+				angles: currentAngles,
+				currentAngle: currentAngle,
+				placementsByAngle: savedPlacementsByAngle,
+				savedAt: new Date().toISOString(),
+			};
+			return JSON.stringify(payload);
+		};
+
 		const updatePlacementOptionStatus = function (placementKey, placementLabel, designUrl, fallbackName) {
 			const key = String(placementKey || '').trim();
 			if (!key) { return; }
@@ -220,6 +259,7 @@ jQuery(function ($) {
 				.addClass('is-complete')
 				.attr('data-threaddesk-layout-placement-complete', '1')
 				.html('<span class="threaddesk-layout-viewer__placement-abbr">' + $('<div>').text(abbr).html() + '</span><span class="threaddesk-layout-viewer__placement-file">' + $('<div>').text(displayName).html() + '</span>');
+			updateSaveLayoutVisibility();
 		};
 
 		const setDesignRatioFromUrl = function (url) {
@@ -277,6 +317,7 @@ jQuery(function ($) {
 		const hideOverlay = function () {
 			designOverlay.attr('src', '').prop('hidden', true).removeAttr('style');
 			selectedDesignSourceUrl = '';
+			selectedDesignBaseSourceUrl = '';
 			currentOverlayConfig = null;
 		};
 
@@ -370,6 +411,7 @@ jQuery(function ($) {
 			viewerStep.removeClass('is-active').prop('hidden', true).attr('aria-hidden', 'true');
 			placementList.empty();
 			placementEmpty.hide();
+			saveLayoutForm.prop('hidden', true);
 			designList.empty();
 			designEmpty.hide();
 			selectedPlacementLabel = '';
@@ -377,8 +419,11 @@ jQuery(function ($) {
 			selectedDesignName = '';
 			selectedBaseWidthPct = 34;
 			sizeSlider.val(100);
-			selectedPlacementBox.text('Placement');
 			selectedDesignNameEl.text('No design selected');
+			selectedDesignMeta = null;
+			selectedDesignBaseSourceUrl = '';
+			renderAdjustPaletteDots();
+			adjustHeading.text('Adjust Placement');
 			Object.keys(savedPlacementsByAngle).forEach(function (angle) { savedPlacementsByAngle[angle] = {}; });
 			clearAngleOverlays();
 			clearStageSavedOverlays();
@@ -396,6 +441,7 @@ jQuery(function ($) {
 			const items = Array.isArray(placements) ? placements : [];
 			if (!items.length) {
 				placementEmpty.show();
+				saveLayoutForm.prop('hidden', true);
 				return;
 			}
 			placementEmpty.hide();
@@ -410,6 +456,7 @@ jQuery(function ($) {
 				placementList.append(btn);
 			});
 			if (!placementList.children().length) { placementEmpty.show(); }
+			updateSaveLayoutVisibility();
 		};
 
 		const renderDesignOptions = function () {
@@ -423,13 +470,23 @@ jQuery(function ($) {
 				const preview = String((design && design.preview) || '').trim();
 				const mockup = String((design && design.mockup) || '').trim();
 				const ratio = Number((design && design.ratio) || 0);
+				const designId = Number((design && design.id) || 0);
+				const fileName = String((design && design.fileName) || '').trim();
+				const palette = String((design && design.palette) || '[]').trim() || '[]';
+				const settings = String((design && design.settings) || '{}').trim() || '{}';
+				const svgName = String((design && design.svgName) || '').trim();
 				const displayImage = mockup || preview || svg;
 				const option = $('<button type="button" class="threaddesk-layout-viewer__design-option"></button>')
 					.attr('data-threaddesk-layout-design-name', title)
 					.attr('data-threaddesk-layout-design-svg', svg)
 					.attr('data-threaddesk-layout-design-preview', preview)
 					.attr('data-threaddesk-layout-design-mockup', mockup)
-					.attr('data-threaddesk-layout-design-ratio', ratio > 0 ? String(ratio) : '');
+					.attr('data-threaddesk-layout-design-ratio', ratio > 0 ? String(ratio) : '')
+					.attr('data-threaddesk-layout-design-id', designId > 0 ? String(designId) : '')
+					.attr('data-threaddesk-layout-design-file-name', fileName)
+					.attr('data-threaddesk-layout-design-palette', palette)
+					.attr('data-threaddesk-layout-design-settings', settings)
+					.attr('data-threaddesk-layout-design-svg-name', svgName);
 				if (displayImage) {
 					option.append($('<img class="threaddesk-layout-viewer__design-option-image" alt="" aria-hidden="true" />').attr('src', displayImage));
 				}
@@ -437,6 +494,202 @@ jQuery(function ($) {
 				designList.append(option);
 			});
 		};
+
+
+		const parseLayoutColor = function (value) {
+			const token = String(value || '').trim();
+			if (!token) { return null; }
+			if (token.toLowerCase() === 'transparent') {
+				return { token: 'transparent', rgb: [255, 255, 255], alpha: 0 };
+			}
+			const normalized = token.replace('#', '').toUpperCase();
+			if (!/^[0-9A-F]{6}$/.test(normalized)) { return null; }
+			return {
+				token: '#' + normalized,
+				rgb: [
+					parseInt(normalized.substring(0, 2), 16),
+					parseInt(normalized.substring(2, 4), 16),
+					parseInt(normalized.substring(4, 6), 16),
+				],
+				alpha: 255,
+			};
+		};
+
+				const getUniqueLayoutPaletteColors = function (rawPalette) {
+			const colors = Array.isArray(rawPalette) ? rawPalette : [];
+			const unique = [];
+			const seen = {};
+			colors.forEach(function (color) {
+				const token = String(color || '').trim();
+				if (!token) { return; }
+				if (token.toLowerCase() === 'transparent') { return; }
+				const parsed = parseLayoutColor(token);
+				if (!parsed) { return; }
+				const key = parsed.token.toLowerCase();
+				if (seen[key]) { return; }
+				seen[key] = true;
+				unique.push(parsed.token);
+			});
+			return unique;
+		};
+
+		const renderAdjustPaletteOptions = function () {
+			adjustPaletteOptions.empty().prop('hidden', true);
+			adjustPaletteOptionsLabel.prop('hidden', true);
+			if (!layoutPaletteState.optionsVisible) { return; }
+			const activeIndex = Number(layoutPaletteState.activeIndex);
+			if (!Number.isInteger(activeIndex) || activeIndex < 0) { return; }
+			const current = layoutPaletteState.currentPalette[activeIndex];
+			if (!current) { return; }
+			layoutPaletteOptionSet.forEach(function (color) {
+				const choice = $('<button type="button" class="threaddesk-layout-viewer__adjust-palette-choice" title="Apply color"></button>')
+					.attr('data-threaddesk-layout-palette-choice', color)
+					.css('--threaddesk-layout-palette-choice-color', color);
+				if (String(color).toLowerCase() === 'transparent') { choice.addClass('is-transparent'); }
+				if (String(current).toUpperCase() === String(color).toUpperCase()) {
+					choice.addClass('is-active');
+				}
+				adjustPaletteOptions.append(choice);
+			});
+			adjustPaletteOptionsLabel.prop('hidden', false);
+			adjustPaletteOptions.prop('hidden', false);
+		};
+
+		const recolorOverlayForLayoutContext = function (configOverride) {
+			const baseUrl = String(selectedDesignBaseSourceUrl || '').trim();
+			if (!baseUrl) { return Promise.resolve(); }
+			const sourceColors = layoutPaletteState.basePalette.slice();
+			const targetColors = layoutPaletteState.currentPalette.slice();
+			if (!sourceColors.length || sourceColors.length !== targetColors.length) {
+				applySelectedDesign(baseUrl, configOverride);
+				return Promise.resolve();
+			}
+			let changed = false;
+			for (let i = 0; i < sourceColors.length; i += 1) {
+				if (String(sourceColors[i]).toUpperCase() !== String(targetColors[i]).toUpperCase()) { changed = true; break; }
+			}
+			if (!changed) {
+				applySelectedDesign(baseUrl, configOverride);
+				return Promise.resolve();
+			}
+			const cacheKey = baseUrl + '|' + sourceColors.join(',') + '|' + targetColors.join(',');
+			if (layoutPaletteState.recolorCache[cacheKey]) {
+				applySelectedDesign(layoutPaletteState.recolorCache[cacheKey], configOverride);
+				return Promise.resolve();
+			}
+			const sourceParsed = sourceColors.map(parseLayoutColor).filter(Boolean);
+			const targetParsed = targetColors.map(parseLayoutColor).filter(Boolean);
+			if (!sourceParsed.length || sourceParsed.length !== targetParsed.length) {
+				applySelectedDesign(baseUrl, configOverride);
+				return Promise.resolve();
+			}
+			return new Promise(function (resolve) {
+				const img = new Image();
+				img.crossOrigin = 'anonymous';
+				img.onload = function () {
+					try {
+						const canvas = document.createElement('canvas');
+						canvas.width = img.naturalWidth || img.width;
+						canvas.height = img.naturalHeight || img.height;
+						const ctx = canvas.getContext('2d', { willReadFrequently: true });
+						ctx.drawImage(img, 0, 0);
+						const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+						const pixels = imageData.data;
+						for (let i = 0; i < pixels.length; i += 4) {
+							if (pixels[i + 3] === 0) { continue; }
+							let bestIndex = 0;
+							let bestScore = Number.POSITIVE_INFINITY;
+							for (let c = 0; c < sourceParsed.length; c += 1) {
+								const dr = pixels[i] - sourceParsed[c].rgb[0];
+								const dg = pixels[i + 1] - sourceParsed[c].rgb[1];
+								const db = pixels[i + 2] - sourceParsed[c].rgb[2];
+								const score = (dr * dr) + (dg * dg) + (db * db);
+								if (score < bestScore) { bestScore = score; bestIndex = c; }
+							}
+							if (targetParsed[bestIndex].alpha === 0) {
+								pixels[i] = 255;
+								pixels[i + 1] = 255;
+								pixels[i + 2] = 255;
+								pixels[i + 3] = 0;
+							} else {
+								pixels[i] = targetParsed[bestIndex].rgb[0];
+								pixels[i + 1] = targetParsed[bestIndex].rgb[1];
+								pixels[i + 2] = targetParsed[bestIndex].rgb[2];
+								pixels[i + 3] = Math.max(pixels[i + 3], targetParsed[bestIndex].alpha);
+							}
+						}
+						ctx.putImageData(imageData, 0, 0);
+						const recolored = canvas.toDataURL('image/png');
+						layoutPaletteState.recolorCache[cacheKey] = recolored;
+						applySelectedDesign(recolored, configOverride);
+					} catch (error) {
+						applySelectedDesign(baseUrl, configOverride);
+					}
+					resolve();
+				};
+				img.onerror = function () { applySelectedDesign(baseUrl, configOverride); resolve(); };
+				img.src = baseUrl;
+			});
+		};
+
+		const renderAdjustPaletteDots = function () {
+			adjustPalette.empty().prop('hidden', true);
+			adjustPaletteLabel.prop('hidden', true);
+			if (!selectedDesignMeta) {
+				layoutPaletteState.basePalette = [];
+				layoutPaletteState.currentPalette = [];
+				layoutPaletteState.activeIndex = -1;
+				renderAdjustPaletteOptions();
+				return;
+			}
+			let palette = [];
+			try { palette = JSON.parse(String(selectedDesignMeta.palette || '[]')); } catch (e) { palette = []; }
+			const uniqueColors = getUniqueLayoutPaletteColors(palette);
+			layoutPaletteState.basePalette = uniqueColors.slice();
+			layoutPaletteState.currentPalette = uniqueColors.slice();
+			layoutPaletteState.activeIndex = uniqueColors.length ? 0 : -1;
+			layoutPaletteState.optionsVisible = false;
+			if (!uniqueColors.length) { renderAdjustPaletteOptions(); return; }
+			uniqueColors.forEach(function (hex, index) {
+				const dot = $('<button type="button" class="threaddesk-layout-viewer__palette-dot" title="Adjust this color"></button>')
+					.attr('data-threaddesk-layout-palette-index', index)
+					.css('--threaddesk-layout-palette-color', String(layoutPaletteState.currentPalette[index] || hex));
+				if (String(layoutPaletteState.currentPalette[index]).toLowerCase() === 'transparent') { dot.addClass('is-transparent'); }
+				if (index === layoutPaletteState.activeIndex) { dot.addClass('is-active'); }
+				adjustPalette.append(dot);
+			});
+			adjustPaletteLabel.prop('hidden', false);
+			adjustPalette.prop('hidden', false);
+			renderAdjustPaletteOptions();
+		};
+
+		$(document).on('click', '.threaddesk-layout-viewer__palette-dot', function (event) {
+			event.preventDefault();
+			const idx = parseInt($(this).attr('data-threaddesk-layout-palette-index'), 10);
+			if (!Number.isInteger(idx) || idx < 0) { return; }
+			layoutPaletteState.activeIndex = idx;
+			layoutPaletteState.optionsVisible = true;
+			adjustPalette.find('.threaddesk-layout-viewer__palette-dot').removeClass('is-active');
+			$(this).addClass('is-active');
+			renderAdjustPaletteOptions();
+		});
+
+		$(document).on('click', '.threaddesk-layout-viewer__adjust-palette-choice', function (event) {
+			event.preventDefault();
+			const idx = Number(layoutPaletteState.activeIndex);
+			if (!Number.isInteger(idx) || idx < 0) { return; }
+			const chosenRaw = String($(this).attr('data-threaddesk-layout-palette-choice') || '').trim();
+			const chosenParsed = parseLayoutColor(chosenRaw);
+			if (!chosenParsed) { return; }
+			layoutPaletteState.currentPalette[idx] = chosenParsed.token;
+			adjustPalette.find('.threaddesk-layout-viewer__palette-dot[data-threaddesk-layout-palette-index="' + idx + '"]')
+				.css('--threaddesk-layout-palette-color', chosenParsed.token)
+				.toggleClass('is-transparent', chosenParsed.token.toLowerCase() === 'transparent');
+			layoutPaletteState.optionsVisible = false;
+			renderAdjustPaletteOptions();
+			const cfg = getOverlayConfig();
+			recolorOverlayForLayoutContext(cfg || undefined);
+		});
 
 		const getPlacementAngleTarget = function (placementKey) {
 			switch (String(placementKey || '').trim()) {
@@ -521,6 +774,12 @@ jQuery(function ($) {
 		$(document).on('click', '[data-threaddesk-layout-angle]', function () { setMainImage($(this).data('threaddesk-layout-angle')); });
 
 		$(document).on('click', '[data-threaddesk-layout-category]', function () {
+			selectedCategorySlug = String($(this).attr('data-threaddesk-layout-category') || '').trim();
+			selectedCategoryId = Number($(this).attr('data-threaddesk-layout-category-id') || 0);
+			saveLayoutCategoryField.val(selectedCategorySlug);
+			saveLayoutCategoryIdField.val(String(selectedCategoryId || 0));
+			layoutModal.attr('data-threaddesk-current-category', selectedCategorySlug);
+			layoutModal.attr('data-threaddesk-current-placement', '');
 			const rawFront = $(this).data('threaddesk-layout-front-image') || '';
 			const rawBack = $(this).data('threaddesk-layout-back-image') || '';
 			const rawSide = $(this).data('threaddesk-layout-side-image') || '';
@@ -553,14 +812,18 @@ jQuery(function ($) {
 		$(document).on('click', '.threaddesk-layout-viewer__placement-option', function () {
 			selectedPlacementLabel = String($(this).attr('data-threaddesk-layout-placement-label') || '').trim();
 			selectedPlacementKey = String($(this).attr('data-threaddesk-layout-placement-key') || '').trim();
+			layoutModal.attr('data-threaddesk-current-placement', selectedPlacementKey);
 			if (!selectedPlacementLabel) { selectedPlacementLabel = 'Placement'; }
 			setMainImage(getPlacementAngleTarget(selectedPlacementKey));
 			designHeading.text('Choose Design for ' + selectedPlacementLabel);
 			sizeSlider.val(100);
 			selectedDesignName = '';
 			selectedDesignAspectRatio = 1;
+			adjustHeading.text('Adjust ' + selectedPlacementLabel.toUpperCase() + ' Placement');
 			selectedDesignNameEl.text('No design selected');
-			selectedPlacementBox.text(selectedPlacementLabel.toUpperCase());
+			selectedDesignMeta = null;
+			selectedDesignBaseSourceUrl = '';
+			renderAdjustPaletteDots();
 			renderDesignOptions();
 			hideOverlay();
 			updateSizeReading();
@@ -569,6 +832,52 @@ jQuery(function ($) {
 
 		$(document).on('click', '[data-threaddesk-layout-back-to-placements]', function () { setPanelStep('placements'); });
 		$(document).on('click', '[data-threaddesk-layout-back-to-designs]', function () { setPanelStep('designs'); });
+
+
+		const resumeLayoutDesignStepFromQuery = function () {
+			let params = null;
+			try { params = new URLSearchParams(window.location.search || ''); } catch (e) { params = null; }
+			if (!params || params.get('td_layout_return') !== '1') { return; }
+			if (!layoutModal.hasClass('is-active')) {
+				openLayoutModal(layoutModal.find('[data-threaddesk-layout-open]').get(0) || document.activeElement);
+			} else {
+				$('body').addClass('threaddesk-modal-open');
+			}
+			const categories = layoutModal.find('[data-threaddesk-layout-category]');
+			if (!categories.length) { return; }
+			const desiredCategory = String(params.get('td_layout_category') || '').trim();
+			let categoryButton = categories.first();
+			if (desiredCategory) {
+				const matchedCategory = categories.filter(function () {
+					return String($(this).attr('data-threaddesk-layout-category') || '').trim() === desiredCategory;
+				}).first();
+				if (matchedCategory.length) { categoryButton = matchedCategory; }
+			}
+			categoryButton.trigger('click');
+			const desiredPlacement = String(params.get('td_layout_placement') || '').trim();
+			if (desiredPlacement) {
+				const placementButton = layoutModal.find('.threaddesk-layout-viewer__placement-option').filter(function () {
+					return String($(this).attr('data-threaddesk-layout-placement-key') || '').trim() === desiredPlacement;
+				}).first();
+				if (placementButton.length) {
+					placementButton.trigger('click');
+				} else {
+					setPanelStep('designs');
+				}
+			} else {
+				setPanelStep('designs');
+			}
+
+			try {
+				const cleanedUrl = new URL(window.location.href);
+				cleanedUrl.searchParams.delete('td_layout_return');
+				cleanedUrl.searchParams.delete('td_layout_category');
+				cleanedUrl.searchParams.delete('td_layout_placement');
+				window.history.replaceState({}, document.title, cleanedUrl.toString());
+			} catch (e) {}
+		};
+
+		resumeLayoutDesignStepFromQuery();
 
 		$(document).on('input change', '[data-threaddesk-layout-size-slider]', function () {
 			if (!isAdjustMode) { return; }
@@ -588,12 +897,24 @@ jQuery(function ($) {
 			const mockupUrl = String($(this).attr('data-threaddesk-layout-design-mockup') || '').trim();
 			const url = mockupUrl || previewUrl || svgUrl;
 			const ratioAttr = parseFloat(String($(this).attr('data-threaddesk-layout-design-ratio') || '').trim());
+			selectedDesignMeta = {
+				id: Number($(this).attr('data-threaddesk-layout-design-id') || 0),
+				title: name,
+				preview: previewUrl,
+				svg: svgUrl,
+				fileName: String($(this).attr('data-threaddesk-layout-design-file-name') || '').trim(),
+				palette: String($(this).attr('data-threaddesk-layout-design-palette') || '[]'),
+				settings: String($(this).attr('data-threaddesk-layout-design-settings') || '{}'),
+				svgName: String($(this).attr('data-threaddesk-layout-design-svg-name') || '').trim(),
+			};
 			selectedDesignAspectRatio = (Number.isFinite(ratioAttr) && ratioAttr > 0) ? ratioAttr : 1;
 			const preset = placementStyleMap[selectedPlacementKey] || placementStyleMap.full_chest;
 			selectedBaseWidthPct = Number(preset.width) || 34;
 			selectedDesignName = name;
-			selectedPlacementBox.text((selectedPlacementLabel || 'Placement').toUpperCase());
+			selectedDesignBaseSourceUrl = url;
+			layoutPaletteState.recolorCache = {};
 			selectedDesignNameEl.text(selectedDesignName.toUpperCase());
+			renderAdjustPaletteDots();
 			applySelectedDesign(url);
 			setDesignRatioFromUrl(url);
 			setPanelStep('adjust');
@@ -644,13 +965,20 @@ jQuery(function ($) {
 			const targetAngle = getPlacementAngleTarget(selectedPlacementKey);
 			savedPlacementsByAngle[targetAngle][selectedPlacementKey] = {
 				url: selectedDesignSourceUrl,
+				baseUrl: selectedDesignBaseSourceUrl,
+				designId: Number((selectedDesignMeta && selectedDesignMeta.id) || 0),
 				designName: selectedDesignName,
+				paletteBase: (layoutPaletteState.basePalette || []).slice(),
+				paletteCurrent: (layoutPaletteState.currentPalette || []).slice(),
 				top: cfg.top,
 				left: cfg.left,
 				width: cfg.width,
 				baseWidth: selectedBaseWidthPct,
 				sliderValue: Number(sizeSlider.val() || 100),
 				designRatio: Number(selectedDesignAspectRatio || 1),
+				placementLabel: selectedPlacementLabel,
+				placementKey: selectedPlacementKey,
+				angle: targetAngle,
 			};
 			applyPlacementOverlayToAngle(targetAngle, selectedPlacementKey, selectedDesignSourceUrl, cfg);
 			renderStageSavedOverlays(currentAngle);
@@ -659,8 +987,10 @@ jQuery(function ($) {
 			selectedPlacementKey = '';
 			selectedDesignName = '';
 			sizeSlider.val(100);
-			selectedPlacementBox.text('Placement');
 			selectedDesignNameEl.text('No design selected');
+			selectedDesignMeta = null;
+			selectedDesignBaseSourceUrl = '';
+			renderAdjustPaletteDots();
 			hideOverlay();
 			updateSizeReading();
 			setPanelStep('placements');
@@ -668,6 +998,17 @@ jQuery(function ($) {
 			button.text('Placement Saved');
 			setTimeout(function () { button.text('Save Placement'); }, 1400);
 		});
+
+
+		if (saveLayoutForm.length) {
+			saveLayoutForm.on('submit', function (event) {
+				event.preventDefault();
+				const payload = buildLayoutPayload();
+				if (!payload) { return; }
+				saveLayoutPayloadField.val(payload);
+				this.submit();
+			});
+		}
 
 		$(document).on('keyup', function (event) {
 			if (event.key === 'Escape' && layoutModal.hasClass('is-active')) {
@@ -797,6 +1138,9 @@ jQuery(function ($) {
 		const statusEl = designModal.find('[data-threaddesk-design-status]');
 		const designIdField = designModal.find('[data-threaddesk-design-id-field]');
 		const designForm = designModal.find('form.threaddesk-auth-modal__form-inner').first();
+		const returnContextField = designForm.find('[data-threaddesk-design-return-context]');
+		const returnCategoryField = designForm.find('[data-threaddesk-design-return-layout-category]');
+		const returnPlacementField = designForm.find('[data-threaddesk-design-return-layout-placement]');
 		const designTitleInput = designModal.find('[data-threaddesk-design-title-input]');
 		const updatePreviewMaxHeight = function () {
 			const panelHeight = Math.round(designModal.find('.threaddesk-auth-modal__panel').innerHeight() || 0);
@@ -1787,6 +2131,16 @@ jQuery(function ($) {
 
 		$(document).on('click', '[data-threaddesk-design-open]', function (event) {
 			event.preventDefault();
+			const fromLayoutViewer = layoutModal.length && layoutModal.hasClass('is-active');
+			if (fromLayoutViewer) {
+				returnContextField.val('layout_viewer');
+				returnCategoryField.val(String(layoutModal.attr('data-threaddesk-current-category') || '').trim());
+				returnPlacementField.val(String(layoutModal.attr('data-threaddesk-current-placement') || '').trim());
+			} else {
+				returnContextField.val('');
+				returnCategoryField.val('');
+				returnPlacementField.val('');
+			}
 			openAndPromptDesignUpload();
 		});
 
@@ -1794,6 +2148,9 @@ jQuery(function ($) {
 		$(document).on('click', '[data-threaddesk-design-edit]', async function (event) {
 			event.preventDefault();
 			shouldOpenModalAfterChoose = false;
+			returnContextField.val('');
+			returnCategoryField.val('');
+			returnPlacementField.val('');
 			openDesignModal(this);
 			const designId = parseInt($(this).attr('data-threaddesk-design-id'), 10) || 0;
 			const title = $(this).attr('data-threaddesk-design-title') || '';
