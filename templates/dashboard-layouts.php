@@ -312,6 +312,7 @@ if ( taxonomy_exists( 'product_cat' ) && is_array( $layout_category_settings ) )
 						$layout_status_titles[ $layout_status ][] = array(
 							'title'  => $layout_title,
 							'reason' => $layout_rejection_reason_text,
+								'mockup' => $preview_overlay_src ? $preview_overlay_src : $preview_base_src,
 						);
 						?>
 						<div class="threaddesk__card threaddesk__card--design">
@@ -382,11 +383,18 @@ if ( taxonomy_exists( 'product_cat' ) && is_array( $layout_category_settings ) )
 								<?php foreach ( $layout_status_titles[ $status_key ] as $status_item ) : ?>
 									<?php
 									$status_title = isset( $status_item['title'] ) ? (string) $status_item['title'] : '';
+									$status_mockup = isset( $status_item['mockup'] ) ? (string) $status_item['mockup'] : '';
 									$status_reason = isset( $status_item['reason'] ) ? (string) $status_item['reason'] : '';
+									$show_hover_mockup = in_array( $status_key, array( 'pending', 'approved' ), true ) && '' !== $status_mockup;
 									$show_hover_reason = 'rejected' === $status_key && '' !== $status_reason;
 									?>
-									<li class="threaddesk__status-list-item<?php echo $show_hover_reason ? ' has-reason' : ''; ?>">
+									<li class="threaddesk__status-list-item<?php echo $show_hover_mockup ? ' has-mockup' : ''; ?><?php echo $show_hover_reason ? ' has-reason' : ''; ?>">
 										<span class="threaddesk__status-list-title"><?php echo esc_html( $status_title ); ?></span>
+										<?php if ( $show_hover_mockup ) : ?>
+											<span class="threaddesk__status-list-mockup-tag" role="tooltip" aria-hidden="true">
+												<img src="<?php echo esc_url( $status_mockup ); ?>" alt="" />
+											</span>
+										<?php endif; ?>
 										<?php if ( $show_hover_reason ) : ?>
 											<span class="threaddesk__status-list-reason-tag" role="tooltip" aria-hidden="true"><?php echo esc_html( $status_reason ); ?></span>
 										<?php endif; ?>
