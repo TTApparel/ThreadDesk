@@ -1882,6 +1882,7 @@ class TTA_ThreadDesk {
 		add_meta_box( 'threaddesk_design_detail', __( 'ThreadDesk Design Details', 'threaddesk' ), array( $this, 'render_design_admin_meta_box' ), 'tta_design', 'normal', 'high' );
 		add_meta_box( 'threaddesk_design_usage', __( 'Used Layouts / Quotes / Invoices', 'threaddesk' ), array( $this, 'render_design_usage_admin_meta_box' ), 'tta_design', 'side', 'default' );
 		add_meta_box( 'threaddesk_layout_detail', __( 'ThreadDesk Layout Details', 'threaddesk' ), array( $this, 'render_layout_admin_meta_box' ), 'tta_layout', 'normal', 'high' );
+		add_meta_box( 'threaddesk_layout_designs', __( 'Designs', 'threaddesk' ), array( $this, 'render_layout_designs_admin_meta_box' ), 'tta_layout', 'side', 'default' );
 	}
 
 	public function render_design_admin_meta_box( $post ) {
@@ -1974,10 +1975,14 @@ class TTA_ThreadDesk {
 		echo '<p><strong>' . esc_html__( 'Placement angles', 'threaddesk' ) . ':</strong></p>';
 		if ( $has_preview_angles ) {
 			echo '<div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;align-items:start;width:100%;max-width:100%;">';
+			$left_preview_url = isset( $preview_angles['left'] ) ? (string) $preview_angles['left'] : '';
+			$right_preview_url = isset( $preview_angles['right'] ) ? (string) $preview_angles['right'] : '';
 			foreach ( $preview_angles as $angle_key => $preview_url ) {
+				$mirror_angle = ( 'right' === $angle_key && '' !== $left_preview_url && $left_preview_url === $right_preview_url );
 				echo '<div style="min-width:0;">';
 				echo '<p style="margin:0 0 6px;"><strong>' . esc_html( strtoupper( $angle_key ) ) . '</strong></p>';
 				echo '<div style="position:relative;width:100%;aspect-ratio:1/1;background:#f6f6f6;border:1px solid #ddd;border-radius:4px;overflow:hidden;">';
+				echo '<div style="position:absolute;inset:0;' . ( $mirror_angle ? 'transform:scaleX(-1);transform-origin:center center;' : '' ) . '">';
 
 				if ( '' !== $preview_url ) {
 					$base_src = preg_match( '#^data:image/#i', $preview_url ) ? esc_attr( $preview_url ) : esc_url( $preview_url );
@@ -2003,11 +2008,12 @@ class TTA_ThreadDesk {
 					$overlay_top = isset( $placement_entry['top'] ) ? (float) $placement_entry['top'] : 50.0;
 					$overlay_left = isset( $placement_entry['left'] ) ? (float) $placement_entry['left'] : 50.0;
 					$overlay_width = isset( $placement_entry['width'] ) ? (float) $placement_entry['width'] : 25.0;
-					echo '<img src="' . $overlay_src . '" alt="" aria-hidden="true" style="position:absolute;top:' . esc_attr( number_format( $overlay_top, 2, '.', '' ) ) . '%;left:' . esc_attr( number_format( $overlay_left, 2, '.', '' ) ) . '%;width:' . esc_attr( number_format( $overlay_width, 2, '.', '' ) ) . '%;height:auto;transform:translate(-50%,-50%);object-fit:contain;pointer-events:none;" />';
-				}
+						echo '<img src="' . $overlay_src . '" alt="" aria-hidden="true" style="position:absolute;top:' . esc_attr( number_format( $overlay_top, 2, '.', '' ) ) . '%;left:' . esc_attr( number_format( $overlay_left, 2, '.', '' ) ) . '%;width:' . esc_attr( number_format( $overlay_width, 2, '.', '' ) ) . '%;height:auto;transform:translate(-50%,-50%);object-fit:contain;pointer-events:none;" />';
+					}
 
-				echo '</div>';
-				echo '</div>';
+					echo '</div>';
+					echo '</div>';
+					echo '</div>';
 			}
 			echo '</div>';
 		} else {
@@ -2023,14 +2029,101 @@ class TTA_ThreadDesk {
 			echo '<li><code>' . esc_html( $key ) . '</code>: ' . esc_html( (string) $value ) . '</li>';
 		}
 		echo '</ul></div></details>';
-		$related_designs = $this->find_related_posts_by_id_in_meta( $post->ID, 'tta_design', true );
-		$related_quotes = $this->find_related_posts_by_id_in_meta( $post->ID, 'tta_quote' );
-		$related_invoices = $this->find_related_posts_by_id_in_meta( $post->ID, 'shop_order' );
-		echo '<p><strong>' . esc_html__( 'Related items', 'threaddesk' ) . ':</strong></p>';
-		echo $this->render_related_post_links_list( $related_designs, __( 'Designs', 'threaddesk' ) );
-		echo $this->render_related_post_links_list( $related_quotes, __( 'Quotes', 'threaddesk' ) );
-		echo $this->render_related_post_links_list( $related_invoices, __( 'Invoices', 'threaddesk' ) );
 		echo '</div>';
+	}
+
+	public function render_layout_designs_admin_meta_box( $post ) {
+		$layout_payload_raw = (string) get_post_meta( $post->ID, 'layout_payload', true );
+		$layout_payload = json_decode( $layout_payload_raw, true );
+		if ( ! is_array( $layout_payload ) ) {
+			echo '<p><em>' . esc_html__( 'No design usage data available.', 'threaddesk' ) . '</em></p>';
+			return;
+		}
+
+		$placements_by_angle = isset( $layout_payload['placementsByAngle'] ) && is_array( $layout_payload['placementsByAngle'] ) ? $layout_payload['placementsByAngle'] : array();
+		$rows = array();
+		foreach ( $placements_by_angle as $angle_entries ) {
+			if ( ! is_array( $angle_entries ) ) {
+				continue;
+			}
+			foreach ( $angle_entries as $placement_key => $entry ) {
+				if ( ! is_array( $entry ) || empty( $entry['url'] ) ) {
+					continue;
+				}
+				$design_id = isset( $entry['designId'] ) ? absint( $entry['designId'] ) : 0;
+				$design_name = isset( $entry['designName'] ) ? sanitize_text_field( (string) $entry['designName'] ) : __( 'Design', 'threaddesk' );
+				$placement_label = isset( $entry['placementLabel'] ) ? sanitize_text_field( (string) $entry['placementLabel'] ) : ucwords( str_replace( '_', ' ', (string) $placement_key ) );
+				$slider_value = isset( $entry['sliderValue'] ) ? (float) $entry['sliderValue'] : 100;
+				$design_ratio = isset( $entry['designRatio'] ) ? (float) $entry['designRatio'] : 1;
+				$size_label = $this->get_layout_entry_size_label( (string) $placement_key, $slider_value, $design_ratio );
+				$colors = isset( $entry['paletteCurrent'] ) && is_array( $entry['paletteCurrent'] ) ? $entry['paletteCurrent'] : array();
+				$colors = array_values( array_filter( array_map( 'sanitize_text_field', $colors ), function ( $color ) { return '' !== trim( (string) $color ); } ) );
+				$rows[] = array(
+					'design_id' => $design_id,
+					'design_name' => $design_name,
+					'placement' => $placement_label,
+					'size' => $size_label,
+					'colors' => $colors,
+				);
+			}
+		}
+
+		if ( empty( $rows ) ) {
+			echo '<p><em>' . esc_html__( 'No designs are currently used in this layout.', 'threaddesk' ) . '</em></p>';
+			return;
+		}
+
+		echo '<div style="display:flex;flex-direction:column;gap:10px;">';
+		foreach ( $rows as $row ) {
+			echo '<div style="border:1px solid #ddd;border-radius:4px;padding:8px;">';
+			echo '<p style="margin:0 0 6px;"><strong>' . esc_html__( 'Design', 'threaddesk' ) . ':</strong> ' . esc_html( $row['design_name'] ) . '</p>';
+			if ( $row['design_id'] > 0 ) {
+				$edit_link = get_edit_post_link( $row['design_id'] );
+				if ( $edit_link ) {
+					echo '<p style="margin:0 0 6px;"><a href="' . esc_url( $edit_link ) . '">' . esc_html__( 'View design in backend', 'threaddesk' ) . '</a></p>';
+				}
+			}
+			echo '<p style="margin:0 0 4px;"><strong>' . esc_html__( 'Placement', 'threaddesk' ) . ':</strong> ' . esc_html( $row['placement'] ) . '</p>';
+			echo '<p style="margin:0 0 4px;"><strong>' . esc_html__( 'Approx. size', 'threaddesk' ) . ':</strong> ' . esc_html( $row['size'] ) . '</p>';
+			echo '<p style="margin:0;"><strong>' . esc_html__( 'Chosen colors', 'threaddesk' ) . ':</strong> ' . esc_html( empty( $row['colors'] ) ? __( 'None', 'threaddesk' ) : implode( ', ', $row['colors'] ) ) . '</p>';
+			echo '</div>';
+		}
+		echo '</div>';
+	}
+
+	private function get_layout_entry_size_label( $placement_key, $slider_value, $design_ratio ) {
+		$placement_key = sanitize_key( (string) $placement_key );
+		$slider_value = (float) $slider_value;
+		$ratio = (float) $design_ratio;
+		if ( $ratio <= 0 ) {
+			$ratio = 1;
+		}
+		$slider_min = 60;
+		$slider_max = 140;
+		$range_map = array(
+			'full_chest' => array( 'min' => 4.5, 'max' => 12.5 ),
+			'back'       => array( 'min' => 4.5, 'max' => 12.5 ),
+			'left_chest' => array( 'approx' => 4.0 ),
+			'right_chest'=> array( 'approx' => 4.0 ),
+			'left_sleeve'=> array( 'approx' => 4.0 ),
+			'right_sleeve'=> array( 'approx' => 4.0 ),
+		);
+		$range = isset( $range_map[ $placement_key ] ) ? $range_map[ $placement_key ] : array( 'approx' => 4.0 );
+		if ( isset( $range['min'], $range['max'] ) ) {
+			$clamped = max( $slider_min, min( $slider_max, $slider_value ) );
+			$normalized = ( $clamped - $slider_min ) / ( $slider_max - $slider_min );
+			$max_dimension = (float) $range['min'] + ( ( (float) $range['max'] - (float) $range['min'] ) * $normalized );
+		} else {
+			$max_dimension = (float) $range['approx'] * ( $slider_value / 100 );
+		}
+		$width = $max_dimension;
+		$height = $max_dimension;
+		if ( $ratio > 1 ) {
+			$height = $max_dimension / $ratio;
+		} elseif ( $ratio > 0 && $ratio < 1 ) {
+			$width = $max_dimension * $ratio;
+		}
+		return number_format_i18n( $width, 1 ) . '" W × ' . number_format_i18n( $height, 1 ) . '" H';
 	}
 
 	private function get_image_dimensions_from_url( $url ) {
