@@ -905,7 +905,42 @@ class TTA_ThreadDesk {
 			$category_label = __( 'Layout', 'threaddesk' );
 		}
 
+		$default_layout_design_name = '';
+		foreach ( $placements_by_angle as $angle_entries ) {
+			if ( ! is_array( $angle_entries ) ) {
+				continue;
+			}
+			foreach ( $angle_entries as $entry ) {
+				if ( ! is_array( $entry ) ) {
+					continue;
+				}
+				$entry_design_name = isset( $entry['designName'] ) ? trim( (string) $entry['designName'] ) : '';
+				if ( '' === $entry_design_name ) {
+					$entry_url = isset( $entry['url'] ) ? trim( (string) $entry['url'] ) : '';
+					if ( '' !== $entry_url ) {
+						$path = wp_parse_url( $entry_url, PHP_URL_PATH );
+						if ( is_string( $path ) && '' !== $path ) {
+							$entry_design_name = pathinfo( basename( $path ), PATHINFO_FILENAME );
+						}
+					}
+				}
+				$entry_design_name = sanitize_text_field( (string) $entry_design_name );
+				if ( '' !== $entry_design_name ) {
+					$default_layout_design_name = $entry_design_name;
+					break 2;
+				}
+			}
+		}
+
 		$layout_title = sprintf( __( '%1$s Layout %2$s', 'threaddesk' ), $category_label, date_i18n( 'Y-m-d H:i' ) );
+		if ( '' !== $default_layout_design_name ) {
+			$layout_title = trim( $default_layout_design_name . ' ' . $category_label );
+		}
+		$layout_title = sanitize_text_field( $layout_title );
+		if ( '' === $layout_title ) {
+			$layout_title = __( 'Layout', 'threaddesk' );
+		}
+
 		$layout_id    = 0;
 		$is_update    = false;
 
