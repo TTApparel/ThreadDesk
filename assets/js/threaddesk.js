@@ -1018,6 +1018,10 @@ jQuery(function ($) {
 			setPanelStep('designs');
 			hideOverlay();
 			renderStageSavedOverlays(currentAngle);
+			renderDesignOptions();
+			if (selectedPlacementLabel) {
+				designHeading.text('Choose Design for ' + selectedPlacementLabel);
+			}
 		});
 
 
