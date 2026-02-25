@@ -34,7 +34,7 @@ class TTA_ThreadDesk {
 		add_action( 'init', array( $this, 'load_textdomain' ) );
 		add_action( 'admin_menu', array( $this, 'register_settings_page' ) );
 		add_action( 'admin_init', array( $this, 'register_settings' ) );
-		add_action( 'admin_enqueue_scripts', array( $this, 'enqueue_admin_assets' ) );
+		add_action( 'admin_enqueue_scripts', array( $this, 'enqueue_admin_assets' ), 1 );
 		add_action( 'add_meta_boxes', array( $this, 'register_admin_meta_boxes' ) );
 		add_action( 'save_post', array( $this, 'maybe_assign_internal_reference' ), 10, 3 );
 		add_filter( 'manage_edit-tta_quote_columns', array( $this, 'filter_quote_admin_columns' ) );
@@ -217,11 +217,13 @@ class TTA_ThreadDesk {
 			return;
 		}
 
-		if ( wp_script_is( 'wp-auth-check', 'registered' ) && ! wp_script_is( 'heartbeat', 'registered' ) ) {
-			$suffix = ( defined( 'SCRIPT_DEBUG' ) && SCRIPT_DEBUG ) ? '' : '.min';
-			wp_register_script( 'heartbeat', includes_url( 'js/heartbeat' . $suffix . '.js' ), array( 'jquery', 'wp-hooks' ), false, true );
+		if ( ! wp_script_is( 'heartbeat', 'registered' ) ) {
+			$scripts = wp_scripts();
+			if ( $scripts instanceof WP_Scripts ) {
+				$suffix = ( defined( 'SCRIPT_DEBUG' ) && SCRIPT_DEBUG ) ? '' : '.min';
+				$scripts->add( 'heartbeat', includes_url( 'js/heartbeat' . $suffix . '.js' ), array( 'jquery', 'wp-hooks' ), false, 1 );
+			}
 		}
-
 		if ( wp_script_is( 'heartbeat', 'registered' ) ) {
 			wp_enqueue_script( 'heartbeat' );
 		}
@@ -2633,7 +2635,8 @@ class TTA_ThreadDesk {
 	}
 
 	private function get_image_dimensions_from_url( $url ) {
-		if ( ! $url ) { return __( 'Unknown', 'threaddesk' ); }
+		$url = is_string( $url ) ? trim( $url ) : '';
+		if ( '' === $url ) { return __( 'Unknown', 'threaddesk' ); }
 		$uploads = wp_upload_dir();
 		$baseurl = isset( $uploads['baseurl'] ) ? (string) $uploads['baseurl'] : '';
 		$basedir = isset( $uploads['basedir'] ) ? (string) $uploads['basedir'] : '';
