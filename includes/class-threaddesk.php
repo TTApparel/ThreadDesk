@@ -181,6 +181,15 @@ class TTA_ThreadDesk {
 
 		add_submenu_page(
 			'tta-threaddesk',
+			__( 'User Detail', 'threaddesk' ),
+			__( 'User Detail', 'threaddesk' ),
+			'manage_woocommerce',
+			'tta-threaddesk-user-detail',
+			array( $this, 'render_admin_user_detail_page' )
+		);
+
+		add_submenu_page(
+			'tta-threaddesk',
 			__( 'Settings', 'threaddesk' ),
 			__( 'Settings', 'threaddesk' ),
 			'manage_woocommerce',
@@ -768,6 +777,12 @@ class TTA_ThreadDesk {
 
 	private function get_user_design_storage( $user_id ) {
 		$uploads = wp_upload_dir();
+		$basedir = isset( $uploads['basedir'] ) ? (string) $uploads['basedir'] : '';
+		$baseurl = isset( $uploads['baseurl'] ) ? (string) $uploads['baseurl'] : '';
+		if ( '' === $basedir || '' === $baseurl ) {
+			return null;
+		}
+
 		$user    = get_userdata( $user_id );
 		$login   = $user ? $user->user_login : 'user-' . (string) $user_id;
 		$folder  = sanitize_file_name( $login );
@@ -775,8 +790,8 @@ class TTA_ThreadDesk {
 			$folder = 'user-' . (string) $user_id;
 		}
 
-		$base_dir = trailingslashit( $uploads['basedir'] ) . 'ThreadDesk/Designs/' . $folder;
-		$base_url = trailingslashit( $uploads['baseurl'] ) . 'ThreadDesk/Designs/' . rawurlencode( $folder );
+		$base_dir = trailingslashit( $basedir ) . 'ThreadDesk/Designs/' . $folder;
+		$base_url = trailingslashit( $baseurl ) . 'ThreadDesk/Designs/' . rawurlencode( $folder );
 
 		if ( ! wp_mkdir_p( $base_dir ) ) {
 			return null;
