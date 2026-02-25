@@ -1157,6 +1157,11 @@ jQuery(function ($) {
 			});
 		}
 
+		$(document).on('click', '[data-threaddesk-layout-save-layout-shortcut]', function () {
+			if (!saveLayoutForm.length) { return; }
+			saveLayoutForm.trigger('submit');
+		});
+
 		$(document).on('keyup', function (event) {
 			if (event.key === 'Escape' && layoutModal.hasClass('is-active')) {
 				closeLayoutModal();
