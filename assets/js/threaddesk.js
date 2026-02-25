@@ -1169,6 +1169,7 @@ jQuery(function ($) {
 				angle: targetAngle,
 			};
 			applyPlacementOverlayToAngle(targetAngle, selectedPlacementKey, selectedDesignSourceUrl, cfg);
+			setPanelStep('placements');
 			renderStageSavedOverlays(currentAngle);
 			updatePlacementOptionStatus(selectedPlacementKey, selectedPlacementLabel, selectedDesignSourceUrl, selectedDesignName);
 			selectedPlacementLabel = '';
@@ -1181,7 +1182,6 @@ jQuery(function ($) {
 			renderAdjustPaletteDots();
 			hideOverlay();
 			updateSizeReading();
-			setPanelStep('placements');
 			const button = $(this);
 			button.text('Placement Saved');
 			setTimeout(function () { button.text('Save Placement'); }, 1400);
