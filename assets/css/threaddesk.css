@@ -1256,6 +1256,15 @@ body.threaddesk-modal-open {
 	max-height: 100%;
 	display: flex;
 	flex-direction: column;
+	flex: 1 1 auto;
+	min-height: 100%;
+}
+
+.threaddesk-layout-viewer__panel-step:not([hidden]) {
+	display: flex;
+	flex-direction: column;
+	flex: 1 1 auto;
+	min-height: 100%;
 }
 
 .threaddesk-layout-viewer__panel-step:not([hidden]) {
