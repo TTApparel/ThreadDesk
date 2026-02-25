@@ -201,6 +201,7 @@ jQuery(function ($) {
 			placementPanelStep.prop('hidden', panel !== 'placements');
 			designPanelStep.prop('hidden', panel !== 'designs');
 			adjustPanelStep.prop('hidden', panel !== 'adjust');
+			angleButtons.prop('disabled', isAdjustMode).attr('aria-disabled', isAdjustMode ? 'true' : 'false');
 		};
 
 		const getPlacementAbbreviation = function (placementLabel, placementKey) {
@@ -922,7 +923,13 @@ jQuery(function ($) {
 			}
 		});
 		$(document).on('click', '[data-threaddesk-layout-close]', function () { closeLayoutModal(); });
-		$(document).on('click', '[data-threaddesk-layout-angle]', function () { setMainImage($(this).data('threaddesk-layout-angle')); });
+		$(document).on('click', '[data-threaddesk-layout-angle]', function (event) {
+			if (isAdjustMode) {
+				event.preventDefault();
+				return;
+			}
+			setMainImage($(this).data('threaddesk-layout-angle'));
+		});
 
 		$(document).on('click', '[data-threaddesk-layout-category]', function () {
 			selectedCategorySlug = String($(this).attr('data-threaddesk-layout-category') || '').trim();
