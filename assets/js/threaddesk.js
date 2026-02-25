@@ -143,6 +143,7 @@ jQuery(function ($) {
 		const adjustHeading = layoutModal.find('[data-threaddesk-layout-adjust-heading]');
 		const adjustPaletteLabel = layoutModal.find('[data-threaddesk-layout-adjust-palette-label]');
 		const adjustPalette = layoutModal.find('[data-threaddesk-layout-adjust-palette]');
+		const adjustPaletteOptionsLabel = layoutModal.find('[data-threaddesk-layout-adjust-palette-options-label]');
 		const adjustPaletteOptions = layoutModal.find('[data-threaddesk-layout-adjust-palette-options]');
 		const layoutDesignsRaw = layoutModal.attr('data-threaddesk-layout-designs') || '[]';
 		let layoutDesigns = [];
@@ -167,12 +168,13 @@ jQuery(function ($) {
 		const savedPlacementsByAngle = { front: {}, left: {}, back: {}, right: {} };
 		const overlayRenderScale = 0.7;
 		const designRatioCache = {};
-		const layoutPaletteOptionSet = ['#FFFFFF','#000000','#FEDB00','#FFB81C','#FF6A39','#C8102E','#A50034','#512D6D','#002D72','#0092CB','#007A53','#B1B3B3'];
+		const layoutPaletteOptionSet = ['transparent','#FFFFFF','#000000','#FEDB00','#FED141','#FFB81C','#FF6A39','#E38331','#BE531C','#C8102E','#D22730','#BE3A34','#A6192E','#A50034','#FF85BD','#BA9CC5','#512D6D','#833177','#351F65','#10069F','#131F29','#28334A','#002D72','#004C97','#0076A8','#8BBEE8','#0092CB','#00AFD7','#007C80','#007A53','#00AD50','#249E6B','#00664F','#304F42','#4E3629','#7B4D35','#D3BC8D','#D5CB9F','#B1B3B3','#A7A8AA','#F2E9DB'];
 		const layoutPaletteState = {
 			basePalette: [],
 			currentPalette: [],
 			activeIndex: -1,
 			recolorCache: {},
+			optionsVisible: false,
 		};
 
 		const placementStyleMap = {
@@ -466,17 +468,26 @@ jQuery(function ($) {
 		};
 
 
-		const hexToRgbTriplet = function (hex) {
-			const normalized = String(hex || '').trim().replace('#', '');
-			if (!/^[0-9a-fA-F]{6}$/.test(normalized)) { return null; }
-			return [
-				parseInt(normalized.substring(0, 2), 16),
-				parseInt(normalized.substring(2, 4), 16),
-				parseInt(normalized.substring(4, 6), 16),
-			];
+		const parseLayoutColor = function (value) {
+			const token = String(value || '').trim();
+			if (!token) { return null; }
+			if (token.toLowerCase() === 'transparent') {
+				return { token: 'transparent', rgb: [255, 255, 255], alpha: 0 };
+			}
+			const normalized = token.replace('#', '').toUpperCase();
+			if (!/^[0-9A-F]{6}$/.test(normalized)) { return null; }
+			return {
+				token: '#' + normalized,
+				rgb: [
+					parseInt(normalized.substring(0, 2), 16),
+					parseInt(normalized.substring(2, 4), 16),
+					parseInt(normalized.substring(4, 6), 16),
+				],
+				alpha: 255,
+			};
 		};
 
-		const getUniqueLayoutPaletteColors = function (rawPalette) {
+				const getUniqueLayoutPaletteColors = function (rawPalette) {
 			const colors = Array.isArray(rawPalette) ? rawPalette : [];
 			const unique = [];
 			const seen = {};
@@ -484,17 +495,20 @@ jQuery(function ($) {
 				const token = String(color || '').trim();
 				if (!token) { return; }
 				if (token.toLowerCase() === 'transparent') { return; }
-				const upper = token.toUpperCase();
-				if (!hexToRgbTriplet(upper)) { return; }
-				if (seen[upper]) { return; }
-				seen[upper] = true;
-				unique.push(upper);
+				const parsed = parseLayoutColor(token);
+				if (!parsed) { return; }
+				const key = parsed.token.toLowerCase();
+				if (seen[key]) { return; }
+				seen[key] = true;
+				unique.push(parsed.token);
 			});
 			return unique;
 		};
 
 		const renderAdjustPaletteOptions = function () {
 			adjustPaletteOptions.empty().prop('hidden', true);
+			adjustPaletteOptionsLabel.prop('hidden', true);
+			if (!layoutPaletteState.optionsVisible) { return; }
 			const activeIndex = Number(layoutPaletteState.activeIndex);
 			if (!Number.isInteger(activeIndex) || activeIndex < 0) { return; }
 			const current = layoutPaletteState.currentPalette[activeIndex];
@@ -503,11 +517,13 @@ jQuery(function ($) {
 				const choice = $('<button type="button" class="threaddesk-layout-viewer__adjust-palette-choice" title="Apply color"></button>')
 					.attr('data-threaddesk-layout-palette-choice', color)
 					.css('--threaddesk-layout-palette-choice-color', color);
+				if (String(color).toLowerCase() === 'transparent') { choice.addClass('is-transparent'); }
 				if (String(current).toUpperCase() === String(color).toUpperCase()) {
 					choice.addClass('is-active');
 				}
 				adjustPaletteOptions.append(choice);
 			});
+			adjustPaletteOptionsLabel.prop('hidden', false);
 			adjustPaletteOptions.prop('hidden', false);
 		};
 
@@ -533,9 +549,9 @@ jQuery(function ($) {
 				applySelectedDesign(layoutPaletteState.recolorCache[cacheKey], configOverride);
 				return Promise.resolve();
 			}
-			const sourceRgb = sourceColors.map(hexToRgbTriplet).filter(Boolean);
-			const targetRgb = targetColors.map(hexToRgbTriplet).filter(Boolean);
-			if (!sourceRgb.length || sourceRgb.length !== targetRgb.length) {
+			const sourceParsed = sourceColors.map(parseLayoutColor).filter(Boolean);
+			const targetParsed = targetColors.map(parseLayoutColor).filter(Boolean);
+			if (!sourceParsed.length || sourceParsed.length !== targetParsed.length) {
 				applySelectedDesign(baseUrl, configOverride);
 				return Promise.resolve();
 			}
@@ -555,16 +571,24 @@ jQuery(function ($) {
 							if (pixels[i + 3] === 0) { continue; }
 							let bestIndex = 0;
 							let bestScore = Number.POSITIVE_INFINITY;
-							for (let c = 0; c < sourceRgb.length; c += 1) {
-								const dr = pixels[i] - sourceRgb[c][0];
-								const dg = pixels[i + 1] - sourceRgb[c][1];
-								const db = pixels[i + 2] - sourceRgb[c][2];
+							for (let c = 0; c < sourceParsed.length; c += 1) {
+								const dr = pixels[i] - sourceParsed[c].rgb[0];
+								const dg = pixels[i + 1] - sourceParsed[c].rgb[1];
+								const db = pixels[i + 2] - sourceParsed[c].rgb[2];
 								const score = (dr * dr) + (dg * dg) + (db * db);
 								if (score < bestScore) { bestScore = score; bestIndex = c; }
 							}
-							pixels[i] = targetRgb[bestIndex][0];
-							pixels[i + 1] = targetRgb[bestIndex][1];
-							pixels[i + 2] = targetRgb[bestIndex][2];
+							if (targetParsed[bestIndex].alpha === 0) {
+								pixels[i] = 255;
+								pixels[i + 1] = 255;
+								pixels[i + 2] = 255;
+								pixels[i + 3] = 0;
+							} else {
+								pixels[i] = targetParsed[bestIndex].rgb[0];
+								pixels[i + 1] = targetParsed[bestIndex].rgb[1];
+								pixels[i + 2] = targetParsed[bestIndex].rgb[2];
+								pixels[i + 3] = Math.max(pixels[i + 3], targetParsed[bestIndex].alpha);
+							}
 						}
 						ctx.putImageData(imageData, 0, 0);
 						const recolored = canvas.toDataURL('image/png');
@@ -596,11 +620,13 @@ jQuery(function ($) {
 			layoutPaletteState.basePalette = uniqueColors.slice();
 			layoutPaletteState.currentPalette = uniqueColors.slice();
 			layoutPaletteState.activeIndex = uniqueColors.length ? 0 : -1;
+			layoutPaletteState.optionsVisible = false;
 			if (!uniqueColors.length) { renderAdjustPaletteOptions(); return; }
 			uniqueColors.forEach(function (hex, index) {
 				const dot = $('<button type="button" class="threaddesk-layout-viewer__palette-dot" title="Adjust this color"></button>')
 					.attr('data-threaddesk-layout-palette-index', index)
 					.css('--threaddesk-layout-palette-color', String(layoutPaletteState.currentPalette[index] || hex));
+				if (String(layoutPaletteState.currentPalette[index]).toLowerCase() === 'transparent') { dot.addClass('is-transparent'); }
 				if (index === layoutPaletteState.activeIndex) { dot.addClass('is-active'); }
 				adjustPalette.append(dot);
 			});
@@ -614,6 +640,7 @@ jQuery(function ($) {
 			const idx = parseInt($(this).attr('data-threaddesk-layout-palette-index'), 10);
 			if (!Number.isInteger(idx) || idx < 0) { return; }
 			layoutPaletteState.activeIndex = idx;
+			layoutPaletteState.optionsVisible = true;
 			adjustPalette.find('.threaddesk-layout-viewer__palette-dot').removeClass('is-active');
 			$(this).addClass('is-active');
 			renderAdjustPaletteOptions();
@@ -623,11 +650,14 @@ jQuery(function ($) {
 			event.preventDefault();
 			const idx = Number(layoutPaletteState.activeIndex);
 			if (!Number.isInteger(idx) || idx < 0) { return; }
-			const chosen = String($(this).attr('data-threaddesk-layout-palette-choice') || '').trim().toUpperCase();
-			if (!hexToRgbTriplet(chosen)) { return; }
-			layoutPaletteState.currentPalette[idx] = chosen;
+			const chosenRaw = String($(this).attr('data-threaddesk-layout-palette-choice') || '').trim();
+			const chosenParsed = parseLayoutColor(chosenRaw);
+			if (!chosenParsed) { return; }
+			layoutPaletteState.currentPalette[idx] = chosenParsed.token;
 			adjustPalette.find('.threaddesk-layout-viewer__palette-dot[data-threaddesk-layout-palette-index="' + idx + '"]')
-				.css('--threaddesk-layout-palette-color', chosen);
+				.css('--threaddesk-layout-palette-color', chosenParsed.token)
+				.toggleClass('is-transparent', chosenParsed.token.toLowerCase() === 'transparent');
+			layoutPaletteState.optionsVisible = false;
 			renderAdjustPaletteOptions();
 			const cfg = getOverlayConfig();
 			recolorOverlayForLayoutContext(cfg || undefined);
