@@ -218,13 +218,72 @@ if ( taxonomy_exists( 'product_cat' ) && is_array( $layout_category_settings ) )
 				<h3><?php echo esc_html__( 'Saved Placements', 'threaddesk' ); ?></h3>
 				<button type="button" class="threaddesk__button" data-threaddesk-layout-open><?php echo esc_html__( 'Add Placement', 'threaddesk' ); ?></button>
 			</div>
-			<p><?php echo esc_html__( 'Placements are placeholders for now. This area will list approved placements for reuse.', 'threaddesk' ); ?></p>
 			<div class="threaddesk__cards">
 				<?php if ( ! empty( $context['layouts'] ) ) : ?>
 					<?php foreach ( $context['layouts'] as $layout ) : ?>
-						<div class="threaddesk__card">
-							<h4><?php echo esc_html( $layout->post_title ); ?></h4>
-							<p><?php echo esc_html__( 'Status: Ready', 'threaddesk' ); ?></p>
+						<?php
+						$layout_title = trim( (string) $layout->post_title );
+						if ( '' === $layout_title ) {
+							$layout_title = __( 'Placement Layout', 'threaddesk' );
+						}
+
+						$layout_category = (string) get_post_meta( $layout->ID, 'layout_category', true );
+						$layout_payload_raw = (string) get_post_meta( $layout->ID, 'layout_payload', true );
+						$layout_payload = json_decode( $layout_payload_raw, true );
+						if ( ! is_array( $layout_payload ) ) {
+							$layout_payload = array();
+						}
+						$placements_by_angle = isset( $layout_payload['placementsByAngle'] ) && is_array( $layout_payload['placementsByAngle'] ) ? $layout_payload['placementsByAngle'] : array();
+
+						$preview_url  = '';
+						$preview_name = '';
+						$print_count  = 0;
+
+						foreach ( $placements_by_angle as $angle_placements ) {
+							if ( ! is_array( $angle_placements ) ) {
+								continue;
+							}
+							foreach ( $angle_placements as $entry ) {
+								if ( ! is_array( $entry ) ) {
+									continue;
+								}
+								$entry_url = isset( $entry['url'] ) ? (string) $entry['url'] : '';
+								if ( '' === $entry_url ) {
+									continue;
+								}
+								$print_count++;
+								if ( '' === $preview_url ) {
+									$preview_url  = $entry_url;
+									$preview_name = isset( $entry['designName'] ) ? (string) $entry['designName'] : '';
+								}
+							}
+						}
+						?>
+						<div class="threaddesk__card threaddesk__card--design">
+							<form class="threaddesk__card-delete" method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
+								<input type="hidden" name="action" value="tta_threaddesk_delete_layout" />
+								<input type="hidden" name="layout_id" value="<?php echo esc_attr( $layout->ID ); ?>" />
+								<?php wp_nonce_field( 'tta_threaddesk_delete_layout' ); ?>
+								<button type="submit" class="threaddesk__card-delete-button" aria-label="<?php echo esc_attr__( 'Delete placement layout', 'threaddesk' ); ?>">&times;</button>
+							</form>
+							<div class="threaddesk__card-design-preview">
+								<?php if ( '' !== $preview_url ) : ?>
+									<img class="threaddesk__card-design-preview-svg" src="<?php echo esc_url( $preview_url ); ?>" alt="<?php echo esc_attr( $preview_name ? $preview_name : $layout_title ); ?>" />
+									<img class="threaddesk__card-design-preview-original" src="<?php echo esc_url( $preview_url ); ?>" alt="" aria-hidden="true" />
+								<?php else : ?>
+									<span class="threaddesk-layout-modal__image-fallback"><?php echo esc_html__( 'No placement preview', 'threaddesk' ); ?></span>
+								<?php endif; ?>
+							</div>
+							<form class="threaddesk__card-title-form" method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
+								<input type="hidden" name="action" value="tta_threaddesk_rename_layout" />
+								<input type="hidden" name="layout_id" value="<?php echo esc_attr( $layout->ID ); ?>" />
+								<?php wp_nonce_field( 'tta_threaddesk_rename_layout' ); ?>
+								<h5 class="threaddesk__card-title"><input class="threaddesk__card-title-input" type="text" name="layout_title" value="<?php echo esc_attr( $layout_title ); ?>" maxlength="120" data-threaddesk-layout-title-card-input data-threaddesk-title-fallback="<?php echo esc_attr__( 'Placement Layout', 'threaddesk' ); ?>" aria-label="<?php echo esc_attr__( 'Placement layout name', 'threaddesk' ); ?>" /></h5>
+								<p class="threaddesk__card-design-color-count"><?php echo esc_html( sprintf( __( 'Print count: %d', 'threaddesk' ), $print_count ) ); ?></p>
+							</form>
+							<div class="threaddesk__card-design-actions">
+								<button type="button" class="threaddesk__button threaddesk__button--small" data-threaddesk-layout-open data-threaddesk-layout-category-open="<?php echo esc_attr( $layout_category ); ?>" data-threaddesk-layout-id="<?php echo esc_attr( $layout->ID ); ?>" data-threaddesk-layout-payload="<?php echo esc_attr( wp_json_encode( $layout_payload ) ); ?>"><?php echo esc_html__( 'Adjust placements', 'threaddesk' ); ?></button>
+							</div>
 						</div>
 					<?php endforeach; ?>
 				<?php else : ?>
@@ -322,7 +381,8 @@ if ( taxonomy_exists( 'product_cat' ) && is_array( $layout_category_settings ) )
 							<?php wp_nonce_field( 'tta_threaddesk_save_layout' ); ?>
 							<input type="hidden" name="threaddesk_layout_category" value="" data-threaddesk-layout-save-category />
 							<input type="hidden" name="threaddesk_layout_category_id" value="0" data-threaddesk-layout-save-category-id />
-							<input type="hidden" name="threaddesk_layout_payload" value="" data-threaddesk-layout-save-payload />
+							<input type="hidden" name="threaddesk_layout_id" value="0" data-threaddesk-layout-save-id />
+								<input type="hidden" name="threaddesk_layout_payload" value="" data-threaddesk-layout-save-payload />
 							<button type="submit" class="threaddesk-layout-viewer__save-layout-button" data-threaddesk-layout-save-layout><?php echo esc_html__( 'Save Layout', 'threaddesk' ); ?></button>
 						</form>
 					</div>
