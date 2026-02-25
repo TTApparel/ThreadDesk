@@ -117,6 +117,7 @@ jQuery(function ($) {
 		const viewerStep = layoutModal.find('[data-threaddesk-layout-step="viewer"]');
 		const stage = layoutModal.find('.threaddesk-layout-viewer__stage');
 		const mainImage = layoutModal.find('[data-threaddesk-layout-main-image]');
+		const layoutViewer = layoutModal.find('.threaddesk-layout-viewer');
 		const angleButtons = layoutModal.find('[data-threaddesk-layout-angle]');
 		const angleButtonsByKey = {
 			front: layoutModal.find('[data-threaddesk-layout-angle="front"]'),
@@ -844,8 +845,24 @@ jQuery(function ($) {
 			else if (target === 'right') { transform = sideConfiguredAsRight ? 'none' : 'scaleX(-1)'; }
 			if (url) {
 				mainImage.attr('src', url).attr('alt', target + ' view').css('transform', transform).show();
+				const syncStageHeight = function () {
+					const imageEl = mainImage.get(0);
+					if (!imageEl) { return; }
+					const renderedHeight = Number(imageEl.getBoundingClientRect().height || 0);
+					if (renderedHeight > 0) {
+						layoutViewer.css('--threaddesk-layout-stage-height', Math.round(renderedHeight) + 'px');
+					}
+				};
+				if (mainImage.get(0) && mainImage.get(0).complete) {
+					syncStageHeight();
+				} else {
+					mainImage.one('load', function () { syncStageHeight(); });
+				}
 			} else {
 				mainImage.attr('src', '').css('transform', 'none').hide();
+				if (layoutViewer.get(0)) {
+					layoutViewer.get(0).style.removeProperty('--threaddesk-layout-stage-height');
+				}
 			}
 			angleButtons.removeClass('is-active');
 			angleButtonsByKey[target].addClass('is-active');

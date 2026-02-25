@@ -708,6 +708,24 @@ body.threaddesk-modal-open {
 	object-fit: contain;
 }
 
+.threaddesk__card-layout-preview-base {
+	position: absolute;
+	inset: 0;
+	width: 100%;
+	height: 100%;
+	object-fit: contain;
+	z-index: 1;
+}
+
+.threaddesk__card-layout-preview-overlay {
+	position: absolute;
+	height: auto;
+	transform: translate(-50%, -50%);
+	z-index: 2;
+	max-width: none;
+	max-height: none;
+}
+
 .threaddesk__card-design-preview-svg,
 .threaddesk__card-design-preview-original {
 	position: absolute;

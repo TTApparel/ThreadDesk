@@ -234,12 +234,18 @@ if ( taxonomy_exists( 'product_cat' ) && is_array( $layout_category_settings ) )
 							$layout_payload = array();
 						}
 						$placements_by_angle = isset( $layout_payload['placementsByAngle'] ) && is_array( $layout_payload['placementsByAngle'] ) ? $layout_payload['placementsByAngle'] : array();
+						$layout_angles = isset( $layout_payload['angles'] ) && is_array( $layout_payload['angles'] ) ? $layout_payload['angles'] : array();
 
 						$preview_url  = '';
 						$preview_name = '';
+						$preview_angle = '';
+						$preview_top = 50;
+						$preview_left = 50;
+						$preview_width = 25;
+						$preview_base_url = '';
 						$print_count  = 0;
 
-						foreach ( $placements_by_angle as $angle_placements ) {
+						foreach ( $placements_by_angle as $angle_key => $angle_placements ) {
 							if ( ! is_array( $angle_placements ) ) {
 								continue;
 							}
@@ -255,8 +261,15 @@ if ( taxonomy_exists( 'product_cat' ) && is_array( $layout_category_settings ) )
 								if ( '' === $preview_url ) {
 									$preview_url  = $entry_url;
 									$preview_name = isset( $entry['designName'] ) ? (string) $entry['designName'] : '';
+									$preview_angle = sanitize_key( (string) $angle_key );
+									$preview_top = isset( $entry['top'] ) ? (float) $entry['top'] : 50;
+									$preview_left = isset( $entry['left'] ) ? (float) $entry['left'] : 50;
+									$preview_width = isset( $entry['width'] ) ? (float) $entry['width'] : 25;
 								}
 							}
+						}
+						if ( '' !== $preview_angle && isset( $layout_angles[ $preview_angle ] ) ) {
+							$preview_base_url = (string) $layout_angles[ $preview_angle ];
 						}
 						?>
 						<div class="threaddesk__card threaddesk__card--design">
@@ -268,8 +281,10 @@ if ( taxonomy_exists( 'product_cat' ) && is_array( $layout_category_settings ) )
 							</form>
 							<div class="threaddesk__card-design-preview">
 								<?php if ( '' !== $preview_url ) : ?>
-									<img class="threaddesk__card-design-preview-svg" src="<?php echo esc_url( $preview_url ); ?>" alt="<?php echo esc_attr( $preview_name ? $preview_name : $layout_title ); ?>" />
-									<img class="threaddesk__card-design-preview-original" src="<?php echo esc_url( $preview_url ); ?>" alt="" aria-hidden="true" />
+									<?php if ( '' !== $preview_base_url ) : ?>
+										<img class="threaddesk__card-layout-preview-base" src="<?php echo esc_url( $preview_base_url ); ?>" alt="" aria-hidden="true" />
+									<?php endif; ?>
+									<img class="threaddesk__card-layout-preview-overlay" src="<?php echo esc_url( $preview_url ); ?>" alt="<?php echo esc_attr( $preview_name ? $preview_name : $layout_title ); ?>" style="top: <?php echo esc_attr( number_format( $preview_top, 2, '.', '' ) ); ?>%; left: <?php echo esc_attr( number_format( $preview_left, 2, '.', '' ) ); ?>%; width: <?php echo esc_attr( number_format( $preview_width, 2, '.', '' ) ); ?>%;" />
 								<?php else : ?>
 									<span class="threaddesk-layout-modal__image-fallback"><?php echo esc_html__( 'No placement preview', 'threaddesk' ); ?></span>
 								<?php endif; ?>
