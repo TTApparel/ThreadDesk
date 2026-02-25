@@ -736,6 +736,11 @@ body.threaddesk-modal-open {
 	opacity: 1;
 }
 
+.threaddesk__aside--designs .threaddesk__status-list-reason-tag {
+	left: auto;
+	right: calc(100% + 8px);
+}
+
 .threaddesk__status-empty {
 	margin: 0;
 	font-size: 13px;

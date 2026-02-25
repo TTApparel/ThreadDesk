@@ -189,7 +189,7 @@ $nav_base = trailingslashit( wc_get_account_endpoint_url( 'thread-desk' ) );
 					</div>
 				</div>
 			</div>
-			<div class="threaddesk__aside">
+			<div class="threaddesk__aside threaddesk__aside--designs">
 				<?php foreach ( $design_status_labels as $status_key => $status_label ) : ?>
 					<div class="threaddesk__card">
 						<div class="threaddesk__card-header">
