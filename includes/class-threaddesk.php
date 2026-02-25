@@ -1929,6 +1929,7 @@ class TTA_ThreadDesk {
 		echo $this->render_related_post_links_list( $related_invoices, __( 'Invoices', 'threaddesk' ) );
 	}
 
+
 	public function render_layout_admin_meta_box( $post ) {
 		$owner = get_userdata( (int) $post->post_author );
 		$category = (string) get_post_meta( $post->ID, 'layout_category', true );
@@ -1938,13 +1939,24 @@ class TTA_ThreadDesk {
 		if ( ! is_array( $layout_payload ) ) {
 			$layout_payload = array();
 		}
+
 		$payload_angles = isset( $layout_payload['angles'] ) && is_array( $layout_payload['angles'] ) ? $layout_payload['angles'] : array();
+		$payload_placements = isset( $layout_payload['placementsByAngle'] ) && is_array( $layout_payload['placementsByAngle'] ) ? $layout_payload['placementsByAngle'] : array();
 		$preview_angles = array(
-			'front' => isset( $payload_angles['front'] ) ? esc_url_raw( (string) $payload_angles['front'] ) : '',
-			'left'  => isset( $payload_angles['left'] ) ? esc_url_raw( (string) $payload_angles['left'] ) : '',
-			'back'  => isset( $payload_angles['back'] ) ? esc_url_raw( (string) $payload_angles['back'] ) : '',
-			'right' => isset( $payload_angles['right'] ) ? esc_url_raw( (string) $payload_angles['right'] ) : '',
+			'front' => isset( $payload_angles['front'] ) ? (string) $payload_angles['front'] : '',
+			'left'  => isset( $payload_angles['left'] ) ? (string) $payload_angles['left'] : '',
+			'back'  => isset( $payload_angles['back'] ) ? (string) $payload_angles['back'] : '',
+			'right' => isset( $payload_angles['right'] ) ? (string) $payload_angles['right'] : '',
 		);
+
+		foreach ( $preview_angles as $angle_key => $raw_preview_url ) {
+			$sanitized_preview_url = esc_url_raw( $raw_preview_url );
+			if ( '' === $sanitized_preview_url && preg_match( '#^data:image\/(png|jpe?g|webp);base64,#i', $raw_preview_url ) ) {
+				$sanitized_preview_url = $raw_preview_url;
+			}
+			$preview_angles[ $angle_key ] = $sanitized_preview_url;
+		}
+
 		$has_preview_angles = false;
 		foreach ( $preview_angles as $preview_url ) {
 			if ( '' !== $preview_url ) {
@@ -1953,6 +1965,7 @@ class TTA_ThreadDesk {
 			}
 		}
 
+		echo '<div style="width:100%;max-width:100%;box-sizing:border-box;overflow:hidden;">';
 		echo '<p><strong>' . esc_html__( 'User', 'threaddesk' ) . ':</strong> ' . esc_html( $owner ? $owner->display_name : __( 'Unknown', 'threaddesk' ) ) . '</p>';
 		echo '<p><strong>' . esc_html__( 'Category', 'threaddesk' ) . ':</strong> ' . esc_html( $category ?: __( 'Not set', 'threaddesk' ) ) . '</p>';
 		echo '<p><strong>' . esc_html__( 'Created', 'threaddesk' ) . ':</strong> ' . esc_html( $created ?: $post->post_date ) . '</p>';
@@ -1960,15 +1973,40 @@ class TTA_ThreadDesk {
 
 		echo '<p><strong>' . esc_html__( 'Placement angles', 'threaddesk' ) . ':</strong></p>';
 		if ( $has_preview_angles ) {
-			echo '<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-start;">';
+			echo '<div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;align-items:start;width:100%;max-width:100%;">';
 			foreach ( $preview_angles as $angle_key => $preview_url ) {
-				echo '<div style="width:120px;">';
+				echo '<div style="min-width:0;">';
 				echo '<p style="margin:0 0 6px;"><strong>' . esc_html( strtoupper( $angle_key ) ) . '</strong></p>';
+				echo '<div style="position:relative;width:100%;aspect-ratio:1/1;background:#f6f6f6;border:1px solid #ddd;border-radius:4px;overflow:hidden;">';
+
 				if ( '' !== $preview_url ) {
-					echo '<img src="' . esc_url( $preview_url ) . '" alt="' . esc_attr( strtoupper( $angle_key ) . ' ' . __( 'view', 'threaddesk' ) ) . '" style="display:block;width:120px;height:120px;object-fit:contain;background:#f6f6f6;border:1px solid #ddd;border-radius:4px;" />';
+					$base_src = preg_match( '#^data:image/#i', $preview_url ) ? esc_attr( $preview_url ) : esc_url( $preview_url );
+					echo '<img src="' . $base_src . '" alt="' . esc_attr( strtoupper( $angle_key ) . ' ' . __( 'view', 'threaddesk' ) ) . '" style="position:absolute;inset:0;display:block;width:100%;height:100%;object-fit:contain;" />';
 				} else {
-					echo '<div style="display:flex;align-items:center;justify-content:center;width:120px;height:120px;background:#f6f6f6;border:1px solid #ddd;border-radius:4px;color:#777;font-size:12px;">' . esc_html__( 'No image', 'threaddesk' ) . '</div>';
+					echo '<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#777;font-size:12px;">' . esc_html__( 'No image', 'threaddesk' ) . '</div>';
 				}
+
+				$angle_placements = isset( $payload_placements[ $angle_key ] ) && is_array( $payload_placements[ $angle_key ] ) ? $payload_placements[ $angle_key ] : array();
+				foreach ( $angle_placements as $placement_entry ) {
+					if ( ! is_array( $placement_entry ) ) {
+						continue;
+					}
+					$overlay_url_raw = isset( $placement_entry['url'] ) ? (string) $placement_entry['url'] : '';
+					$overlay_url = esc_url_raw( $overlay_url_raw );
+					if ( '' === $overlay_url && preg_match( '#^data:image\/(png|jpe?g|webp);base64,#i', $overlay_url_raw ) ) {
+						$overlay_url = $overlay_url_raw;
+					}
+					if ( '' === $overlay_url ) {
+						continue;
+					}
+					$overlay_src = preg_match( '#^data:image/#i', $overlay_url ) ? esc_attr( $overlay_url ) : esc_url( $overlay_url );
+					$overlay_top = isset( $placement_entry['top'] ) ? (float) $placement_entry['top'] : 50.0;
+					$overlay_left = isset( $placement_entry['left'] ) ? (float) $placement_entry['left'] : 50.0;
+					$overlay_width = isset( $placement_entry['width'] ) ? (float) $placement_entry['width'] : 25.0;
+					echo '<img src="' . $overlay_src . '" alt="" aria-hidden="true" style="position:absolute;top:' . esc_attr( number_format( $overlay_top, 2, '.', '' ) ) . '%;left:' . esc_attr( number_format( $overlay_left, 2, '.', '' ) ) . '%;width:' . esc_attr( number_format( $overlay_width, 2, '.', '' ) ) . '%;height:auto;transform:translate(-50%,-50%);object-fit:contain;pointer-events:none;" />';
+				}
+
+				echo '</div>';
 				echo '</div>';
 			}
 			echo '</div>';
@@ -1977,14 +2015,14 @@ class TTA_ThreadDesk {
 		}
 
 		$meta = get_post_meta( $post->ID );
-		echo '<details><summary><strong>' . esc_html__( 'Design + placement/sizing data', 'threaddesk' ) . '</strong></summary><ul>';
+		echo '<details style="margin-top:12px;max-width:100%;"><summary><strong>' . esc_html__( 'Design + placement/sizing data', 'threaddesk' ) . '</strong></summary><div style="max-width:100%;overflow:auto;"><ul style="margin-top:8px;">';
 		foreach ( $meta as $key => $values ) {
 			if ( false === strpos( $key, 'design' ) && false === strpos( $key, 'placement' ) && false === strpos( $key, 'layout' ) && false === strpos( $key, 'size' ) ) { continue; }
 			$value = isset( $values[0] ) ? maybe_unserialize( $values[0] ) : '';
 			if ( is_array( $value ) || is_object( $value ) ) { $value = wp_json_encode( $value ); }
 			echo '<li><code>' . esc_html( $key ) . '</code>: ' . esc_html( (string) $value ) . '</li>';
 		}
-		echo '</ul></details>';
+		echo '</ul></div></details>';
 		$related_designs = $this->find_related_posts_by_id_in_meta( $post->ID, 'tta_design', true );
 		$related_quotes = $this->find_related_posts_by_id_in_meta( $post->ID, 'tta_quote' );
 		$related_invoices = $this->find_related_posts_by_id_in_meta( $post->ID, 'shop_order' );
@@ -1992,6 +2030,7 @@ class TTA_ThreadDesk {
 		echo $this->render_related_post_links_list( $related_designs, __( 'Designs', 'threaddesk' ) );
 		echo $this->render_related_post_links_list( $related_quotes, __( 'Quotes', 'threaddesk' ) );
 		echo $this->render_related_post_links_list( $related_invoices, __( 'Invoices', 'threaddesk' ) );
+		echo '</div>';
 	}
 
 	private function get_image_dimensions_from_url( $url ) {
