@@ -47,6 +47,12 @@ $design_status_labels = array(
 	'approved' => __( 'Approved', 'threaddesk' ),
 	'rejected' => __( 'Rejected', 'threaddesk' ),
 );
+$design_rejection_reason_labels = array(
+	'low_resolution' => __( 'The design file is of too low a resolution to proceed to printing.', 'threaddesk' ),
+	'copyright_risk' => __( 'The design is copyrighted and is at risk of infringement.', 'threaddesk' ),
+	'detail_concerns' => __( 'Gradients/Transparencies/Fine detail concerns', 'threaddesk' ),
+	'other'          => __( 'Other (a representative will be in contact with you in the coming days)', 'threaddesk' ),
+);
 
 
 if ( '' === $cover ) {
@@ -117,6 +123,8 @@ $nav_base = trailingslashit( wc_get_account_endpoint_url( 'thread-desk' ) );
 					<?php $design_mockup_png = get_post_meta( $design->ID, 'design_mockup_file_url', true ); ?>
 					<?php $design_status_mockup = $design_mockup_png ? $design_mockup_png : $design_preview; ?>
 					<?php $design_status = sanitize_key( (string) get_post_meta( $design->ID, 'design_status', true ) ); ?>
+					<?php $design_rejection_reason = sanitize_key( (string) get_post_meta( $design->ID, 'design_rejection_reason', true ) ); ?>
+					<?php $design_rejection_reason_text = isset( $design_rejection_reason_labels[ $design_rejection_reason ] ) ? $design_rejection_reason_labels[ $design_rejection_reason ] : ''; ?>
 					<?php if ( ! in_array( $design_status, array( 'pending', 'approved', 'rejected' ), true ) ) : ?>
 						<?php $design_status = 'pending'; ?>
 					<?php endif; ?>
@@ -135,6 +143,7 @@ $nav_base = trailingslashit( wc_get_account_endpoint_url( 'thread-desk' ) );
 					<?php $design_status_titles[ $design_status ][] = array(
 						'title'  => $design_title,
 						'mockup' => $design_status_mockup,
+						'reason' => $design_rejection_reason_text,
 					); ?>
 					<div class="threaddesk__card threaddesk__card--design">
 						<form class="threaddesk__card-delete" method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
@@ -192,14 +201,19 @@ $nav_base = trailingslashit( wc_get_account_endpoint_url( 'thread-desk' ) );
 									<?php
 									$status_title = isset( $status_item['title'] ) ? (string) $status_item['title'] : '';
 									$status_mockup = isset( $status_item['mockup'] ) ? (string) $status_item['mockup'] : '';
+									$status_reason = isset( $status_item['reason'] ) ? (string) $status_item['reason'] : '';
 									$show_hover_mockup = in_array( $status_key, array( 'pending', 'approved' ), true ) && '' !== $status_mockup;
+									$show_hover_reason = 'rejected' === $status_key && '' !== $status_reason;
 									?>
-									<li class="threaddesk__status-list-item<?php echo $show_hover_mockup ? ' has-mockup' : ''; ?>">
+									<li class="threaddesk__status-list-item<?php echo $show_hover_mockup ? ' has-mockup' : ''; ?><?php echo $show_hover_reason ? ' has-reason' : ''; ?>">
 										<span class="threaddesk__status-list-title"><?php echo esc_html( $status_title ); ?></span>
 										<?php if ( $show_hover_mockup ) : ?>
 											<span class="threaddesk__status-list-mockup-tag" role="tooltip" aria-hidden="true">
 												<img src="<?php echo esc_url( $status_mockup ); ?>" alt="" />
 											</span>
+										<?php endif; ?>
+										<?php if ( $show_hover_reason ) : ?>
+											<span class="threaddesk__status-list-reason-tag" role="tooltip" aria-hidden="true"><?php echo esc_html( $status_reason ); ?></span>
 										<?php endif; ?>
 									</li>
 								<?php endforeach; ?>

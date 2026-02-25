@@ -711,6 +711,31 @@ body.threaddesk-modal-open {
 	opacity: 1;
 }
 
+.threaddesk__status-list-reason-tag {
+	position: absolute;
+	left: calc(100% + 8px);
+	top: 50%;
+	transform: translateY(-50%);
+	background: #fff;
+	border: 1px solid rgba(0, 0, 0, 0.14);
+	box-shadow: 0 6px 18px rgba(0, 0, 0, 0.14);
+	border-radius: 8px;
+	padding: 8px 10px;
+	z-index: 15;
+	width: 220px;
+	font-size: 12px;
+	line-height: 1.4;
+	color: #2f2f2f;
+	opacity: 0;
+	pointer-events: none;
+	transition: opacity .15s ease;
+}
+
+.threaddesk__status-list-item.has-reason:hover .threaddesk__status-list-reason-tag,
+.threaddesk__status-list-item.has-reason:focus-within .threaddesk__status-list-reason-tag {
+	opacity: 1;
+}
+
 .threaddesk__status-empty {
 	margin: 0;
 	font-size: 13px;
