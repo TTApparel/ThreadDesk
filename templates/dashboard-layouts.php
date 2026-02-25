@@ -271,6 +271,14 @@ if ( taxonomy_exists( 'product_cat' ) && is_array( $layout_category_settings ) )
 						if ( '' !== $preview_angle && isset( $layout_angles[ $preview_angle ] ) ) {
 							$preview_base_url = (string) $layout_angles[ $preview_angle ];
 						}
+						$preview_base_src = '';
+						if ( '' !== $preview_base_url ) {
+							$preview_base_src = preg_match( '#^data:image/#i', $preview_base_url ) ? esc_attr( $preview_base_url ) : esc_url( $preview_base_url );
+						}
+						$preview_overlay_src = '';
+						if ( '' !== $preview_url ) {
+							$preview_overlay_src = preg_match( '#^data:image/#i', $preview_url ) ? esc_attr( $preview_url ) : esc_url( $preview_url );
+						}
 						?>
 						<div class="threaddesk__card threaddesk__card--design">
 							<form class="threaddesk__card-delete" method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
@@ -281,10 +289,12 @@ if ( taxonomy_exists( 'product_cat' ) && is_array( $layout_category_settings ) )
 							</form>
 							<div class="threaddesk__card-design-preview">
 								<?php if ( '' !== $preview_url ) : ?>
-									<?php if ( '' !== $preview_base_url ) : ?>
-										<img class="threaddesk__card-layout-preview-base" src="<?php echo esc_url( $preview_base_url ); ?>" alt="" aria-hidden="true" />
+									<?php if ( '' !== $preview_base_src ) : ?>
+										<img class="threaddesk__card-layout-preview-base" src="<?php echo $preview_base_src; ?>" alt="" aria-hidden="true" />
 									<?php endif; ?>
-									<img class="threaddesk__card-layout-preview-overlay" src="<?php echo esc_url( $preview_url ); ?>" alt="<?php echo esc_attr( $preview_name ? $preview_name : $layout_title ); ?>" style="top: <?php echo esc_attr( number_format( $preview_top, 2, '.', '' ) ); ?>%; left: <?php echo esc_attr( number_format( $preview_left, 2, '.', '' ) ); ?>%; width: <?php echo esc_attr( number_format( $preview_width, 2, '.', '' ) ); ?>%;" />
+									<?php if ( '' !== $preview_overlay_src ) : ?>
+										<img class="threaddesk__card-layout-preview-overlay" src="<?php echo $preview_overlay_src; ?>" alt="<?php echo esc_attr( $preview_name ? $preview_name : $layout_title ); ?>" style="top: <?php echo esc_attr( number_format( $preview_top, 2, '.', '' ) ); ?>%; left: <?php echo esc_attr( number_format( $preview_left, 2, '.', '' ) ); ?>%; width: <?php echo esc_attr( number_format( $preview_width, 2, '.', '' ) ); ?>%;" />
+									<?php endif; ?>
 								<?php else : ?>
 									<span class="threaddesk-layout-modal__image-fallback"><?php echo esc_html__( 'No placement preview', 'threaddesk' ); ?></span>
 								<?php endif; ?>
