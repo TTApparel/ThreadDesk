@@ -148,19 +148,7 @@ $nav_base = trailingslashit( wc_get_account_endpoint_url( 'thread-desk' ) );
 								data-threaddesk-design-file-name="<?php echo esc_attr( $design_file_name ); ?>"
 								data-threaddesk-design-palette="<?php echo esc_attr( $design_palette ? $design_palette : '[]' ); ?>"
 								data-threaddesk-design-settings="<?php echo esc_attr( $design_settings ? $design_settings : '{}' ); ?>">
-								<?php echo esc_html__( 'Edit', 'threaddesk' ); ?>
-							</button>
-							<button
-								type="button"
-								class="threaddesk__button threaddesk__button--small"
-								data-threaddesk-design-download-svg
-								data-threaddesk-design-preview-url="<?php echo esc_url( $design_preview ); ?>"
-								data-threaddesk-design-file-name="<?php echo esc_attr( $design_file_name ); ?>"
-								data-threaddesk-design-palette="<?php echo esc_attr( $design_palette ? $design_palette : '[]' ); ?>"
-								data-threaddesk-design-settings="<?php echo esc_attr( $design_settings ? $design_settings : '{}' ); ?>"
-								data-threaddesk-design-svg-url="<?php echo esc_url( $design_svg_url ); ?>"
-								data-threaddesk-design-svg-name="<?php echo esc_attr( $design_svg_name ); ?>">
-								<?php echo esc_html__( 'Save', 'threaddesk' ); ?>
+								<?php echo esc_html__( 'Adjust Design', 'threaddesk' ); ?>
 							</button>
 						</div>
 					</div>
