@@ -43,6 +43,9 @@ class TTA_ThreadDesk {
 		add_action( 'manage_tta_quote_posts_custom_column', array( $this, 'render_custom_admin_columns' ), 10, 2 );
 		add_action( 'manage_tta_design_posts_custom_column', array( $this, 'render_custom_admin_columns' ), 10, 2 );
 		add_action( 'manage_tta_layout_posts_custom_column', array( $this, 'render_custom_admin_columns' ), 10, 2 );
+		add_action( 'quick_edit_custom_box', array( $this, 'render_design_quick_edit_status_field' ), 10, 2 );
+		add_action( 'admin_footer-edit.php', array( $this, 'render_design_quick_edit_status_script' ) );
+		add_action( 'save_post_tta_design', array( $this, 'handle_design_status_save' ), 10, 2 );
 		add_filter( 'manage_edit-tta_quote_sortable_columns', array( $this, 'filter_quote_sortable_columns' ) );
 		add_filter( 'manage_edit-tta_design_sortable_columns', array( $this, 'filter_design_sortable_columns' ) );
 		add_filter( 'manage_edit-tta_layout_sortable_columns', array( $this, 'filter_layout_sortable_columns' ) );
@@ -188,6 +191,25 @@ class TTA_ThreadDesk {
 			'right_sleeve'=> __( 'Right Sleeve', 'threaddesk' ),
 			'back'        => __( 'Back', 'threaddesk' ),
 		);
+	}
+
+	private function get_design_status_options() {
+		return array(
+			'pending'  => __( 'Pending', 'threaddesk' ),
+			'approved' => __( 'Approved', 'threaddesk' ),
+			'rejected' => __( 'Rejected', 'threaddesk' ),
+		);
+	}
+
+	private function sanitize_design_status( $status ) {
+		$status  = sanitize_key( (string) $status );
+		$options = $this->get_design_status_options();
+		return isset( $options[ $status ] ) ? $status : 'pending';
+	}
+
+	private function get_design_status( $design_id ) {
+		$stored = get_post_meta( (int) $design_id, 'design_status', true );
+		return $this->sanitize_design_status( $stored );
 	}
 
 	private function render_media_picker_field( $name, $value ) {
@@ -1087,6 +1109,8 @@ class TTA_ThreadDesk {
 				wp_safe_redirect( $redirect_url );
 				exit;
 			}
+
+			update_post_meta( $design_id, 'design_status', 'pending' );
 		}
 
 		$palette_raw = isset( $_POST['threaddesk_design_palette'] ) ? wp_unslash( $_POST['threaddesk_design_palette'] ) : '[]';
@@ -1916,8 +1940,21 @@ class TTA_ThreadDesk {
 	public function register_admin_meta_boxes() {
 		add_meta_box( 'threaddesk_design_detail', __( 'ThreadDesk Design Details', 'threaddesk' ), array( $this, 'render_design_admin_meta_box' ), 'tta_design', 'normal', 'high' );
 		add_meta_box( 'threaddesk_design_usage', __( 'Used Layouts / Quotes / Invoices', 'threaddesk' ), array( $this, 'render_design_usage_admin_meta_box' ), 'tta_design', 'side', 'default' );
+		add_meta_box( 'threaddesk_design_status', __( 'Design Status', 'threaddesk' ), array( $this, 'render_design_status_admin_meta_box' ), 'tta_design', 'side', 'high' );
 		add_meta_box( 'threaddesk_layout_detail', __( 'ThreadDesk Layout Details', 'threaddesk' ), array( $this, 'render_layout_admin_meta_box' ), 'tta_layout', 'normal', 'high' );
 		add_meta_box( 'threaddesk_layout_designs', __( 'Designs', 'threaddesk' ), array( $this, 'render_layout_designs_admin_meta_box' ), 'tta_layout', 'side', 'default' );
+	}
+
+	public function render_design_status_admin_meta_box( $post ) {
+		$status = $this->get_design_status( $post->ID );
+		$options = $this->get_design_status_options();
+		wp_nonce_field( 'tta_threaddesk_design_status_meta_box', 'tta_threaddesk_design_status_meta_nonce' );
+		echo '<label for="threaddesk_design_status_field" class="screen-reader-text">' . esc_html__( 'Design status', 'threaddesk' ) . '</label>';
+		echo '<select id="threaddesk_design_status_field" name="threaddesk_design_status" style="width:100%;">';
+		foreach ( $options as $value => $label ) {
+			echo '<option value="' . esc_attr( $value ) . '" ' . selected( $status, $value, false ) . '>' . esc_html( $label ) . '</option>';
+		}
+		echo '</select>';
 	}
 
 	public function render_design_admin_meta_box( $post ) {
@@ -2290,7 +2327,15 @@ class TTA_ThreadDesk {
 	}
 
 	public function filter_design_admin_columns( $columns ) {
-		return $this->filter_entity_admin_columns( $columns );
+		$columns = $this->filter_entity_admin_columns( $columns );
+		$updated = array();
+		foreach ( $columns as $key => $label ) {
+			$updated[ $key ] = $label;
+			if ( 'tta_internal_ref' === $key ) {
+				$updated['tta_design_status'] = __( 'Status', 'threaddesk' );
+			}
+		}
+		return $updated;
 	}
 
 	public function filter_layout_admin_columns( $columns ) {
@@ -2322,6 +2367,16 @@ class TTA_ThreadDesk {
 			echo '<a href="' . esc_url( $url ) . '">' . esc_html( $owner->display_name ) . '</a>';
 			return;
 		}
+		if ( 'tta_design_status' === $column ) {
+			if ( 'tta_design' !== $post->post_type ) {
+				echo '&mdash;';
+				return;
+			}
+			$status = $this->get_design_status( $post_id );
+			$options = $this->get_design_status_options();
+			echo '<span class="threaddesk-design-status" data-threaddesk-design-status="' . esc_attr( $status ) . '">' . esc_html( isset( $options[ $status ] ) ? $options[ $status ] : $options['pending'] ) . '</span>';
+			return;
+		}
 	}
 
 	private function filter_entity_sortable_columns( $columns ) {
@@ -2336,7 +2391,9 @@ class TTA_ThreadDesk {
 	}
 
 	public function filter_design_sortable_columns( $columns ) {
-		return $this->filter_entity_sortable_columns( $columns );
+		$columns = $this->filter_entity_sortable_columns( $columns );
+		$columns['tta_design_status'] = 'tta_design_status';
+		return $columns;
 	}
 
 	public function filter_layout_sortable_columns( $columns ) {
@@ -2359,7 +2416,83 @@ class TTA_ThreadDesk {
 		}
 		if ( 'tta_owner' === $orderby ) {
 			$query->set( 'orderby', 'author' );
+			return;
 		}
+		if ( 'tta_design_status' === $orderby && 'tta_design' === $post_type ) {
+			$query->set( 'meta_key', 'design_status' );
+			$query->set( 'orderby', 'meta_value' );
+		}
+	}
+
+	public function render_design_quick_edit_status_field( $column_name, $post_type ) {
+		if ( 'tta_design_status' !== $column_name || 'tta_design' !== $post_type ) {
+			return;
+		}
+		$options = $this->get_design_status_options();
+		wp_nonce_field( 'tta_threaddesk_design_status_quick_edit', 'tta_threaddesk_design_status_nonce' );
+		echo '<fieldset class="inline-edit-col-right">';
+		echo '<div class="inline-edit-col">';
+		echo '<label class="inline-edit-group">';
+		echo '<span class="title">' . esc_html__( 'Design status', 'threaddesk' ) . '</span>';
+		echo '<select name="threaddesk_design_status">';
+		foreach ( $options as $value => $label ) {
+			echo '<option value="' . esc_attr( $value ) . '">' . esc_html( $label ) . '</option>';
+		}
+		echo '</select>';
+		echo '</label>';
+		echo '</div>';
+		echo '</fieldset>';
+	}
+
+	public function render_design_quick_edit_status_script() {
+		$screen = function_exists( 'get_current_screen' ) ? get_current_screen() : null;
+		if ( ! $screen || 'edit-tta_design' !== $screen->id ) {
+			return;
+		}
+		?>
+		<script>
+		jQuery(function ($) {
+			const $wpInlineEdit = inlineEditPost.edit;
+			inlineEditPost.edit = function (postId) {
+				$wpInlineEdit.apply(this, arguments);
+				let id = 0;
+				if (typeof(postId) === 'object') {
+					id = parseInt(this.getId(postId), 10);
+				} else {
+					id = parseInt(postId, 10);
+				}
+				if (!id) { return; }
+				const $editRow = $('#edit-' + id);
+				const $postRow = $('#post-' + id);
+				const rawStatus = String(($postRow.find('.threaddesk-design-status').attr('data-threaddesk-design-status') || 'pending')).toLowerCase();
+				const status = rawStatus === 'approved' || rawStatus === 'rejected' ? rawStatus : 'pending';
+				$editRow.find('select[name="threaddesk_design_status"]').val(status);
+			};
+		});
+		</script>
+		<?php
+	}
+
+	public function handle_design_status_save( $post_id, $post ) {
+		if ( ! $post || 'tta_design' !== $post->post_type ) {
+			return;
+		}
+		if ( defined( 'DOING_AUTOSAVE' ) && DOING_AUTOSAVE ) {
+			return;
+		}
+		if ( ! current_user_can( 'edit_post', $post_id ) ) {
+			return;
+		}
+		if ( ! isset( $_POST['threaddesk_design_status'] ) ) {
+			return;
+		}
+		$has_quick_edit_nonce = isset( $_POST['tta_threaddesk_design_status_nonce'] ) && wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['tta_threaddesk_design_status_nonce'] ) ), 'tta_threaddesk_design_status_quick_edit' );
+		$has_meta_box_nonce   = isset( $_POST['tta_threaddesk_design_status_meta_nonce'] ) && wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['tta_threaddesk_design_status_meta_nonce'] ) ), 'tta_threaddesk_design_status_meta_box' );
+		if ( ! $has_quick_edit_nonce && ! $has_meta_box_nonce ) {
+			return;
+		}
+		$status = $this->sanitize_design_status( wp_unslash( $_POST['threaddesk_design_status'] ) );
+		update_post_meta( $post_id, 'design_status', $status );
 	}
 
 	public function handle_auth_login() {

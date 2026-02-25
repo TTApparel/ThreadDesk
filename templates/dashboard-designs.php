@@ -102,6 +102,11 @@ $nav_base = trailingslashit( wc_get_account_endpoint_url( 'thread-desk' ) );
 					<?php $design_settings = get_post_meta( $design->ID, 'design_analysis_settings', true ); ?>
 					<?php $design_svg_url = get_post_meta( $design->ID, 'design_svg_file_url', true ); ?>
 					<?php $design_svg_name = get_post_meta( $design->ID, 'design_svg_file_name', true ); ?>
+					<?php $design_status = sanitize_key( (string) get_post_meta( $design->ID, 'design_status', true ) ); ?>
+					<?php if ( ! in_array( $design_status, array( 'pending', 'approved', 'rejected' ), true ) ) : ?>
+						<?php $design_status = 'pending'; ?>
+					<?php endif; ?>
+					<?php $design_status_labels = array( 'pending' => __( 'Pending', 'threaddesk' ), 'approved' => __( 'Approved', 'threaddesk' ), 'rejected' => __( 'Rejected', 'threaddesk' ) ); ?>
 					<?php $design_palette_values = json_decode( (string) $design_palette, true ); ?>
 					<?php $design_palette_values = is_array( $design_palette_values ) ? $design_palette_values : array(); ?>
 					<?php $design_palette_values = array_map( function ( $color ) { return strtoupper( trim( (string) $color ) ); }, $design_palette_values ); ?>
@@ -132,7 +137,7 @@ $nav_base = trailingslashit( wc_get_account_endpoint_url( 'thread-desk' ) );
 							<input type="hidden" name="design_id" value="<?php echo esc_attr( $design->ID ); ?>" />
 							<?php wp_nonce_field( 'tta_threaddesk_rename_design' ); ?>
 							<h5 class="threaddesk__card-title"><input class="threaddesk__card-title-input" type="text" name="design_title" value="<?php echo esc_attr( $design_title ); ?>" maxlength="120" data-threaddesk-design-title-card-input aria-label="<?php echo esc_attr__( 'Design title', 'threaddesk' ); ?>" /></h5>
-							<p class="threaddesk__card-design-color-count"><?php echo esc_html( sprintf( __( 'Color count: %d', 'threaddesk' ), $design_color_count ) ); ?></p>
+							<p class="threaddesk__card-design-color-count"><span><?php echo esc_html( sprintf( __( 'Color count: %d', 'threaddesk' ), $design_color_count ) ); ?></span><span class="threaddesk__card-design-status threaddesk__card-design-status--<?php echo esc_attr( $design_status ); ?>"><?php echo esc_html( isset( $design_status_labels[ $design_status ] ) ? $design_status_labels[ $design_status ] : $design_status_labels['pending'] ); ?></span></p>
 						</form>
 						<div class="threaddesk__card-design-actions">
 							<button
