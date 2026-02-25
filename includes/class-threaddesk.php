@@ -190,6 +190,15 @@ class TTA_ThreadDesk {
 
 		add_submenu_page(
 			'tta-threaddesk',
+			__( 'User Detail', 'threaddesk' ),
+			__( 'User Detail', 'threaddesk' ),
+			'manage_woocommerce',
+			'tta-threaddesk-user-detail',
+			array( $this, 'render_admin_user_detail_page' )
+		);
+
+		add_submenu_page(
+			'tta-threaddesk',
 			__( 'Settings', 'threaddesk' ),
 			__( 'Settings', 'threaddesk' ),
 			'manage_woocommerce',
@@ -206,6 +215,15 @@ class TTA_ThreadDesk {
 	public function enqueue_admin_assets( $hook ) {
 		if ( 'toplevel_page_tta-threaddesk' !== $hook && false === strpos( (string) $hook, 'tta-threaddesk-settings' ) && false === strpos( (string) $hook, 'tta-threaddesk-user-detail' ) ) {
 			return;
+		}
+
+		if ( wp_script_is( 'wp-auth-check', 'registered' ) && ! wp_script_is( 'heartbeat', 'registered' ) ) {
+			$suffix = ( defined( 'SCRIPT_DEBUG' ) && SCRIPT_DEBUG ) ? '' : '.min';
+			wp_register_script( 'heartbeat', includes_url( 'js/heartbeat' . $suffix . '.js' ), array( 'jquery', 'wp-hooks' ), false, true );
+		}
+
+		if ( wp_script_is( 'heartbeat', 'registered' ) ) {
+			wp_enqueue_script( 'heartbeat' );
 		}
 
 		wp_enqueue_media();
