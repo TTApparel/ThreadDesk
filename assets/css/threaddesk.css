@@ -659,6 +659,24 @@ body.threaddesk-modal-open {
 	color: #b22a2a;
 }
 
+.threaddesk__status-list {
+	margin: 0;
+	padding-left: 18px;
+	font-size: 13px;
+	line-height: 1.5;
+	color: #444;
+}
+
+.threaddesk__status-list li + li {
+	margin-top: 4px;
+}
+
+.threaddesk__status-empty {
+	margin: 0;
+	font-size: 13px;
+	color: #777;
+}
+
 .threaddesk__card-title-input {
 	width: 100%;
 	font-family: inherit;

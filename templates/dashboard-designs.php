@@ -37,6 +37,16 @@ if ( $user ) {
 }
 $profile_name = $profile_name ? $profile_name : $client_name;
 $profile_username = $user ? $user->user_login : __( 'Username', 'threaddesk' );
+$design_status_titles = array(
+	'pending'  => array(),
+	'approved' => array(),
+	'rejected' => array(),
+);
+$design_status_labels = array(
+	'pending'  => __( 'Pending', 'threaddesk' ),
+	'approved' => __( 'Approved', 'threaddesk' ),
+	'rejected' => __( 'Rejected', 'threaddesk' ),
+);
 
 
 if ( '' === $cover ) {
@@ -88,13 +98,15 @@ $nav_base = trailingslashit( wc_get_account_endpoint_url( 'thread-desk' ) );
 			</form>
 		</div>
 
-		<div class="threaddesk__section">
-			<div class="threaddesk__card-header threaddesk-designer__heading">
-				<h3><?php echo esc_html__( 'Saved Designs', 'threaddesk' ); ?></h3>
-				<button type="button" class="threaddesk__button" data-threaddesk-design-open><?php echo esc_html__( 'Add Design', 'threaddesk' ); ?></button>
-			</div>
-						<div class="threaddesk__cards">
-				<?php if ( ! empty( $context['designs'] ) ) : ?>
+		<div class="threaddesk__content-inner">
+			<div class="threaddesk__main">
+				<div class="threaddesk__section">
+					<div class="threaddesk__card-header threaddesk-designer__heading">
+						<h3><?php echo esc_html__( 'Saved Designs', 'threaddesk' ); ?></h3>
+						<button type="button" class="threaddesk__button" data-threaddesk-design-open><?php echo esc_html__( 'Add Design', 'threaddesk' ); ?></button>
+					</div>
+					<div class="threaddesk__cards">
+						<?php if ( ! empty( $context['designs'] ) ) : ?>
 					<?php foreach ( $context['designs'] as $design ) : ?>
 					<?php $design_preview = get_post_meta( $design->ID, 'design_preview_url', true ); ?>
 					<?php $design_file_name = get_post_meta( $design->ID, 'design_file_name', true ); ?>
@@ -106,7 +118,6 @@ $nav_base = trailingslashit( wc_get_account_endpoint_url( 'thread-desk' ) );
 					<?php if ( ! in_array( $design_status, array( 'pending', 'approved', 'rejected' ), true ) ) : ?>
 						<?php $design_status = 'pending'; ?>
 					<?php endif; ?>
-					<?php $design_status_labels = array( 'pending' => __( 'Pending', 'threaddesk' ), 'approved' => __( 'Approved', 'threaddesk' ), 'rejected' => __( 'Rejected', 'threaddesk' ) ); ?>
 					<?php $design_palette_values = json_decode( (string) $design_palette, true ); ?>
 					<?php $design_palette_values = is_array( $design_palette_values ) ? $design_palette_values : array(); ?>
 					<?php $design_palette_values = array_map( function ( $color ) { return strtoupper( trim( (string) $color ) ); }, $design_palette_values ); ?>
@@ -119,6 +130,7 @@ $nav_base = trailingslashit( wc_get_account_endpoint_url( 'thread-desk' ) );
 					<?php if ( '' === $design_title ) : ?>
 						<?php $design_title = __( 'Design', 'threaddesk' ); ?>
 					<?php endif; ?>
+					<?php $design_status_titles[ $design_status ][] = $design_title; ?>
 					<div class="threaddesk__card threaddesk__card--design">
 						<form class="threaddesk__card-delete" method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
 							<input type="hidden" name="action" value="tta_threaddesk_delete_design" />
@@ -155,11 +167,31 @@ $nav_base = trailingslashit( wc_get_account_endpoint_url( 'thread-desk' ) );
 						</div>
 					</div>
 					<?php endforeach; ?>
-				<?php else : ?>
-					<div class="threaddesk__card">
-						<p><?php echo esc_html__( 'No designs found yet.', 'threaddesk' ); ?></p>
+						<?php else : ?>
+							<div class="threaddesk__card">
+								<p><?php echo esc_html__( 'No designs found yet.', 'threaddesk' ); ?></p>
+							</div>
+						<?php endif; ?>
 					</div>
-				<?php endif; ?>
+				</div>
+			</div>
+			<div class="threaddesk__aside">
+				<?php foreach ( $design_status_labels as $status_key => $status_label ) : ?>
+					<div class="threaddesk__card">
+						<div class="threaddesk__card-header">
+							<h4><?php echo esc_html( $status_label ); ?></h4>
+						</div>
+						<?php if ( ! empty( $design_status_titles[ $status_key ] ) ) : ?>
+							<ul class="threaddesk__status-list">
+								<?php foreach ( $design_status_titles[ $status_key ] as $status_title ) : ?>
+									<li><?php echo esc_html( $status_title ); ?></li>
+								<?php endforeach; ?>
+							</ul>
+						<?php else : ?>
+							<p class="threaddesk__status-empty"><?php echo esc_html__( 'No designs', 'threaddesk' ); ?></p>
+						<?php endif; ?>
+					</div>
+				<?php endforeach; ?>
 			</div>
 		</div>
 	</div>
