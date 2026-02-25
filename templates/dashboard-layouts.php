@@ -378,7 +378,7 @@ if ( taxonomy_exists( 'product_cat' ) && is_array( $layout_category_settings ) )
 		</div>
 
 
-			<div class="threaddesk__aside">
+			<div class="threaddesk__aside threaddesk__aside--placements">
 				<?php foreach ( $layout_status_labels as $status_key => $status_label ) : ?>
 					<div class="threaddesk__card">
 						<div class="threaddesk__card-header">

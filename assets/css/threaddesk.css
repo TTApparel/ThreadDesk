@@ -714,6 +714,14 @@ body.threaddesk-modal-open {
 }
 
 .threaddesk__status-list-mockup-tag .threaddesk__card-layout-preview-base {
+	top: 50%;
+	left: 50%;
+	inset: auto;
+	width: auto;
+	height: auto;
+	max-width: calc(100% - 8px);
+	max-height: calc(100% - 8px);
+	transform: translate(-50%, -50%);
 	object-fit: contain;
 }
 
@@ -752,7 +760,8 @@ body.threaddesk-modal-open {
 	opacity: 1;
 }
 
-.threaddesk__aside--designs .threaddesk__status-list-reason-tag {
+.threaddesk__aside--designs .threaddesk__status-list-reason-tag,
+.threaddesk__aside--placements .threaddesk__status-list-reason-tag {
 	left: auto;
 	right: calc(100% + 8px);
 }
