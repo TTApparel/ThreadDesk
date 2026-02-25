@@ -23,7 +23,6 @@
 	display: block;
 	padding: 14px 20px;
 	border: 1px solid #1f1f1f;
-	border-radius: 999px;
 	text-align: center;
 	text-transform: uppercase;
 	letter-spacing: 0.08em;
@@ -1328,8 +1327,6 @@ body.threaddesk-modal-open {
 
 .threaddesk-layout-modal__image-wrap {
 	aspect-ratio: 4 / 5;
-	background: #f5f5f5;
-	padding: 8px;
 	border-radius: 6px;
 	display: flex;
 	align-items: center;
