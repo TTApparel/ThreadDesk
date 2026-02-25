@@ -282,7 +282,7 @@ if ( taxonomy_exists( 'product_cat' ) && is_array( $layout_category_settings ) )
 								<p class="threaddesk__card-design-color-count"><?php echo esc_html( sprintf( __( 'Print count: %d', 'threaddesk' ), $print_count ) ); ?></p>
 							</form>
 							<div class="threaddesk__card-design-actions">
-								<button type="button" class="threaddesk__button threaddesk__button--small" data-threaddesk-layout-open data-threaddesk-layout-category-open="<?php echo esc_attr( $layout_category ); ?>" data-threaddesk-layout-payload="<?php echo esc_attr( wp_json_encode( $layout_payload ) ); ?>"><?php echo esc_html__( 'Adjust placements', 'threaddesk' ); ?></button>
+								<button type="button" class="threaddesk__button threaddesk__button--small" data-threaddesk-layout-open data-threaddesk-layout-category-open="<?php echo esc_attr( $layout_category ); ?>" data-threaddesk-layout-id="<?php echo esc_attr( $layout->ID ); ?>" data-threaddesk-layout-payload="<?php echo esc_attr( wp_json_encode( $layout_payload ) ); ?>"><?php echo esc_html__( 'Adjust placements', 'threaddesk' ); ?></button>
 							</div>
 						</div>
 					<?php endforeach; ?>
@@ -381,7 +381,8 @@ if ( taxonomy_exists( 'product_cat' ) && is_array( $layout_category_settings ) )
 							<?php wp_nonce_field( 'tta_threaddesk_save_layout' ); ?>
 							<input type="hidden" name="threaddesk_layout_category" value="" data-threaddesk-layout-save-category />
 							<input type="hidden" name="threaddesk_layout_category_id" value="0" data-threaddesk-layout-save-category-id />
-							<input type="hidden" name="threaddesk_layout_payload" value="" data-threaddesk-layout-save-payload />
+							<input type="hidden" name="threaddesk_layout_id" value="0" data-threaddesk-layout-save-id />
+								<input type="hidden" name="threaddesk_layout_payload" value="" data-threaddesk-layout-save-payload />
 							<button type="submit" class="threaddesk-layout-viewer__save-layout-button" data-threaddesk-layout-save-layout><?php echo esc_html__( 'Save Layout', 'threaddesk' ); ?></button>
 						</form>
 					</div>

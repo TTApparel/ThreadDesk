@@ -136,6 +136,7 @@ jQuery(function ($) {
 		const saveLayoutCategoryField = layoutModal.find('[data-threaddesk-layout-save-category]');
 		const saveLayoutCategoryIdField = layoutModal.find('[data-threaddesk-layout-save-category-id]');
 		const saveLayoutPayloadField = layoutModal.find('[data-threaddesk-layout-save-payload]');
+		const saveLayoutIdField = layoutModal.find('[data-threaddesk-layout-save-id]');
 		const placementPanelStep = layoutModal.find('[data-threaddesk-layout-panel-step="placements"]');
 		const designPanelStep = layoutModal.find('[data-threaddesk-layout-panel-step="designs"]');
 		const adjustPanelStep = layoutModal.find('[data-threaddesk-layout-panel-step="adjust"]');
@@ -820,6 +821,7 @@ jQuery(function ($) {
 			$('body').addClass('threaddesk-modal-open');
 			showChooserStep();
 			setPanelStep('placements');
+			saveLayoutIdField.val('0');
 		};
 
 		const closeLayoutModal = function () {
@@ -857,6 +859,10 @@ jQuery(function ($) {
 			const trigger = $(this);
 			const savedPayload = parseLayoutPayloadFromAttribute(trigger.attr('data-threaddesk-layout-payload'));
 			const requestedCategory = String(trigger.attr('data-threaddesk-layout-category-open') || (savedPayload && savedPayload.category) || '').trim();
+			const existingLayoutId = Number(trigger.attr('data-threaddesk-layout-id') || 0);
+			if (existingLayoutId > 0) {
+				saveLayoutIdField.val(String(existingLayoutId));
+			}
 
 			const categoryButton = requestedCategory ? layoutModal.find('[data-threaddesk-layout-category]').filter(function () {
 				return String($(this).attr('data-threaddesk-layout-category') || '').trim() === requestedCategory;
