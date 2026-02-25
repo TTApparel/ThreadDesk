@@ -961,7 +961,42 @@ jQuery(function ($) {
 			selectedPlacementKey = String($(this).attr('data-threaddesk-layout-placement-key') || '').trim();
 			layoutModal.attr('data-threaddesk-current-placement', selectedPlacementKey);
 			if (!selectedPlacementLabel) { selectedPlacementLabel = 'Placement'; }
-			setMainImage(getPlacementAngleTarget(selectedPlacementKey));
+			const targetAngle = getPlacementAngleTarget(selectedPlacementKey);
+			setMainImage(targetAngle);
+			const savedForPlacement = (savedPlacementsByAngle[targetAngle] || {})[selectedPlacementKey] || null;
+			if ($(this).hasClass('is-complete') && savedForPlacement && savedForPlacement.url) {
+				const savedName = String(savedForPlacement.designName || '').trim() || 'Design';
+				const savedPaletteBase = Array.isArray(savedForPlacement.paletteBase) ? savedForPlacement.paletteBase.slice() : [];
+				const savedPaletteCurrent = Array.isArray(savedForPlacement.paletteCurrent) ? savedForPlacement.paletteCurrent.slice() : [];
+				selectedDesignMeta = {
+					id: Number(savedForPlacement.designId || 0),
+					title: savedName,
+					palette: JSON.stringify(savedPaletteBase.length ? savedPaletteBase : savedPaletteCurrent),
+				};
+				selectedDesignName = savedName;
+				selectedDesignBaseSourceUrl = String(savedForPlacement.baseUrl || savedForPlacement.url || '').trim();
+				selectedDesignAspectRatio = Number(savedForPlacement.designRatio || 1) > 0 ? Number(savedForPlacement.designRatio || 1) : 1;
+				selectedBaseWidthPct = Number(savedForPlacement.baseWidth || 0) > 0 ? Number(savedForPlacement.baseWidth || 0) : Number((placementStyleMap[selectedPlacementKey] || placementStyleMap.full_chest).width || 34);
+				sizeSlider.val(String(Number(savedForPlacement.sliderValue || 100)));
+				adjustHeading.text('Adjust ' + selectedPlacementLabel.toUpperCase() + ' Placement');
+				selectedDesignNameEl.text(selectedDesignName.toUpperCase());
+				layoutPaletteState.recolorCache = {};
+				renderAdjustPaletteDots();
+				if (savedPaletteBase.length) {
+					layoutPaletteState.basePalette = savedPaletteBase.slice();
+					layoutPaletteState.currentPalette = (savedPaletteCurrent.length ? savedPaletteCurrent : savedPaletteBase).slice();
+					layoutPaletteState.activeIndex = layoutPaletteState.currentPalette.length ? 0 : -1;
+					layoutPaletteState.optionsVisible = false;
+					renderAdjustPaletteDots();
+				}
+				applySelectedDesign(String(savedForPlacement.url || '').trim(), {
+					top: Number(savedForPlacement.top || 0),
+					left: Number(savedForPlacement.left || 0),
+					width: Number(savedForPlacement.width || 0),
+				});
+				setPanelStep('adjust');
+				return;
+			}
 			designHeading.text('Choose Design for ' + selectedPlacementLabel);
 			sizeSlider.val(100);
 			selectedDesignName = '';
