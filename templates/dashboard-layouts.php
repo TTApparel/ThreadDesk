@@ -367,10 +367,40 @@ if ( taxonomy_exists( 'product_cat' ) && is_array( $layout_category_settings ) )
 				<?php endif; ?>
 			</div>
 
+			</div>
+		</div>
+
+
+			<div class="threaddesk__aside">
+				<?php foreach ( $layout_status_labels as $status_key => $status_label ) : ?>
+					<div class="threaddesk__card">
+						<div class="threaddesk__card-header">
+							<h4><?php echo esc_html( $status_label ); ?></h4>
+						</div>
+						<?php if ( ! empty( $layout_status_titles[ $status_key ] ) ) : ?>
+							<ul class="threaddesk__status-list">
+								<?php foreach ( $layout_status_titles[ $status_key ] as $status_item ) : ?>
+									<?php
+									$status_title = isset( $status_item['title'] ) ? (string) $status_item['title'] : '';
+									$status_reason = isset( $status_item['reason'] ) ? (string) $status_item['reason'] : '';
+									$show_hover_reason = 'rejected' === $status_key && '' !== $status_reason;
+									?>
+									<li class="threaddesk__status-list-item<?php echo $show_hover_reason ? ' has-reason' : ''; ?>">
+										<span class="threaddesk__status-list-title"><?php echo esc_html( $status_title ); ?></span>
+										<?php if ( $show_hover_reason ) : ?>
+											<span class="threaddesk__status-list-reason-tag" role="tooltip" aria-hidden="true"><?php echo esc_html( $status_reason ); ?></span>
+										<?php endif; ?>
+									</li>
+								<?php endforeach; ?>
+							</ul>
+						<?php else : ?>
+							<p class="threaddesk__status-empty"><?php echo esc_html__( 'No layouts', 'threaddesk' ); ?></p>
+						<?php endif; ?>
+					</div>
+				<?php endforeach; ?>
+			</div>
 		</div>
 	</div>
-</div>
-
 <div class="<?php echo esc_attr( $layout_modal_classes ); ?>" aria-hidden="<?php echo esc_attr( $layout_modal_aria_hidden ); ?>" data-threaddesk-layout-designs="<?php echo esc_attr( wp_json_encode( $saved_designs ) ); ?>">
 	<div class="threaddesk-auth-modal__overlay" data-threaddesk-layout-close></div>
 	<div class="threaddesk-auth-modal__panel" role="dialog" aria-label="<?php echo esc_attr__( 'Choose a placement category', 'threaddesk' ); ?>" aria-modal="true">
@@ -487,36 +517,6 @@ if ( taxonomy_exists( 'product_cat' ) && is_array( $layout_category_settings ) )
 				</div>
 			</div>
 			</div>
-			<div class="threaddesk__aside">
-				<?php foreach ( $layout_status_labels as $status_key => $status_label ) : ?>
-					<div class="threaddesk__card">
-						<div class="threaddesk__card-header">
-							<h4><?php echo esc_html( $status_label ); ?></h4>
-						</div>
-						<?php if ( ! empty( $layout_status_titles[ $status_key ] ) ) : ?>
-							<ul class="threaddesk__status-list">
-								<?php foreach ( $layout_status_titles[ $status_key ] as $status_item ) : ?>
-									<?php
-									$status_title = isset( $status_item['title'] ) ? (string) $status_item['title'] : '';
-									$status_reason = isset( $status_item['reason'] ) ? (string) $status_item['reason'] : '';
-									$show_hover_reason = 'rejected' === $status_key && '' !== $status_reason;
-									?>
-									<li class="threaddesk__status-list-item<?php echo $show_hover_reason ? ' has-reason' : ''; ?>">
-										<span class="threaddesk__status-list-title"><?php echo esc_html( $status_title ); ?></span>
-										<?php if ( $show_hover_reason ) : ?>
-											<span class="threaddesk__status-list-reason-tag" role="tooltip" aria-hidden="true"><?php echo esc_html( $status_reason ); ?></span>
-										<?php endif; ?>
-									</li>
-								<?php endforeach; ?>
-							</ul>
-						<?php else : ?>
-							<p class="threaddesk__status-empty"><?php echo esc_html__( 'No layouts', 'threaddesk' ); ?></p>
-						<?php endif; ?>
-					</div>
-				<?php endforeach; ?>
-			</div>
-		</div>
-	</div>
 </div>
 
 <div class="threaddesk-design-modal" aria-hidden="true">
