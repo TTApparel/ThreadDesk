@@ -242,6 +242,7 @@ if ( taxonomy_exists( 'product_cat' ) && is_array( $layout_category_settings ) )
 						$preview_top = 50;
 						$preview_left = 50;
 						$preview_width = 25;
+						$preview_entries = array();
 						$preview_base_url = '';
 						$print_count  = 0;
 
@@ -266,7 +267,13 @@ if ( taxonomy_exists( 'product_cat' ) && is_array( $layout_category_settings ) )
 									$preview_left = isset( $entry['left'] ) ? (float) $entry['left'] : 50;
 									$preview_width = isset( $entry['width'] ) ? (float) $entry['width'] : 25;
 								}
+								if ( '' !== $preview_angle && sanitize_key( (string) $angle_key ) === $preview_angle ) {
+									$preview_entries[] = $entry;
+								}
 							}
+						}
+						if ( empty( $preview_entries ) && '' !== $preview_angle && isset( $placements_by_angle[ $preview_angle ] ) && is_array( $placements_by_angle[ $preview_angle ] ) ) {
+							$preview_entries = $placements_by_angle[ $preview_angle ];
 						}
 						if ( '' !== $preview_angle && isset( $layout_angles[ $preview_angle ] ) ) {
 							$preview_base_url = (string) $layout_angles[ $preview_angle ];
@@ -292,7 +299,22 @@ if ( taxonomy_exists( 'product_cat' ) && is_array( $layout_category_settings ) )
 									<?php if ( '' !== $preview_base_src ) : ?>
 										<img class="threaddesk__card-layout-preview-base" src="<?php echo $preview_base_src; ?>" alt="" aria-hidden="true" />
 									<?php endif; ?>
-									<?php if ( '' !== $preview_overlay_src ) : ?>
+									<?php if ( ! empty( $preview_entries ) ) : ?>
+										<?php foreach ( $preview_entries as $preview_entry ) : ?>
+											<?php
+											$overlay_url = isset( $preview_entry['url'] ) ? (string) $preview_entry['url'] : '';
+											if ( '' === $overlay_url ) {
+												continue;
+											}
+											$overlay_src = preg_match( '#^data:image/#i', $overlay_url ) ? esc_attr( $overlay_url ) : esc_url( $overlay_url );
+											$overlay_top = isset( $preview_entry['top'] ) ? (float) $preview_entry['top'] : $preview_top;
+											$overlay_left = isset( $preview_entry['left'] ) ? (float) $preview_entry['left'] : $preview_left;
+											$overlay_width = isset( $preview_entry['width'] ) ? (float) $preview_entry['width'] : $preview_width;
+											$overlay_name = isset( $preview_entry['designName'] ) ? (string) $preview_entry['designName'] : '';
+											?>
+											<img class="threaddesk__card-layout-preview-overlay" src="<?php echo $overlay_src; ?>" alt="<?php echo esc_attr( $overlay_name ? $overlay_name : $layout_title ); ?>" style="top: <?php echo esc_attr( number_format( $overlay_top, 2, '.', '' ) ); ?>%; left: <?php echo esc_attr( number_format( $overlay_left, 2, '.', '' ) ); ?>%; width: <?php echo esc_attr( number_format( $overlay_width, 2, '.', '' ) ); ?>%;" />
+										<?php endforeach; ?>
+									<?php elseif ( '' !== $preview_overlay_src ) : ?>
 										<img class="threaddesk__card-layout-preview-overlay" src="<?php echo $preview_overlay_src; ?>" alt="<?php echo esc_attr( $preview_name ? $preview_name : $layout_title ); ?>" style="top: <?php echo esc_attr( number_format( $preview_top, 2, '.', '' ) ); ?>%; left: <?php echo esc_attr( number_format( $preview_left, 2, '.', '' ) ); ?>%; width: <?php echo esc_attr( number_format( $preview_width, 2, '.', '' ) ); ?>%;" />
 									<?php endif; ?>
 								<?php else : ?>
