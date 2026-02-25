@@ -282,7 +282,7 @@ if ( taxonomy_exists( 'product_cat' ) && is_array( $layout_category_settings ) )
 								<p class="threaddesk__card-design-color-count"><?php echo esc_html( sprintf( __( 'Print count: %d', 'threaddesk' ), $print_count ) ); ?></p>
 							</form>
 							<div class="threaddesk__card-design-actions">
-								<button type="button" class="threaddesk__button threaddesk__button--small" data-threaddesk-layout-open data-threaddesk-layout-category-open="<?php echo esc_attr( $layout_category ); ?>"><?php echo esc_html__( 'Adjust placements', 'threaddesk' ); ?></button>
+								<button type="button" class="threaddesk__button threaddesk__button--small" data-threaddesk-layout-open data-threaddesk-layout-category-open="<?php echo esc_attr( $layout_category ); ?>" data-threaddesk-layout-payload="<?php echo esc_attr( wp_json_encode( $layout_payload ) ); ?>"><?php echo esc_html__( 'Adjust placements', 'threaddesk' ); ?></button>
 							</div>
 						</div>
 					<?php endforeach; ?>

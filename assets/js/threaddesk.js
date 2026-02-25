@@ -731,6 +731,89 @@ jQuery(function ($) {
 			});
 		};
 
+
+		const parseLayoutPayloadFromAttribute = function (raw) {
+			const payloadRaw = String(raw || '').trim();
+			if (!payloadRaw) { return null; }
+			try {
+				const parsed = JSON.parse(payloadRaw);
+				return parsed && typeof parsed === 'object' ? parsed : null;
+			} catch (e) {
+				return null;
+			}
+		};
+
+		const getPlacementOptionsFromSavedPayload = function (payload) {
+			const placementsByAngle = payload && payload.placementsByAngle && typeof payload.placementsByAngle === 'object' ? payload.placementsByAngle : {};
+			const list = [];
+			const seen = {};
+			Object.keys(placementsByAngle).forEach(function (angle) {
+				const entries = placementsByAngle[angle];
+				if (!entries || typeof entries !== 'object') { return; }
+				Object.keys(entries).forEach(function (placementKey) {
+					const key = String(placementKey || '').trim();
+					if (!key || seen[key]) { return; }
+					const entry = entries[placementKey] || {};
+					const label = String(entry.placementLabel || key).trim();
+					seen[key] = true;
+					list.push({ key: key, label: label });
+				});
+			});
+			return list;
+		};
+
+		const applySavedLayoutPayload = function (payload) {
+			if (!payload || typeof payload !== 'object') { return; }
+			const placementsByAngle = payload.placementsByAngle && typeof payload.placementsByAngle === 'object' ? payload.placementsByAngle : {};
+			Object.keys(savedPlacementsByAngle).forEach(function (angle) { savedPlacementsByAngle[angle] = {}; });
+			clearAngleOverlays();
+			clearStageSavedOverlays();
+
+			Object.keys(placementsByAngle).forEach(function (angle) {
+				const normalizedAngle = String(angle || '').trim();
+				if (!normalizedAngle || !Object.prototype.hasOwnProperty.call(savedPlacementsByAngle, normalizedAngle)) { return; }
+				const entries = placementsByAngle[angle];
+				if (!entries || typeof entries !== 'object') { return; }
+				Object.keys(entries).forEach(function (placementKey) {
+					const entry = entries[placementKey];
+					if (!entry || typeof entry !== 'object') { return; }
+					const url = String(entry.url || '').trim();
+					if (!url) { return; }
+					const key = String(placementKey || entry.placementKey || '').trim();
+					if (!key) { return; }
+					const cfg = {
+						top: Number(entry.top || 0),
+						left: Number(entry.left || 0),
+						width: Number(entry.width || 0),
+					};
+					savedPlacementsByAngle[normalizedAngle][key] = {
+						url: url,
+						baseUrl: String(entry.baseUrl || '').trim(),
+						designId: Number(entry.designId || 0),
+						designName: String(entry.designName || '').trim(),
+						paletteBase: Array.isArray(entry.paletteBase) ? entry.paletteBase.slice() : [],
+						paletteCurrent: Array.isArray(entry.paletteCurrent) ? entry.paletteCurrent.slice() : [],
+						top: cfg.top,
+						left: cfg.left,
+						width: cfg.width,
+						baseWidth: Number(entry.baseWidth || 0),
+						sliderValue: Number(entry.sliderValue || 100),
+						designRatio: Number(entry.designRatio || 1),
+						placementLabel: String(entry.placementLabel || '').trim(),
+						placementKey: key,
+						angle: normalizedAngle,
+					};
+					if (Number.isFinite(cfg.top) && Number.isFinite(cfg.left) && Number.isFinite(cfg.width) && cfg.width > 0) {
+						applyPlacementOverlayToAngle(normalizedAngle, key, url, cfg);
+					}
+					updatePlacementOptionStatus(key, String(entry.placementLabel || '').trim(), url, String(entry.designName || '').trim());
+				});
+			});
+
+			renderStageSavedOverlays(currentAngle);
+			updateSaveLayoutVisibility();
+		};
+
 		const openLayoutModal = function (triggerEl) {
 			lastLayoutTrigger = triggerEl || document.activeElement || lastLayoutTrigger;
 			layoutModal.addClass('is-active').attr('aria-hidden', 'false');
@@ -771,15 +854,44 @@ jQuery(function ($) {
 
 		$(document).on('click', '[data-threaddesk-layout-open]', function () {
 			openLayoutModal(this);
-			const requestedCategory = String($(this).attr('data-threaddesk-layout-category-open') || '').trim();
-			if (!requestedCategory) {
-				return;
-			}
-			const categoryButton = layoutModal.find('[data-threaddesk-layout-category]').filter(function () {
+			const trigger = $(this);
+			const savedPayload = parseLayoutPayloadFromAttribute(trigger.attr('data-threaddesk-layout-payload'));
+			const requestedCategory = String(trigger.attr('data-threaddesk-layout-category-open') || (savedPayload && savedPayload.category) || '').trim();
+
+			const categoryButton = requestedCategory ? layoutModal.find('[data-threaddesk-layout-category]').filter(function () {
 				return String($(this).attr('data-threaddesk-layout-category') || '').trim() === requestedCategory;
-			}).first();
+			}).first() : $();
+
 			if (categoryButton.length) {
 				categoryButton.trigger('click');
+			} else if (savedPayload) {
+				selectedCategorySlug = String(savedPayload.category || '').trim();
+				selectedCategoryId = Number(savedPayload.categoryId || 0);
+				layoutModal.attr('data-threaddesk-current-category', selectedCategorySlug);
+				layoutModal.attr('data-threaddesk-current-placement', '');
+				saveLayoutCategoryField.val(selectedCategorySlug);
+				saveLayoutCategoryIdField.val(String(selectedCategoryId || 0));
+				const savedAngles = savedPayload.angles && typeof savedPayload.angles === 'object' ? savedPayload.angles : {};
+				if (savedAngles && Object.keys(savedAngles).length) {
+					currentAngles = {
+						front: String(savedAngles.front || '').trim(),
+						left: String(savedAngles.left || '').trim(),
+						back: String(savedAngles.back || '').trim(),
+						right: String(savedAngles.right || '').trim(),
+					};
+				}
+				const fallbackPlacements = getPlacementOptionsFromSavedPayload(savedPayload);
+				renderPlacementOptions(fallbackPlacements);
+				showViewerStep();
+				setMainImage(String(savedPayload.currentAngle || 'front').trim() || 'front');
+			}
+
+			if (savedPayload) {
+				applySavedLayoutPayload(savedPayload);
+				const preferredAngle = String(savedPayload.currentAngle || '').trim();
+				if (preferredAngle) {
+					setMainImage(preferredAngle);
+				}
 			}
 		});
 		$(document).on('click', '[data-threaddesk-layout-close]', function () { closeLayoutModal(); });
