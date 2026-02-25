@@ -102,14 +102,16 @@ $nav_base = trailingslashit( wc_get_account_endpoint_url( 'thread-desk' ) );
 					<?php $design_settings = get_post_meta( $design->ID, 'design_analysis_settings', true ); ?>
 					<?php $design_svg_url = get_post_meta( $design->ID, 'design_svg_file_url', true ); ?>
 					<?php $design_svg_name = get_post_meta( $design->ID, 'design_svg_file_name', true ); ?>
-					<?php $design_color_count = absint( get_post_meta( $design->ID, 'design_color_count', true ) ); ?>
-					<?php if ( ! empty( $design_palette ) ) : ?>
-						<?php $design_palette_values = json_decode( (string) $design_palette, true ); ?>
-						<?php if ( is_array( $design_palette_values ) ) : ?>
-							<?php $design_non_transparent_palette = array_values( array_filter( $design_palette_values, function ( $color ) { return 'transparent' !== strtolower( (string) $color ); } ) ); ?>
-							<?php $design_color_count = count( $design_non_transparent_palette ); ?>
-						<?php endif; ?>
+					<?php $design_status = sanitize_key( (string) get_post_meta( $design->ID, 'design_status', true ) ); ?>
+					<?php if ( ! in_array( $design_status, array( 'pending', 'approved', 'rejected' ), true ) ) : ?>
+						<?php $design_status = 'pending'; ?>
 					<?php endif; ?>
+					<?php $design_status_labels = array( 'pending' => __( 'Pending', 'threaddesk' ), 'approved' => __( 'Approved', 'threaddesk' ), 'rejected' => __( 'Rejected', 'threaddesk' ) ); ?>
+					<?php $design_palette_values = json_decode( (string) $design_palette, true ); ?>
+					<?php $design_palette_values = is_array( $design_palette_values ) ? $design_palette_values : array(); ?>
+					<?php $design_palette_values = array_map( function ( $color ) { return strtoupper( trim( (string) $color ) ); }, $design_palette_values ); ?>
+					<?php $design_palette_values = array_values( array_filter( $design_palette_values, function ( $color ) { return '' !== $color && 'TRANSPARENT' !== $color; } ) ); ?>
+					<?php $design_color_count = count( array_unique( $design_palette_values ) ); ?>
 					<?php $design_title = trim( (string) $design->post_title ); ?>
 					<?php if ( '' === $design_title && ! empty( $design_file_name ) ) : ?>
 						<?php $design_title = trim( (string) preg_replace( '/\.[^.]+$/', '', (string) $design_file_name ) ); ?>
@@ -125,7 +127,7 @@ $nav_base = trailingslashit( wc_get_account_endpoint_url( 'thread-desk' ) );
 							<button type="submit" class="threaddesk__card-delete-button" aria-label="<?php echo esc_attr__( 'Delete design', 'threaddesk' ); ?>">&times;</button>
 						</form>
 						<?php if ( $design_preview ) : ?>
-							<div class="threaddesk__card-design-preview">
+							<div class="threaddesk__card-design-preview threaddesk__card-design-preview--checker">
 								<img class="threaddesk__card-design-preview-svg" src="<?php echo esc_url( $design_preview ); ?>" alt="<?php echo esc_attr( $design_title ); ?>" />
 								<img class="threaddesk__card-design-preview-original" src="<?php echo esc_url( $design_preview ); ?>" alt="" aria-hidden="true" />
 							</div>
@@ -135,7 +137,7 @@ $nav_base = trailingslashit( wc_get_account_endpoint_url( 'thread-desk' ) );
 							<input type="hidden" name="design_id" value="<?php echo esc_attr( $design->ID ); ?>" />
 							<?php wp_nonce_field( 'tta_threaddesk_rename_design' ); ?>
 							<h5 class="threaddesk__card-title"><input class="threaddesk__card-title-input" type="text" name="design_title" value="<?php echo esc_attr( $design_title ); ?>" maxlength="120" data-threaddesk-design-title-card-input aria-label="<?php echo esc_attr__( 'Design title', 'threaddesk' ); ?>" /></h5>
-							<p class="threaddesk__card-design-color-count"><?php echo esc_html( sprintf( __( 'Estimated color count: %d', 'threaddesk' ), $design_color_count ) ); ?></p>
+							<p class="threaddesk__card-design-color-count"><span><?php echo esc_html( sprintf( __( 'Color count: %d', 'threaddesk' ), $design_color_count ) ); ?></span><span class="threaddesk__card-design-status threaddesk__card-design-status--<?php echo esc_attr( $design_status ); ?>"><?php echo esc_html( isset( $design_status_labels[ $design_status ] ) ? $design_status_labels[ $design_status ] : $design_status_labels['pending'] ); ?></span></p>
 						</form>
 						<div class="threaddesk__card-design-actions">
 							<button
@@ -148,19 +150,7 @@ $nav_base = trailingslashit( wc_get_account_endpoint_url( 'thread-desk' ) );
 								data-threaddesk-design-file-name="<?php echo esc_attr( $design_file_name ); ?>"
 								data-threaddesk-design-palette="<?php echo esc_attr( $design_palette ? $design_palette : '[]' ); ?>"
 								data-threaddesk-design-settings="<?php echo esc_attr( $design_settings ? $design_settings : '{}' ); ?>">
-								<?php echo esc_html__( 'Edit', 'threaddesk' ); ?>
-							</button>
-							<button
-								type="button"
-								class="threaddesk__button threaddesk__button--small"
-								data-threaddesk-design-download-svg
-								data-threaddesk-design-preview-url="<?php echo esc_url( $design_preview ); ?>"
-								data-threaddesk-design-file-name="<?php echo esc_attr( $design_file_name ); ?>"
-								data-threaddesk-design-palette="<?php echo esc_attr( $design_palette ? $design_palette : '[]' ); ?>"
-								data-threaddesk-design-settings="<?php echo esc_attr( $design_settings ? $design_settings : '{}' ); ?>"
-								data-threaddesk-design-svg-url="<?php echo esc_url( $design_svg_url ); ?>"
-								data-threaddesk-design-svg-name="<?php echo esc_attr( $design_svg_name ); ?>">
-								<?php echo esc_html__( 'Save', 'threaddesk' ); ?>
+								<?php echo esc_html__( 'Adjust Design', 'threaddesk' ); ?>
 							</button>
 						</div>
 					</div>
