@@ -34,6 +34,7 @@ class TTA_ThreadDesk {
 		add_action( 'init', array( $this, 'load_textdomain' ) );
 		add_action( 'admin_menu', array( $this, 'register_settings_page' ) );
 		add_action( 'admin_init', array( $this, 'register_settings' ) );
+		add_action( 'wp_default_scripts', array( $this, 'ensure_heartbeat_dependency' ), 1 );
 		add_action( 'admin_enqueue_scripts', array( $this, 'enqueue_admin_assets' ) );
 		add_action( 'add_meta_boxes', array( $this, 'register_admin_meta_boxes' ) );
 		add_action( 'save_post', array( $this, 'maybe_assign_internal_reference' ), 10, 3 );
@@ -70,6 +71,26 @@ class TTA_ThreadDesk {
 		add_action( 'init', array( $this, 'handle_auth_register' ) );
 		add_shortcode( 'threaddesk', array( $this, 'render_shortcode' ) );
 		add_shortcode( 'threaddesk_auth', array( $this, 'render_auth_shortcode' ) );
+	}
+
+	/**
+	 * Prevent missing heartbeat dependency notices when wp-auth-check is enqueued.
+	 *
+	 * @param WP_Scripts $scripts Script registry instance.
+	 *
+	 * @return void
+	 */
+	public function ensure_heartbeat_dependency( $scripts ) {
+		if ( ! $scripts instanceof WP_Scripts ) {
+			return;
+		}
+
+		if ( isset( $scripts->registered['heartbeat'] ) ) {
+			return;
+		}
+
+		$suffix = ( defined( 'SCRIPT_DEBUG' ) && SCRIPT_DEBUG ) ? '' : '.min';
+		$scripts->add( 'heartbeat', includes_url( 'js/heartbeat' . $suffix . '.js' ), array( 'jquery', 'wp-hooks' ), false, 1 );
 	}
 
 	public static function activate() {
@@ -216,12 +237,6 @@ class TTA_ThreadDesk {
 		if ( 'toplevel_page_tta-threaddesk' !== $hook && false === strpos( (string) $hook, 'tta-threaddesk-settings' ) && false === strpos( (string) $hook, 'tta-threaddesk-user-detail' ) ) {
 			return;
 		}
-
-		if ( wp_script_is( 'wp-auth-check', 'registered' ) && ! wp_script_is( 'heartbeat', 'registered' ) ) {
-			$suffix = ( defined( 'SCRIPT_DEBUG' ) && SCRIPT_DEBUG ) ? '' : '.min';
-			wp_register_script( 'heartbeat', includes_url( 'js/heartbeat' . $suffix . '.js' ), array( 'jquery', 'wp-hooks' ), false, true );
-		}
-
 		if ( wp_script_is( 'heartbeat', 'registered' ) ) {
 			wp_enqueue_script( 'heartbeat' );
 		}
