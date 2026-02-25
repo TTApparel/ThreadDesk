@@ -317,6 +317,14 @@ if ( taxonomy_exists( 'product_cat' ) && is_array( $layout_category_settings ) )
 						<h4><?php echo esc_html__( 'Choose Placement', 'threaddesk' ); ?></h4>
 						<div class="threaddesk-layout-viewer__placement-list" data-threaddesk-layout-placement-list></div>
 						<p class="threaddesk-layout-viewer__placement-empty" data-threaddesk-layout-placement-empty><?php echo esc_html__( 'No placements available for this category.', 'threaddesk' ); ?></p>
+						<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" class="threaddesk-layout-viewer__save-layout-form" data-threaddesk-layout-save-layout-form hidden>
+							<input type="hidden" name="action" value="tta_threaddesk_save_layout" />
+							<?php wp_nonce_field( 'tta_threaddesk_save_layout' ); ?>
+							<input type="hidden" name="threaddesk_layout_category" value="" data-threaddesk-layout-save-category />
+							<input type="hidden" name="threaddesk_layout_category_id" value="0" data-threaddesk-layout-save-category-id />
+							<input type="hidden" name="threaddesk_layout_payload" value="" data-threaddesk-layout-save-payload />
+							<button type="submit" class="threaddesk-layout-viewer__save-layout-button" data-threaddesk-layout-save-layout><?php echo esc_html__( 'Save Layout', 'threaddesk' ); ?></button>
+						</form>
 					</div>
 					<div class="threaddesk-layout-viewer__panel-step" data-threaddesk-layout-panel-step="designs" hidden>
 						<h4 data-threaddesk-layout-design-heading><?php echo esc_html__( 'Choose Design', 'threaddesk' ); ?></h4>

@@ -46,6 +46,8 @@ jQuery(function ($) {
 
 
 
+
+
 		$(document).on('keyup', function (event) {
 			if (event.key === 'Escape') {
 				closeModal();
@@ -130,6 +132,10 @@ jQuery(function ($) {
 		};
 		const placementList = layoutModal.find('[data-threaddesk-layout-placement-list]');
 		const placementEmpty = layoutModal.find('[data-threaddesk-layout-placement-empty]');
+		const saveLayoutForm = layoutModal.find('[data-threaddesk-layout-save-layout-form]');
+		const saveLayoutCategoryField = layoutModal.find('[data-threaddesk-layout-save-category]');
+		const saveLayoutCategoryIdField = layoutModal.find('[data-threaddesk-layout-save-category-id]');
+		const saveLayoutPayloadField = layoutModal.find('[data-threaddesk-layout-save-payload]');
 		const placementPanelStep = layoutModal.find('[data-threaddesk-layout-panel-step="placements"]');
 		const designPanelStep = layoutModal.find('[data-threaddesk-layout-panel-step="designs"]');
 		const adjustPanelStep = layoutModal.find('[data-threaddesk-layout-panel-step="adjust"]');
@@ -150,6 +156,7 @@ jQuery(function ($) {
 		try { layoutDesigns = JSON.parse(layoutDesignsRaw); } catch (e) { layoutDesigns = []; }
 
 		let selectedCategorySlug = '';
+		let selectedCategoryId = 0;
 		let selectedPlacementLabel = '';
 		let selectedPlacementKey = '';
 		let selectedDesignName = '';
@@ -224,6 +231,23 @@ jQuery(function ($) {
 			return 'Design';
 		};
 
+		const updateSaveLayoutVisibility = function () {
+			const hasCompletedPlacements = placementList.find('.threaddesk-layout-viewer__placement-option.is-complete').length > 0;
+			saveLayoutForm.prop('hidden', !hasCompletedPlacements);
+		};
+
+		const buildLayoutPayload = function () {
+			const payload = {
+				category: selectedCategorySlug,
+				categoryId: Number(selectedCategoryId || 0),
+				angles: currentAngles,
+				currentAngle: currentAngle,
+				placementsByAngle: savedPlacementsByAngle,
+				savedAt: new Date().toISOString(),
+			};
+			return JSON.stringify(payload);
+		};
+
 		const updatePlacementOptionStatus = function (placementKey, placementLabel, designUrl, fallbackName) {
 			const key = String(placementKey || '').trim();
 			if (!key) { return; }
@@ -235,6 +259,7 @@ jQuery(function ($) {
 				.addClass('is-complete')
 				.attr('data-threaddesk-layout-placement-complete', '1')
 				.html('<span class="threaddesk-layout-viewer__placement-abbr">' + $('<div>').text(abbr).html() + '</span><span class="threaddesk-layout-viewer__placement-file">' + $('<div>').text(displayName).html() + '</span>');
+			updateSaveLayoutVisibility();
 		};
 
 		const setDesignRatioFromUrl = function (url) {
@@ -386,6 +411,7 @@ jQuery(function ($) {
 			viewerStep.removeClass('is-active').prop('hidden', true).attr('aria-hidden', 'true');
 			placementList.empty();
 			placementEmpty.hide();
+			saveLayoutForm.prop('hidden', true);
 			designList.empty();
 			designEmpty.hide();
 			selectedPlacementLabel = '';
@@ -415,6 +441,7 @@ jQuery(function ($) {
 			const items = Array.isArray(placements) ? placements : [];
 			if (!items.length) {
 				placementEmpty.show();
+				saveLayoutForm.prop('hidden', true);
 				return;
 			}
 			placementEmpty.hide();
@@ -429,6 +456,7 @@ jQuery(function ($) {
 				placementList.append(btn);
 			});
 			if (!placementList.children().length) { placementEmpty.show(); }
+			updateSaveLayoutVisibility();
 		};
 
 		const renderDesignOptions = function () {
@@ -747,6 +775,9 @@ jQuery(function ($) {
 
 		$(document).on('click', '[data-threaddesk-layout-category]', function () {
 			selectedCategorySlug = String($(this).attr('data-threaddesk-layout-category') || '').trim();
+			selectedCategoryId = Number($(this).attr('data-threaddesk-layout-category-id') || 0);
+			saveLayoutCategoryField.val(selectedCategorySlug);
+			saveLayoutCategoryIdField.val(String(selectedCategoryId || 0));
 			layoutModal.attr('data-threaddesk-current-category', selectedCategorySlug);
 			layoutModal.attr('data-threaddesk-current-placement', '');
 			const rawFront = $(this).data('threaddesk-layout-front-image') || '';
@@ -934,13 +965,20 @@ jQuery(function ($) {
 			const targetAngle = getPlacementAngleTarget(selectedPlacementKey);
 			savedPlacementsByAngle[targetAngle][selectedPlacementKey] = {
 				url: selectedDesignSourceUrl,
+				baseUrl: selectedDesignBaseSourceUrl,
+				designId: Number((selectedDesignMeta && selectedDesignMeta.id) || 0),
 				designName: selectedDesignName,
+				paletteBase: (layoutPaletteState.basePalette || []).slice(),
+				paletteCurrent: (layoutPaletteState.currentPalette || []).slice(),
 				top: cfg.top,
 				left: cfg.left,
 				width: cfg.width,
 				baseWidth: selectedBaseWidthPct,
 				sliderValue: Number(sizeSlider.val() || 100),
 				designRatio: Number(selectedDesignAspectRatio || 1),
+				placementLabel: selectedPlacementLabel,
+				placementKey: selectedPlacementKey,
+				angle: targetAngle,
 			};
 			applyPlacementOverlayToAngle(targetAngle, selectedPlacementKey, selectedDesignSourceUrl, cfg);
 			renderStageSavedOverlays(currentAngle);
@@ -960,6 +998,17 @@ jQuery(function ($) {
 			button.text('Placement Saved');
 			setTimeout(function () { button.text('Save Placement'); }, 1400);
 		});
+
+
+		if (saveLayoutForm.length) {
+			saveLayoutForm.on('submit', function (event) {
+				event.preventDefault();
+				const payload = buildLayoutPayload();
+				if (!payload) { return; }
+				saveLayoutPayloadField.val(payload);
+				this.submit();
+			});
+		}
 
 		$(document).on('keyup', function (event) {
 			if (event.key === 'Escape' && layoutModal.hasClass('is-active')) {

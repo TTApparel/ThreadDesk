@@ -1267,6 +1267,13 @@ body.threaddesk-modal-open {
 	min-height: 100%;
 }
 
+.threaddesk-layout-viewer__panel-step:not([hidden]) {
+	display: flex;
+	flex-direction: column;
+	flex: 1 1 auto;
+	min-height: 100%;
+}
+
 .threaddesk-layout-viewer__design-panel h4 {
 	margin: 0;
 	text-transform: uppercase;
@@ -1286,6 +1293,29 @@ body.threaddesk-modal-open {
 }
 
 
+
+
+.threaddesk-layout-viewer__save-layout-form {
+	margin-top: auto;
+}
+
+.threaddesk-layout-viewer__save-layout-button {
+	width: 100%;
+	padding: 10px;
+	border: 1px solid #111;
+	background: #111;
+	color: #fff;
+	text-transform: uppercase;
+	letter-spacing: .06em;
+	font-size: 12px;
+	cursor: pointer;
+}
+
+.threaddesk-layout-viewer__save-layout-button:hover,
+.threaddesk-layout-viewer__save-layout-button:focus-visible {
+	background: #2d2d2d;
+	outline: none;
+}
 
 .threaddesk-layout-viewer__add-design-button {
 	width: 100%;
