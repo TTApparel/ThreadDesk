@@ -948,6 +948,14 @@ body.threaddesk-modal-open {
 	margin-top: 16px;
 }
 
+.threaddesk__cards--designs {
+	grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.threaddesk__cards--placements {
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
 @media (max-width: 1024px) {
 	.threaddesk {
 		flex-direction: column;
@@ -964,6 +972,11 @@ body.threaddesk-modal-open {
 
 	.threaddesk__content-inner {
 		grid-template-columns: 1fr;
+	}
+
+	.threaddesk__cards--designs,
+	.threaddesk__cards--placements {
+		grid-template-columns: repeat(2, minmax(0, 1fr));
 	}
 }
 

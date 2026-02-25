@@ -111,7 +111,7 @@ $nav_base = trailingslashit( wc_get_account_endpoint_url( 'thread-desk' ) );
 						<h3><?php echo esc_html__( 'Saved Designs', 'threaddesk' ); ?></h3>
 						<button type="button" class="threaddesk__button" data-threaddesk-design-open><?php echo esc_html__( 'Add Design', 'threaddesk' ); ?></button>
 					</div>
-					<div class="threaddesk__cards">
+					<div class="threaddesk__cards threaddesk__cards--designs">
 						<?php if ( ! empty( $context['designs'] ) ) : ?>
 					<?php foreach ( $context['designs'] as $design ) : ?>
 					<?php $design_preview = get_post_meta( $design->ID, 'design_preview_url', true ); ?>

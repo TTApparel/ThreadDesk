@@ -235,7 +235,7 @@ if ( taxonomy_exists( 'product_cat' ) && is_array( $layout_category_settings ) )
 				<h3><?php echo esc_html__( 'Saved Placements', 'threaddesk' ); ?></h3>
 				<button type="button" class="threaddesk__button" data-threaddesk-layout-open><?php echo esc_html__( 'Add Placement', 'threaddesk' ); ?></button>
 			</div>
-			<div class="threaddesk__cards">
+			<div class="threaddesk__cards threaddesk__cards--placements">
 				<?php if ( ! empty( $context['layouts'] ) ) : ?>
 					<?php foreach ( $context['layouts'] as $layout ) : ?>
 						<?php
