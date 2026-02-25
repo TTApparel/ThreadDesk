@@ -631,11 +631,51 @@ body.threaddesk-modal-open {
 }
 
 .threaddesk__card-design-color-count {
-	display: block;
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 10px;
 	margin: 8px 0 0;
 	font-size: 12px;
 	color: #6d6d6d;
 	line-height: 1.33;
+}
+
+.threaddesk__card-design-status {
+	font-weight: 600;
+	font-size: 11px;
+	text-transform: uppercase;
+	letter-spacing: .04em;
+}
+
+.threaddesk__card-design-status--pending {
+	color: #8a6d1f;
+}
+
+.threaddesk__card-design-status--approved {
+	color: #1e7a35;
+}
+
+.threaddesk__card-design-status--rejected {
+	color: #b22a2a;
+}
+
+.threaddesk__status-list {
+	margin: 0;
+	padding-left: 18px;
+	font-size: 13px;
+	line-height: 1.5;
+	color: #444;
+}
+
+.threaddesk__status-list li + li {
+	margin-top: 4px;
+}
+
+.threaddesk__status-empty {
+	margin: 0;
+	font-size: 13px;
+	color: #777;
 }
 
 .threaddesk__card-title-input {
@@ -701,11 +741,40 @@ body.threaddesk-modal-open {
 	box-sizing: border-box;
 }
 
+.threaddesk__card-design-preview--checker {
+	background-color: #f0f0f0;
+	background-image:
+		linear-gradient(45deg, #d9d9d9 25%, transparent 25%),
+		linear-gradient(-45deg, #d9d9d9 25%, transparent 25%),
+		linear-gradient(45deg, transparent 75%, #d9d9d9 75%),
+		linear-gradient(-45deg, transparent 75%, #d9d9d9 75%);
+	background-size: 24px 24px;
+	background-position: 0 0, 0 12px, 12px -12px, -12px 0;
+}
+
 .threaddesk__card-design-preview img {
 	max-width: 100%;
 	max-height: 100%;
 	display: block;
 	object-fit: contain;
+}
+
+.threaddesk__card-layout-preview-base {
+	position: absolute;
+	inset: 0;
+	width: 100%;
+	height: 100%;
+	object-fit: contain;
+	z-index: 1;
+}
+
+.threaddesk__card-layout-preview-overlay {
+	position: absolute;
+	height: auto;
+	transform: translate(-50%, -50%);
+	z-index: 2;
+	max-width: none;
+	max-height: none;
 }
 
 .threaddesk__card-design-preview-svg,
@@ -743,6 +812,7 @@ body.threaddesk-modal-open {
 	display: flex;
 	gap: 8px;
 	margin-top: 10px;
+	justify-content: center;
 }
 
 .threaddesk__card-design-actions form {
@@ -1187,10 +1257,12 @@ body.threaddesk-modal-open {
 
 .threaddesk-layout-viewer {
 	margin-top: 20px;
+	--threaddesk-layout-stage-height: 460px;
 }
 
 .threaddesk-layout-viewer__stage {
-	min-height: 360px;
+	min-height: var(--threaddesk-layout-stage-height);
+	max-height: var(--threaddesk-layout-stage-height);
 	background: #efefef;
 	display: flex;
 	align-items: center;
@@ -1253,11 +1325,12 @@ body.threaddesk-modal-open {
 	width: 240px;
 	background: #fff;
 	min-height: 300px;
-	max-height: 100%;
+	max-height: var(--threaddesk-layout-stage-height);
+	overflow: auto;
 	display: flex;
 	flex-direction: column;
-	flex: 1 1 auto;
-	min-height: 100%;
+	flex: 0 1 auto;
+	min-height: 0;
 }
 
 .threaddesk-layout-viewer__panel-step:not([hidden]) {
@@ -1281,6 +1354,10 @@ body.threaddesk-modal-open {
 	letter-spacing: .08em;
 }
 
+.threaddesk-layout-viewer__panel-step[data-threaddesk-layout-panel-step="placements"] h4 {
+	margin-bottom: 20px;
+}
+
 .threaddesk-layout-viewer__back-button {
 	margin-bottom: 20px;
 	padding: 0;
@@ -1301,6 +1378,7 @@ body.threaddesk-modal-open {
 
 .threaddesk-layout-viewer__save-layout-button {
 	width: 100%;
+	margin-top: 10px;
 	padding: 10px;
 	border: 1px solid #111;
 	background: #111;
@@ -1583,6 +1661,28 @@ body.threaddesk-modal-open {
 	cursor: pointer;
 }
 
+.threaddesk-layout-viewer__adjust-actions .threaddesk-layout-viewer__save-button {
+	margin-top: 0;
+}
+
+.threaddesk-layout-viewer__remove-button {
+	width: 100%;
+	padding: 10px;
+	border: 1px solid #777;
+	background: #fff;
+	color: #222;
+	text-transform: uppercase;
+	letter-spacing: .06em;
+	font-size: 12px;
+	cursor: pointer;
+}
+
+.threaddesk-layout-viewer__remove-button:hover,
+.threaddesk-layout-viewer__remove-button:focus-visible {
+	background: #f3f3f3;
+	outline: none;
+}
+
 .threaddesk-layout-viewer__save-button:hover,
 .threaddesk-layout-viewer__save-button:focus-visible {
 	background: #2d2d2d;
@@ -1652,12 +1752,12 @@ body.threaddesk-modal-open {
 
 .threaddesk-layout-viewer__angle.is-active {
 	border-color: #111;
-	box-shadow: 0 0 0 2px #111 inset;
+	box-shadow: 0 0 0 1px #111 inset;
 }
 
 
-.threaddesk-layout-modal .threaddesk-layout-viewer__stage {
-	min-height: 300px;
+.threaddesk-layout-modal .threaddesk-layout-viewer {
+	--threaddesk-layout-stage-height: 300px;
 }
 
 .threaddesk-layout-modal .threaddesk-layout-viewer {
@@ -1682,6 +1782,8 @@ body.threaddesk-modal-open {
 
 	.threaddesk-layout-viewer__design-panel {
 		width: 100%;
+		max-height: none;
+		overflow: visible;
 	}
 
 	.threaddesk-layout-viewer__angles {
