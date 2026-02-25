@@ -1523,6 +1523,7 @@ body.threaddesk-modal-open {
 }
 
 .threaddesk-layout-viewer__save-button {
+	margin-top: 20px;
 	width: 100%;
 	padding: 10px;
 	border: 1px solid #111;
