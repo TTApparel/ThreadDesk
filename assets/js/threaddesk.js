@@ -1067,11 +1067,11 @@ jQuery(function ($) {
 			setPanelStep('adjust');
 		});
 
-		const updateDragPosition = function (pageX, pageY) {
+		const updateDragPosition = function (clientX, clientY) {
 			const rect = stage.get(0).getBoundingClientRect();
 			if (!rect.width || !rect.height) { return; }
-			const x = Math.min(Math.max(pageX - rect.left, 0), rect.width);
-			const y = Math.min(Math.max(pageY - rect.top, 0), rect.height);
+			const x = Math.min(Math.max(clientX - rect.left, 0), rect.width);
+			const y = Math.min(Math.max(clientY - rect.top, 0), rect.height);
 			const cfg = getOverlayConfig() || { width: selectedBaseWidthPct };
 			cfg.left = (x / rect.width) * 100;
 			cfg.top = (y / rect.height) * 100;
@@ -1091,13 +1091,13 @@ jQuery(function ($) {
 
 		$(document).on('mousemove', function (event) {
 			if (!dragState || !dragState.active) { return; }
-			updateDragPosition(event.pageX, event.pageY);
+			updateDragPosition(event.clientX, event.clientY);
 		});
 		$(document).on('touchmove', function (event) {
 			if (!dragState || !dragState.active) { return; }
 			const touch = event.originalEvent.touches && event.originalEvent.touches[0];
 			if (!touch) { return; }
-			updateDragPosition(touch.pageX, touch.pageY);
+			updateDragPosition(touch.clientX, touch.clientY);
 		});
 		$(document).on('mouseup touchend touchcancel', function () {
 			if (!dragState || !dragState.active) { return; }
