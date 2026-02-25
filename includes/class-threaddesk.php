@@ -172,15 +172,6 @@ class TTA_ThreadDesk {
 
 		add_submenu_page(
 			'tta-threaddesk',
-			__( 'User Detail', 'threaddesk' ),
-			__( 'User Detail', 'threaddesk' ),
-			'manage_woocommerce',
-			'tta-threaddesk-user-detail',
-			array( $this, 'render_admin_user_detail_page' )
-		);
-
-		add_submenu_page(
-			'tta-threaddesk',
 			__( 'Settings', 'threaddesk' ),
 			__( 'Settings', 'threaddesk' ),
 			'manage_woocommerce',
@@ -195,7 +186,7 @@ class TTA_ThreadDesk {
 
 
 	public function enqueue_admin_assets( $hook ) {
-		if ( 'toplevel_page_tta-threaddesk' !== $hook && false === strpos( (string) $hook, 'tta-threaddesk-settings' ) ) {
+		if ( 'toplevel_page_tta-threaddesk' !== $hook && false === strpos( (string) $hook, 'tta-threaddesk-settings' ) && false === strpos( (string) $hook, 'tta-threaddesk-user-detail' ) ) {
 			return;
 		}
 
@@ -2001,6 +1992,7 @@ class TTA_ThreadDesk {
 
 		$user_id = isset( $_GET['user_id'] ) ? absint( $_GET['user_id'] ) : 0;
 		$user = $user_id ? get_userdata( $user_id ) : false;
+		$active_section = isset( $_GET['td_user_section'] ) ? sanitize_key( wp_unslash( $_GET['td_user_section'] ) ) : '';
 
 		echo '<div class="wrap">';
 		echo '<h1>' . esc_html__( 'ThreadDesk User Profile', 'threaddesk' ) . '</h1>';
@@ -2027,16 +2019,33 @@ class TTA_ThreadDesk {
 		$company = $this->get_user_company_label( $user_id );
 		$outstanding = $this->data->get_outstanding_total( $user_id );
 
+		$design_count = (int) count_user_posts( $user_id, 'tta_design' );
+		$layout_count = (int) count_user_posts( $user_id, 'tta_layout' );
+		$quote_count = (int) count_user_posts( $user_id, 'tta_quote' );
+		$order_count = isset( $stats['order_count'] ) ? (int) $stats['order_count'] : 0;
+
+		$base_detail_url = add_query_arg(
+			array(
+				'page'    => 'tta-threaddesk-user-detail',
+				'user_id' => $user_id,
+			),
+			admin_url( 'admin.php' )
+		);
+
 		echo '<p><a href="' . esc_url( admin_url( 'admin.php?page=tta-threaddesk-users' ) ) . '">&larr; ' . esc_html__( 'Back to Users', 'threaddesk' ) . '</a></p>';
 		echo '<h2>' . esc_html( $user->display_name ) . '</h2>';
 		echo '<p><strong>' . esc_html__( 'Company/Username', 'threaddesk' ) . ':</strong> ' . esc_html( $company ? $company : $user->user_login ) . '</p>';
 
-		echo '<table class="widefat striped" style="max-width:980px;margin-bottom:16px;"><tbody>';
-		echo '<tr><th>' . esc_html__( 'Designs', 'threaddesk' ) . '</th><td>' . esc_html( (string) count_user_posts( $user_id, 'tta_design' ) ) . '</td><th>' . esc_html__( 'Layouts', 'threaddesk' ) . '</th><td>' . esc_html( (string) count_user_posts( $user_id, 'tta_layout' ) ) . '</td></tr>';
-		echo '<tr><th>' . esc_html__( 'Quotes', 'threaddesk' ) . '</th><td>' . esc_html( (string) count_user_posts( $user_id, 'tta_quote' ) ) . '</td><th>' . esc_html__( 'Outstanding Total', 'threaddesk' ) . '</th><td>' . esc_html( function_exists( 'wc_price' ) ? wp_strip_all_tags( wc_price( $outstanding ) ) : number_format_i18n( (float) $outstanding, 2 ) ) . '</td></tr>';
-		echo '<tr><th>' . esc_html__( 'Orders', 'threaddesk' ) . '</th><td>' . esc_html( isset( $stats['order_count'] ) ? (string) (int) $stats['order_count'] : '0' ) . '</td><th>' . esc_html__( 'Last Order', 'threaddesk' ) . '</th><td>' . esc_html( isset( $stats['last_order'] ) ? (string) $stats['last_order'] : __( 'No orders yet', 'threaddesk' ) ) . '</td></tr>';
-		echo '<tr><th>' . esc_html__( 'Average Order', 'threaddesk' ) . '</th><td>' . esc_html( function_exists( 'wc_price' ) ? wp_strip_all_tags( wc_price( isset( $stats['avg_order'] ) ? (float) $stats['avg_order'] : 0 ) ) : number_format_i18n( isset( $stats['avg_order'] ) ? (float) $stats['avg_order'] : 0, 2 ) ) . '</td><th>' . esc_html__( 'Lifetime Value', 'threaddesk' ) . '</th><td>' . esc_html( function_exists( 'wc_price' ) ? wp_strip_all_tags( wc_price( isset( $stats['lifetime'] ) ? (float) $stats['lifetime'] : 0 ) ) : number_format_i18n( isset( $stats['lifetime'] ) ? (float) $stats['lifetime'] : 0, 2 ) ) . '</td></tr>';
+		echo '<table class="widefat striped" style="max-width:980px;margin-bottom:16px;"><thead><tr><th>' . esc_html__( 'Activity', 'threaddesk' ) . '</th><th>' . esc_html__( 'Account Totals', 'threaddesk' ) . '</th></tr></thead><tbody>';
+		echo '<tr><td><a href="' . esc_url( add_query_arg( 'td_user_section', 'designs', $base_detail_url ) ) . '">' . esc_html__( 'Designs', 'threaddesk' ) . '</a>: ' . esc_html( (string) $design_count ) . '</td><td>' . esc_html__( 'Outstanding Total', 'threaddesk' ) . ': ' . esc_html( function_exists( 'wc_price' ) ? wp_strip_all_tags( wc_price( $outstanding ) ) : number_format_i18n( (float) $outstanding, 2 ) ) . '</td></tr>';
+		echo '<tr><td><a href="' . esc_url( add_query_arg( 'td_user_section', 'layouts', $base_detail_url ) ) . '">' . esc_html__( 'Layouts', 'threaddesk' ) . '</a>: ' . esc_html( (string) $layout_count ) . '</td><td>' . esc_html__( 'Last Order', 'threaddesk' ) . ': ' . esc_html( isset( $stats['last_order'] ) ? (string) $stats['last_order'] : __( 'No orders yet', 'threaddesk' ) ) . '</td></tr>';
+		echo '<tr><td><a href="' . esc_url( add_query_arg( 'td_user_section', 'quotes', $base_detail_url ) ) . '">' . esc_html__( 'Quotes', 'threaddesk' ) . '</a>: ' . esc_html( (string) $quote_count ) . '</td><td>' . esc_html__( 'Average Order', 'threaddesk' ) . ': ' . esc_html( function_exists( 'wc_price' ) ? wp_strip_all_tags( wc_price( isset( $stats['avg_order'] ) ? (float) $stats['avg_order'] : 0 ) ) : number_format_i18n( isset( $stats['avg_order'] ) ? (float) $stats['avg_order'] : 0, 2 ) ) . '</td></tr>';
+		echo '<tr><td><a href="' . esc_url( add_query_arg( 'td_user_section', 'orders', $base_detail_url ) ) . '">' . esc_html__( 'Orders', 'threaddesk' ) . '</a>: ' . esc_html( (string) $order_count ) . '</td><td>' . esc_html__( 'Lifetime Value', 'threaddesk' ) . ': ' . esc_html( function_exists( 'wc_price' ) ? wp_strip_all_tags( wc_price( isset( $stats['lifetime'] ) ? (float) $stats['lifetime'] : 0 ) ) : number_format_i18n( isset( $stats['lifetime'] ) ? (float) $stats['lifetime'] : 0, 2 ) ) . '</td></tr>';
 		echo '</tbody></table>';
+
+		if ( in_array( $active_section, array( 'designs', 'layouts', 'quotes', 'orders' ), true ) ) {
+			$this->render_admin_user_related_items( $user_id, $active_section, $base_detail_url );
+		}
 
 		echo '<form method="post" action="' . esc_url( admin_url( 'admin-post.php' ) ) . '" style="max-width:980px;">';
 		echo '<input type="hidden" name="action" value="tta_threaddesk_admin_save_user" />';
@@ -2050,22 +2059,110 @@ class TTA_ThreadDesk {
 		echo '<tr><th><label for="tta_td_user_email">' . esc_html__( 'Email', 'threaddesk' ) . '</label></th><td><input name="user_email" id="tta_td_user_email" type="email" class="regular-text" value="' . esc_attr( (string) $user->user_email ) . '" /></td></tr>';
 		echo '<tr><th><label for="tta_td_user_login">' . esc_html__( 'Username', 'threaddesk' ) . '</label></th><td><input id="tta_td_user_login" type="text" class="regular-text" value="' . esc_attr( (string) $user->user_login ) . '" readonly /></td></tr>';
 		echo '<tr><th><label for="tta_td_company">' . esc_html__( 'Company', 'threaddesk' ) . '</label></th><td><input name="company" id="tta_td_company" type="text" class="regular-text" value="' . esc_attr( $company ) . '" /></td></tr>';
-		echo '<tr><th><label for="tta_td_avatar_id">' . esc_html__( 'Profile Photo (Attachment ID)', 'threaddesk' ) . '</label></th><td><input name="avatar_id" id="tta_td_avatar_id" type="number" min="0" class="small-text" value="' . esc_attr( (string) $avatar_id ) . '" />';
-		if ( $avatar_url ) {
-			echo '<p><img src="' . esc_url( $avatar_url ) . '" alt="" style="max-width:80px;height:auto;border-radius:8px;border:1px solid #ddd;" /></p>';
-		}
+		echo '<tr><th><label for="tta_td_avatar_id">' . esc_html__( 'Profile Photo', 'threaddesk' ) . '</label></th><td>';
+		echo '<input name="avatar_id" id="tta_td_avatar_id" type="hidden" value="' . esc_attr( (string) $avatar_id ) . '" />';
+		echo '<button type="button" class="button" id="tta_td_avatar_select">' . esc_html__( 'Select / Change Photo', 'threaddesk' ) . '</button> ';
+		echo '<button type="button" class="button-link" id="tta_td_avatar_remove">' . esc_html__( 'Remove', 'threaddesk' ) . '</button>';
+		echo '<div><img id="tta_td_avatar_preview" src="' . esc_url( $avatar_url ) . '" alt="" style="margin-top:8px;max-width:80px;height:auto;border-radius:8px;border:1px solid #ddd;' . ( $avatar_url ? '' : 'display:none;' ) . '" /></div>';
 		echo '</td></tr>';
 		echo '</tbody></table>';
 
+		echo '<div style="display:flex;gap:20px;align-items:flex-start;flex-wrap:wrap;">';
+		echo '<div style="flex:1 1 420px;min-width:320px;">';
 		$this->render_admin_user_address_fields( 'billing', __( 'Billing Details', 'threaddesk' ), $billing );
+		echo '</div>';
+		echo '<div style="flex:1 1 420px;min-width:320px;">';
 		$this->render_admin_user_address_fields( 'shipping', __( 'Shipping Details', 'threaddesk' ), $shipping );
+		echo '</div>';
+		echo '</div>';
 
 		echo '<h2>' . esc_html__( 'Account Details', 'threaddesk' ) . '</h2>';
 		echo '<p>' . esc_html__( 'Username is read-only in this screen. You can update name, email, company, avatar, and billing/shipping fields.', 'threaddesk' ) . '</p>';
 
 		submit_button( __( 'Save User Profile', 'threaddesk' ) );
 		echo '</form>';
+
+		echo '<script>jQuery(function($){var frame=null;$("#tta_td_avatar_select").on("click",function(e){e.preventDefault();if(frame){frame.open();return;}frame=wp.media({title:"' . esc_js( __( 'Select profile photo', 'threaddesk' ) ) . '",button:{text:"' . esc_js( __( 'Use photo', 'threaddesk' ) ) . '"},multiple:false,library:{type:"image"}});frame.on("select",function(){var a=frame.state().get("selection").first().toJSON();var u=a.url||"";var i=parseInt(a.id||0,10);$("#tta_td_avatar_id").val(i>0?i:"");if(u){$("#tta_td_avatar_preview").attr("src",u).show();}});frame.open();});$("#tta_td_avatar_remove").on("click",function(e){e.preventDefault();$("#tta_td_avatar_id").val("0");$("#tta_td_avatar_preview").attr("src","").hide();});});</script>';
+
 		echo '</div>';
+	}
+
+	private function render_admin_user_related_items( $user_id, $section, $base_detail_url ) {
+		$section_labels = array(
+			'designs' => __( 'Designs', 'threaddesk' ),
+			'layouts' => __( 'Layouts', 'threaddesk' ),
+			'quotes'  => __( 'Quotes', 'threaddesk' ),
+			'orders'  => __( 'Orders', 'threaddesk' ),
+		);
+
+		if ( ! isset( $section_labels[ $section ] ) ) {
+			return;
+		}
+
+		echo '<h2>' . sprintf( esc_html__( '%s for this user', 'threaddesk' ), esc_html( $section_labels[ $section ] ) ) . '</h2>';
+
+		if ( 'orders' === $section ) {
+			if ( ! function_exists( 'wc_get_orders' ) ) {
+				echo '<p>' . esc_html__( 'WooCommerce orders are unavailable.', 'threaddesk' ) . '</p>';
+				return;
+			}
+			$orders = wc_get_orders( array( 'customer_id' => $user_id, 'limit' => 50, 'orderby' => 'date', 'order' => 'DESC' ) );
+			if ( empty( $orders ) ) {
+				echo '<p>' . esc_html__( 'No orders found.', 'threaddesk' ) . '</p>';
+				return;
+			}
+			echo '<ul>';
+			foreach ( $orders as $order ) {
+				$link = admin_url( 'post.php?post=' . absint( $order->get_id() ) . '&action=edit' );
+				echo '<li><a href="' . esc_url( $link ) . '">#' . esc_html( $order->get_order_number() ) . '</a> — ' . esc_html( $order->get_status() ) . '</li>';
+			}
+			echo '</ul>';
+			return;
+		}
+
+		$post_type_map = array(
+			'designs' => 'tta_design',
+			'layouts' => 'tta_layout',
+			'quotes'  => 'tta_quote',
+		);
+		$post_type = $post_type_map[ $section ];
+
+		$posts = get_posts(
+			array(
+				'post_type'      => $post_type,
+				'author'         => $user_id,
+				'posts_per_page' => 50,
+				'post_status'    => array( 'publish', 'draft', 'pending', 'private' ),
+			)
+		);
+
+		if ( in_array( $section, array( 'designs', 'layouts' ), true ) ) {
+			$status_key = 'designs' === $section ? 'design_status' : 'layout_status';
+			$approved = 0;
+			$pending_or_rejected = 0;
+			foreach ( $posts as $item ) {
+				$status = sanitize_key( (string) get_post_meta( $item->ID, $status_key, true ) );
+				if ( 'approved' === $status ) {
+					$approved++;
+				} else {
+					$pending_or_rejected++;
+				}
+			}
+			echo '<p><strong>' . esc_html__( 'Approved', 'threaddesk' ) . ':</strong> ' . esc_html( (string) $approved ) . ' &nbsp; <strong>' . esc_html__( 'Pending/Rejected', 'threaddesk' ) . ':</strong> ' . esc_html( (string) $pending_or_rejected ) . '</p>';
+		}
+
+		if ( empty( $posts ) ) {
+			echo '<p>' . esc_html__( 'None found.', 'threaddesk' ) . '</p>';
+			return;
+		}
+
+		echo '<ul>';
+		foreach ( $posts as $item ) {
+			$title = '' !== trim( (string) $item->post_title ) ? $item->post_title : '#' . $item->ID;
+			echo '<li><a href="' . esc_url( get_edit_post_link( $item->ID ) ) . '">' . esc_html( $title ) . '</a></li>';
+		}
+		echo '</ul>';
+		echo '<p><a href="' . esc_url( remove_query_arg( 'td_user_section', $base_detail_url ) ) . '">' . esc_html__( 'Hide list', 'threaddesk' ) . '</a></p>';
 	}
 
 	private function render_admin_user_address_fields( $type, $heading, $address ) {
