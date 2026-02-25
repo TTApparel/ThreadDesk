@@ -334,6 +334,9 @@ jQuery(function ($) {
 			const targetAngle = String(angle || currentAngle || 'front').trim();
 			const entries = savedPlacementsByAngle[targetAngle] || {};
 			Object.keys(entries).forEach(function (placementKey) {
+				if (isAdjustMode && selectedPlacementKey && placementKey === selectedPlacementKey && targetAngle === currentAngle) {
+					return;
+				}
 				const saved = entries[placementKey];
 				if (!saved || !saved.url) { return; }
 				const savedOverlay = $('<img class="threaddesk-layout-viewer__saved-overlay" alt="" aria-hidden="true" />')
@@ -968,10 +971,11 @@ jQuery(function ($) {
 				const savedName = String(savedForPlacement.designName || '').trim() || 'Design';
 				const savedPaletteBase = Array.isArray(savedForPlacement.paletteBase) ? savedForPlacement.paletteBase.slice() : [];
 				const savedPaletteCurrent = Array.isArray(savedForPlacement.paletteCurrent) ? savedForPlacement.paletteCurrent.slice() : [];
+				const activePalette = savedPaletteCurrent.length ? savedPaletteCurrent : savedPaletteBase;
 				selectedDesignMeta = {
 					id: Number(savedForPlacement.designId || 0),
 					title: savedName,
-					palette: JSON.stringify(savedPaletteBase.length ? savedPaletteBase : savedPaletteCurrent),
+					palette: JSON.stringify(activePalette),
 				};
 				selectedDesignName = savedName;
 				selectedDesignBaseSourceUrl = String(savedForPlacement.baseUrl || savedForPlacement.url || '').trim();
@@ -982,13 +986,7 @@ jQuery(function ($) {
 				selectedDesignNameEl.text(selectedDesignName.toUpperCase());
 				layoutPaletteState.recolorCache = {};
 				renderAdjustPaletteDots();
-				if (savedPaletteBase.length) {
-					layoutPaletteState.basePalette = savedPaletteBase.slice();
-					layoutPaletteState.currentPalette = (savedPaletteCurrent.length ? savedPaletteCurrent : savedPaletteBase).slice();
-					layoutPaletteState.activeIndex = layoutPaletteState.currentPalette.length ? 0 : -1;
-					layoutPaletteState.optionsVisible = false;
-					renderAdjustPaletteDots();
-				}
+				renderStageSavedOverlays(currentAngle);
 				applySelectedDesign(String(savedForPlacement.url || '').trim(), {
 					top: Number(savedForPlacement.top || 0),
 					left: Number(savedForPlacement.left || 0),
