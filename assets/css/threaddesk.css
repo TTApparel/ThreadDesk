@@ -1610,6 +1610,28 @@ body.threaddesk-modal-open {
 	cursor: pointer;
 }
 
+.threaddesk-layout-viewer__adjust-actions .threaddesk-layout-viewer__save-button {
+	margin-top: 0;
+}
+
+.threaddesk-layout-viewer__remove-button {
+	width: 100%;
+	padding: 10px;
+	border: 1px solid #777;
+	background: #fff;
+	color: #222;
+	text-transform: uppercase;
+	letter-spacing: .06em;
+	font-size: 12px;
+	cursor: pointer;
+}
+
+.threaddesk-layout-viewer__remove-button:hover,
+.threaddesk-layout-viewer__remove-button:focus-visible {
+	background: #f3f3f3;
+	outline: none;
+}
+
 .threaddesk-layout-viewer__save-button:hover,
 .threaddesk-layout-viewer__save-button:focus-visible {
 	background: #2d2d2d;

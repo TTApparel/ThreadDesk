@@ -154,6 +154,7 @@ jQuery(function ($) {
 		const adjustPalette = layoutModal.find('[data-threaddesk-layout-adjust-palette]');
 		const adjustPaletteOptionsLabel = layoutModal.find('[data-threaddesk-layout-adjust-palette-options-label]');
 		const adjustPaletteOptions = layoutModal.find('[data-threaddesk-layout-adjust-palette-options]');
+		const removePlacementButton = layoutModal.find('[data-threaddesk-layout-remove-placement]');
 		const layoutDesignsRaw = layoutModal.attr('data-threaddesk-layout-designs') || '[]';
 		let layoutDesigns = [];
 		try { layoutDesigns = JSON.parse(layoutDesignsRaw); } catch (e) { layoutDesigns = []; }
@@ -202,6 +203,9 @@ jQuery(function ($) {
 			designPanelStep.prop('hidden', panel !== 'designs');
 			adjustPanelStep.prop('hidden', panel !== 'adjust');
 			angleButtons.prop('disabled', isAdjustMode).attr('aria-disabled', isAdjustMode ? 'true' : 'false');
+			const targetAngle = getPlacementAngleTarget(selectedPlacementKey);
+			const savedEntry = targetAngle && selectedPlacementKey ? ((savedPlacementsByAngle[targetAngle] || {})[selectedPlacementKey] || null) : null;
+			removePlacementButton.prop('hidden', !(isAdjustMode && savedEntry && savedEntry.url));
 		};
 
 		const getPlacementAbbreviation = function (placementLabel, placementKey) {
@@ -1197,6 +1201,45 @@ jQuery(function ($) {
 			const button = $(this);
 			button.text('Placement Saved');
 			setTimeout(function () { button.text('Save Placement'); }, 1400);
+		});
+
+		$(document).on('click', '[data-threaddesk-layout-remove-placement]', function () {
+			const placementKey = String(selectedPlacementKey || '').trim();
+			if (!placementKey) { return; }
+			const targetAngle = getPlacementAngleTarget(placementKey);
+			const savedEntry = (savedPlacementsByAngle[targetAngle] || {})[placementKey] || null;
+			if (!savedEntry || !savedEntry.url) { return; }
+
+			delete savedPlacementsByAngle[targetAngle][placementKey];
+			layoutModal.find('.threaddesk-layout-viewer__angle-overlay[data-threaddesk-placement-key="' + placementKey + '"]').remove();
+
+			const option = placementList.find('.threaddesk-layout-viewer__placement-option[data-threaddesk-layout-placement-key="' + placementKey + '"]');
+			if (option.length) {
+				const label = String(option.attr('data-threaddesk-layout-placement-label') || selectedPlacementLabel || '').trim() || 'Placement';
+				const abbr = getPlacementAbbreviation(label, placementKey);
+				option
+					.removeClass('is-complete')
+					.removeAttr('data-threaddesk-layout-placement-complete')
+					.html('<span class="threaddesk-layout-viewer__placement-abbr">' + $('<div>').text(abbr).html() + '</span><span class="threaddesk-layout-viewer__placement-file">' + $('<div>').text('No design selected').html() + '</span>');
+			}
+
+			updateSaveLayoutVisibility();
+			selectedPlacementLabel = '';
+			selectedPlacementKey = '';
+			selectedDesignName = '';
+			sizeSlider.val(100);
+			selectedDesignNameEl.text('No design selected');
+			selectedDesignMeta = null;
+			selectedDesignBaseSourceUrl = '';
+			renderAdjustPaletteDots();
+			hideOverlay();
+			updateSizeReading();
+			setPanelStep('placements');
+			renderStageSavedOverlays(currentAngle);
+
+			const button = $(this);
+			button.text('Design Removed');
+			setTimeout(function () { button.text('Remove Design'); }, 1400);
 		});
 
 
