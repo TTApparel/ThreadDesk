@@ -59,6 +59,21 @@ $placement_slot_labels = array(
 );
 $placement_categories    = array();
 $saved_designs           = array();
+$layout_status_titles    = array(
+	'pending'  => array(),
+	'approved' => array(),
+	'rejected' => array(),
+);
+$layout_status_labels = array(
+	'pending'  => __( 'Pending', 'threaddesk' ),
+	'approved' => __( 'Approved', 'threaddesk' ),
+	'rejected' => __( 'Rejected', 'threaddesk' ),
+);
+$layout_rejection_reason_labels = array(
+	'placement_restrictions' => __( 'Placement restrictions (too close to seams, on zippers, pockets or off garment)', 'threaddesk' ),
+	'overlapping_designs'    => __( 'Overlapping designs', 'threaddesk' ),
+	'other'                  => __( 'Other', 'threaddesk' ),
+);
 
 $resolve_image_ratio = function ( $url ) {
 	$url = is_string( $url ) ? trim( $url ) : '';
@@ -213,18 +228,136 @@ if ( taxonomy_exists( 'product_cat' ) && is_array( $layout_category_settings ) )
 			</form>
 		</div>
 
+		<div class="threaddesk__content-inner">
+			<div class="threaddesk__main">
 		<div class="threaddesk__section">
 			<div class="threaddesk__card-header threaddesk-designer__heading">
 				<h3><?php echo esc_html__( 'Saved Placements', 'threaddesk' ); ?></h3>
 				<button type="button" class="threaddesk__button" data-threaddesk-layout-open><?php echo esc_html__( 'Add Placement', 'threaddesk' ); ?></button>
 			</div>
-			<p><?php echo esc_html__( 'Placements are placeholders for now. This area will list approved placements for reuse.', 'threaddesk' ); ?></p>
 			<div class="threaddesk__cards">
 				<?php if ( ! empty( $context['layouts'] ) ) : ?>
 					<?php foreach ( $context['layouts'] as $layout ) : ?>
-						<div class="threaddesk__card">
-							<h4><?php echo esc_html( $layout->post_title ); ?></h4>
-							<p><?php echo esc_html__( 'Status: Ready', 'threaddesk' ); ?></p>
+						<?php
+						$layout_title = trim( (string) $layout->post_title );
+						if ( '' === $layout_title ) {
+							$layout_title = __( 'Placement Layout', 'threaddesk' );
+						}
+
+						$layout_category = (string) get_post_meta( $layout->ID, 'layout_category', true );
+						$layout_payload_raw = (string) get_post_meta( $layout->ID, 'layout_payload', true );
+						$layout_payload = json_decode( $layout_payload_raw, true );
+						if ( ! is_array( $layout_payload ) ) {
+							$layout_payload = array();
+						}
+						$placements_by_angle = isset( $layout_payload['placementsByAngle'] ) && is_array( $layout_payload['placementsByAngle'] ) ? $layout_payload['placementsByAngle'] : array();
+						$layout_angles = isset( $layout_payload['angles'] ) && is_array( $layout_payload['angles'] ) ? $layout_payload['angles'] : array();
+						$layout_status = sanitize_key( (string) get_post_meta( $layout->ID, 'layout_status', true ) );
+						if ( ! in_array( $layout_status, array( 'pending', 'approved', 'rejected' ), true ) ) {
+							$layout_status = 'pending';
+						}
+						$layout_rejection_reason = sanitize_key( (string) get_post_meta( $layout->ID, 'layout_rejection_reason', true ) );
+						$layout_rejection_reason_text = isset( $layout_rejection_reason_labels[ $layout_rejection_reason ] ) ? $layout_rejection_reason_labels[ $layout_rejection_reason ] : '';
+
+						$preview_url  = '';
+						$preview_name = '';
+						$preview_angle = '';
+						$preview_top = 50;
+						$preview_left = 50;
+						$preview_width = 25;
+						$preview_entries = array();
+						$preview_base_url = '';
+						$print_count  = 0;
+
+						foreach ( $placements_by_angle as $angle_key => $angle_placements ) {
+							if ( ! is_array( $angle_placements ) ) {
+								continue;
+							}
+							foreach ( $angle_placements as $entry ) {
+								if ( ! is_array( $entry ) ) {
+									continue;
+								}
+								$entry_url = isset( $entry['url'] ) ? (string) $entry['url'] : '';
+								if ( '' === $entry_url ) {
+									continue;
+								}
+								$print_count++;
+								if ( '' === $preview_url ) {
+									$preview_url  = $entry_url;
+									$preview_name = isset( $entry['designName'] ) ? (string) $entry['designName'] : '';
+									$preview_angle = sanitize_key( (string) $angle_key );
+									$preview_top = isset( $entry['top'] ) ? (float) $entry['top'] : 50;
+									$preview_left = isset( $entry['left'] ) ? (float) $entry['left'] : 50;
+									$preview_width = isset( $entry['width'] ) ? (float) $entry['width'] : 25;
+								}
+								if ( '' !== $preview_angle && sanitize_key( (string) $angle_key ) === $preview_angle ) {
+									$preview_entries[] = $entry;
+								}
+							}
+						}
+						if ( empty( $preview_entries ) && '' !== $preview_angle && isset( $placements_by_angle[ $preview_angle ] ) && is_array( $placements_by_angle[ $preview_angle ] ) ) {
+							$preview_entries = $placements_by_angle[ $preview_angle ];
+						}
+						if ( '' !== $preview_angle && isset( $layout_angles[ $preview_angle ] ) ) {
+							$preview_base_url = (string) $layout_angles[ $preview_angle ];
+						}
+						$preview_base_src = '';
+						if ( '' !== $preview_base_url ) {
+							$preview_base_src = preg_match( '#^data:image/#i', $preview_base_url ) ? esc_attr( $preview_base_url ) : esc_url( $preview_base_url );
+						}
+						$preview_overlay_src = '';
+						if ( '' !== $preview_url ) {
+							$preview_overlay_src = preg_match( '#^data:image/#i', $preview_url ) ? esc_attr( $preview_url ) : esc_url( $preview_url );
+						}
+						$layout_status_titles[ $layout_status ][] = array(
+							'title'  => $layout_title,
+							'reason' => $layout_rejection_reason_text,
+						);
+						?>
+						<div class="threaddesk__card threaddesk__card--design">
+							<form class="threaddesk__card-delete" method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
+								<input type="hidden" name="action" value="tta_threaddesk_delete_layout" />
+								<input type="hidden" name="layout_id" value="<?php echo esc_attr( $layout->ID ); ?>" />
+								<?php wp_nonce_field( 'tta_threaddesk_delete_layout' ); ?>
+								<button type="submit" class="threaddesk__card-delete-button" aria-label="<?php echo esc_attr__( 'Delete placement layout', 'threaddesk' ); ?>">&times;</button>
+							</form>
+							<div class="threaddesk__card-design-preview">
+								<?php if ( '' !== $preview_url ) : ?>
+									<?php if ( '' !== $preview_base_src ) : ?>
+										<img class="threaddesk__card-layout-preview-base" src="<?php echo $preview_base_src; ?>" alt="" aria-hidden="true" />
+									<?php endif; ?>
+									<?php if ( ! empty( $preview_entries ) ) : ?>
+										<?php foreach ( $preview_entries as $preview_entry ) : ?>
+											<?php
+											$overlay_url = isset( $preview_entry['url'] ) ? (string) $preview_entry['url'] : '';
+											if ( '' === $overlay_url ) {
+												continue;
+											}
+											$overlay_src = preg_match( '#^data:image/#i', $overlay_url ) ? esc_attr( $overlay_url ) : esc_url( $overlay_url );
+											$overlay_top = isset( $preview_entry['top'] ) ? (float) $preview_entry['top'] : $preview_top;
+											$overlay_left = isset( $preview_entry['left'] ) ? (float) $preview_entry['left'] : $preview_left;
+											$overlay_width = isset( $preview_entry['width'] ) ? (float) $preview_entry['width'] : $preview_width;
+											$overlay_name = isset( $preview_entry['designName'] ) ? (string) $preview_entry['designName'] : '';
+											?>
+											<img class="threaddesk__card-layout-preview-overlay" src="<?php echo $overlay_src; ?>" alt="<?php echo esc_attr( $overlay_name ? $overlay_name : $layout_title ); ?>" style="top: <?php echo esc_attr( number_format( $overlay_top, 2, '.', '' ) ); ?>%; left: <?php echo esc_attr( number_format( $overlay_left, 2, '.', '' ) ); ?>%; width: <?php echo esc_attr( number_format( $overlay_width, 2, '.', '' ) ); ?>%;" />
+										<?php endforeach; ?>
+									<?php elseif ( '' !== $preview_overlay_src ) : ?>
+										<img class="threaddesk__card-layout-preview-overlay" src="<?php echo $preview_overlay_src; ?>" alt="<?php echo esc_attr( $preview_name ? $preview_name : $layout_title ); ?>" style="top: <?php echo esc_attr( number_format( $preview_top, 2, '.', '' ) ); ?>%; left: <?php echo esc_attr( number_format( $preview_left, 2, '.', '' ) ); ?>%; width: <?php echo esc_attr( number_format( $preview_width, 2, '.', '' ) ); ?>%;" />
+									<?php endif; ?>
+								<?php else : ?>
+									<span class="threaddesk-layout-modal__image-fallback"><?php echo esc_html__( 'No placement preview', 'threaddesk' ); ?></span>
+								<?php endif; ?>
+							</div>
+							<form class="threaddesk__card-title-form" method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
+								<input type="hidden" name="action" value="tta_threaddesk_rename_layout" />
+								<input type="hidden" name="layout_id" value="<?php echo esc_attr( $layout->ID ); ?>" />
+								<?php wp_nonce_field( 'tta_threaddesk_rename_layout' ); ?>
+								<h5 class="threaddesk__card-title"><input class="threaddesk__card-title-input" type="text" name="layout_title" value="<?php echo esc_attr( $layout_title ); ?>" maxlength="120" data-threaddesk-layout-title-card-input data-threaddesk-title-fallback="<?php echo esc_attr__( 'Placement Layout', 'threaddesk' ); ?>" aria-label="<?php echo esc_attr__( 'Placement layout name', 'threaddesk' ); ?>" /></h5>
+									<p class="threaddesk__card-design-color-count"><span><?php echo esc_html( sprintf( __( 'Print count: %d', 'threaddesk' ), $print_count ) ); ?></span><span class="threaddesk__card-design-status threaddesk__card-design-status--<?php echo esc_attr( $layout_status ); ?>"><?php echo esc_html( isset( $layout_status_labels[ $layout_status ] ) ? $layout_status_labels[ $layout_status ] : $layout_status_labels['pending'] ); ?></span></p>
+								</form>
+							<div class="threaddesk__card-design-actions">
+								<button type="button" class="threaddesk__button threaddesk__button--small" data-threaddesk-layout-open data-threaddesk-layout-category-open="<?php echo esc_attr( $layout_category ); ?>" data-threaddesk-layout-id="<?php echo esc_attr( $layout->ID ); ?>" data-threaddesk-layout-payload="<?php echo esc_attr( wp_json_encode( $layout_payload ) ); ?>"><?php echo esc_html__( 'Adjust Placements', 'threaddesk' ); ?></button>
+							</div>
 						</div>
 					<?php endforeach; ?>
 				<?php else : ?>
@@ -234,10 +367,40 @@ if ( taxonomy_exists( 'product_cat' ) && is_array( $layout_category_settings ) )
 				<?php endif; ?>
 			</div>
 
+			</div>
+		</div>
+
+
+			<div class="threaddesk__aside">
+				<?php foreach ( $layout_status_labels as $status_key => $status_label ) : ?>
+					<div class="threaddesk__card">
+						<div class="threaddesk__card-header">
+							<h4><?php echo esc_html( $status_label ); ?></h4>
+						</div>
+						<?php if ( ! empty( $layout_status_titles[ $status_key ] ) ) : ?>
+							<ul class="threaddesk__status-list">
+								<?php foreach ( $layout_status_titles[ $status_key ] as $status_item ) : ?>
+									<?php
+									$status_title = isset( $status_item['title'] ) ? (string) $status_item['title'] : '';
+									$status_reason = isset( $status_item['reason'] ) ? (string) $status_item['reason'] : '';
+									$show_hover_reason = 'rejected' === $status_key && '' !== $status_reason;
+									?>
+									<li class="threaddesk__status-list-item<?php echo $show_hover_reason ? ' has-reason' : ''; ?>">
+										<span class="threaddesk__status-list-title"><?php echo esc_html( $status_title ); ?></span>
+										<?php if ( $show_hover_reason ) : ?>
+											<span class="threaddesk__status-list-reason-tag" role="tooltip" aria-hidden="true"><?php echo esc_html( $status_reason ); ?></span>
+										<?php endif; ?>
+									</li>
+								<?php endforeach; ?>
+							</ul>
+						<?php else : ?>
+							<p class="threaddesk__status-empty"><?php echo esc_html__( 'No layouts', 'threaddesk' ); ?></p>
+						<?php endif; ?>
+					</div>
+				<?php endforeach; ?>
+			</div>
 		</div>
 	</div>
-</div>
-
 <div class="<?php echo esc_attr( $layout_modal_classes ); ?>" aria-hidden="<?php echo esc_attr( $layout_modal_aria_hidden ); ?>" data-threaddesk-layout-designs="<?php echo esc_attr( wp_json_encode( $saved_designs ) ); ?>">
 	<div class="threaddesk-auth-modal__overlay" data-threaddesk-layout-close></div>
 	<div class="threaddesk-auth-modal__panel" role="dialog" aria-label="<?php echo esc_attr__( 'Choose a placement category', 'threaddesk' ); ?>" aria-modal="true">
@@ -322,7 +485,8 @@ if ( taxonomy_exists( 'product_cat' ) && is_array( $layout_category_settings ) )
 							<?php wp_nonce_field( 'tta_threaddesk_save_layout' ); ?>
 							<input type="hidden" name="threaddesk_layout_category" value="" data-threaddesk-layout-save-category />
 							<input type="hidden" name="threaddesk_layout_category_id" value="0" data-threaddesk-layout-save-category-id />
-							<input type="hidden" name="threaddesk_layout_payload" value="" data-threaddesk-layout-save-payload />
+							<input type="hidden" name="threaddesk_layout_id" value="0" data-threaddesk-layout-save-id />
+								<input type="hidden" name="threaddesk_layout_payload" value="" data-threaddesk-layout-save-payload />
 							<button type="submit" class="threaddesk-layout-viewer__save-layout-button" data-threaddesk-layout-save-layout><?php echo esc_html__( 'Save Layout', 'threaddesk' ); ?></button>
 						</form>
 					</div>
@@ -345,13 +509,13 @@ if ( taxonomy_exists( 'product_cat' ) && is_array( $layout_category_settings ) )
 						<input id="threaddesk-layout-size-slider" type="range" min="60" max="140" value="100" class="threaddesk-layout-viewer__size-slider" data-threaddesk-layout-size-slider />
 						<p class="threaddesk-layout-viewer__size-reading" data-threaddesk-layout-size-reading><?php echo esc_html__( 'Approx. size: --', 'threaddesk' ); ?></p>
 						<div class="threaddesk-layout-viewer__adjust-actions">
+							<button type="button" class="threaddesk-layout-viewer__remove-button" data-threaddesk-layout-remove-placement hidden><?php echo esc_html__( 'Remove Design', 'threaddesk' ); ?></button>
 							<button type="button" class="threaddesk-layout-viewer__save-button" data-threaddesk-layout-save-placement><?php echo esc_html__( 'Save Placement', 'threaddesk' ); ?></button>
 						</div>
 					</div>
 				</div>
 			</div>
-		</div>
-	</div>
+			</div>
 </div>
 
 <div class="threaddesk-design-modal" aria-hidden="true">
