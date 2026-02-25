@@ -1187,10 +1187,12 @@ body.threaddesk-modal-open {
 
 .threaddesk-layout-viewer {
 	margin-top: 20px;
+	--threaddesk-layout-stage-height: 460px;
 }
 
 .threaddesk-layout-viewer__stage {
-	min-height: 360px;
+	min-height: var(--threaddesk-layout-stage-height);
+	max-height: var(--threaddesk-layout-stage-height);
 	background: #efefef;
 	display: flex;
 	align-items: center;
@@ -1253,11 +1255,12 @@ body.threaddesk-modal-open {
 	width: 240px;
 	background: #fff;
 	min-height: 300px;
-	max-height: 100%;
+	max-height: var(--threaddesk-layout-stage-height);
+	overflow: auto;
 	display: flex;
 	flex-direction: column;
-	flex: 1 1 auto;
-	min-height: 100%;
+	flex: 0 1 auto;
+	min-height: 0;
 }
 
 .threaddesk-layout-viewer__panel-step:not([hidden]) {
@@ -1656,8 +1659,8 @@ body.threaddesk-modal-open {
 }
 
 
-.threaddesk-layout-modal .threaddesk-layout-viewer__stage {
-	min-height: 300px;
+.threaddesk-layout-modal .threaddesk-layout-viewer {
+	--threaddesk-layout-stage-height: 300px;
 }
 
 .threaddesk-layout-modal .threaddesk-layout-viewer {
@@ -1682,6 +1685,8 @@ body.threaddesk-modal-open {
 
 	.threaddesk-layout-viewer__design-panel {
 		width: 100%;
+		max-height: none;
+		overflow: visible;
 	}
 
 	.threaddesk-layout-viewer__angles {
