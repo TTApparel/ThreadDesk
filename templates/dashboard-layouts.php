@@ -432,6 +432,7 @@ if ( taxonomy_exists( 'product_cat' ) && is_array( $layout_category_settings ) )
 						<div class="threaddesk-layout-viewer__adjust-actions">
 							<button type="button" class="threaddesk-layout-viewer__remove-button" data-threaddesk-layout-remove-placement hidden><?php echo esc_html__( 'Remove Design', 'threaddesk' ); ?></button>
 							<button type="button" class="threaddesk-layout-viewer__save-button" data-threaddesk-layout-save-placement><?php echo esc_html__( 'Save Placement', 'threaddesk' ); ?></button>
+							<button type="button" class="threaddesk-layout-viewer__save-layout-button" data-threaddesk-layout-save-layout-shortcut><?php echo esc_html__( 'Save Layout', 'threaddesk' ); ?></button>
 						</div>
 					</div>
 				</div>
