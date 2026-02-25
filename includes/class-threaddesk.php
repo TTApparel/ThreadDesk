@@ -172,6 +172,15 @@ class TTA_ThreadDesk {
 
 		add_submenu_page(
 			'tta-threaddesk',
+			__( 'User Detail', 'threaddesk' ),
+			__( 'User Detail', 'threaddesk' ),
+			'manage_woocommerce',
+			'tta-threaddesk-user-detail',
+			array( $this, 'render_admin_user_detail_page' )
+		);
+
+		add_submenu_page(
+			'tta-threaddesk',
 			__( 'Settings', 'threaddesk' ),
 			__( 'Settings', 'threaddesk' ),
 			'manage_woocommerce',
@@ -180,6 +189,7 @@ class TTA_ThreadDesk {
 		);
 
 		remove_submenu_page( 'tta-threaddesk', 'tta-threaddesk' );
+		remove_submenu_page( 'tta-threaddesk', 'tta-threaddesk-user-detail' );
 		remove_submenu_page( 'woocommerce', 'tta-threaddesk' );
 	}
 
@@ -2936,6 +2946,8 @@ class TTA_ThreadDesk {
 		} else {
 			delete_post_meta( $post_id, 'layout_rejection_reason' );
 		}
+		$status = $this->sanitize_design_status( wp_unslash( $_POST['threaddesk_design_status'] ) );
+		update_post_meta( $post_id, 'design_status', $status );
 	}
 
 	public function handle_auth_login() {
