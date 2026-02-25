@@ -1933,19 +1933,58 @@ class TTA_ThreadDesk {
 		$owner = get_userdata( (int) $post->post_author );
 		$category = (string) get_post_meta( $post->ID, 'layout_category', true );
 		$created = (string) get_post_meta( $post->ID, 'created_at', true );
+		$layout_payload_raw = (string) get_post_meta( $post->ID, 'layout_payload', true );
+		$layout_payload = json_decode( $layout_payload_raw, true );
+		if ( ! is_array( $layout_payload ) ) {
+			$layout_payload = array();
+		}
+		$payload_angles = isset( $layout_payload['angles'] ) && is_array( $layout_payload['angles'] ) ? $layout_payload['angles'] : array();
+		$preview_angles = array(
+			'front' => isset( $payload_angles['front'] ) ? esc_url_raw( (string) $payload_angles['front'] ) : '',
+			'left'  => isset( $payload_angles['left'] ) ? esc_url_raw( (string) $payload_angles['left'] ) : '',
+			'back'  => isset( $payload_angles['back'] ) ? esc_url_raw( (string) $payload_angles['back'] ) : '',
+			'right' => isset( $payload_angles['right'] ) ? esc_url_raw( (string) $payload_angles['right'] ) : '',
+		);
+		$has_preview_angles = false;
+		foreach ( $preview_angles as $preview_url ) {
+			if ( '' !== $preview_url ) {
+				$has_preview_angles = true;
+				break;
+			}
+		}
+
 		echo '<p><strong>' . esc_html__( 'User', 'threaddesk' ) . ':</strong> ' . esc_html( $owner ? $owner->display_name : __( 'Unknown', 'threaddesk' ) ) . '</p>';
 		echo '<p><strong>' . esc_html__( 'Category', 'threaddesk' ) . ':</strong> ' . esc_html( $category ?: __( 'Not set', 'threaddesk' ) ) . '</p>';
 		echo '<p><strong>' . esc_html__( 'Created', 'threaddesk' ) . ':</strong> ' . esc_html( $created ?: $post->post_date ) . '</p>';
 		echo '<p><strong>' . esc_html__( 'Last edited', 'threaddesk' ) . ':</strong> ' . esc_html( $post->post_modified ) . '</p>';
+
+		echo '<p><strong>' . esc_html__( 'Placement angles', 'threaddesk' ) . ':</strong></p>';
+		if ( $has_preview_angles ) {
+			echo '<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-start;">';
+			foreach ( $preview_angles as $angle_key => $preview_url ) {
+				echo '<div style="width:120px;">';
+				echo '<p style="margin:0 0 6px;"><strong>' . esc_html( strtoupper( $angle_key ) ) . '</strong></p>';
+				if ( '' !== $preview_url ) {
+					echo '<img src="' . esc_url( $preview_url ) . '" alt="' . esc_attr( strtoupper( $angle_key ) . ' ' . __( 'view', 'threaddesk' ) ) . '" style="display:block;width:120px;height:120px;object-fit:contain;background:#f6f6f6;border:1px solid #ddd;border-radius:4px;" />';
+				} else {
+					echo '<div style="display:flex;align-items:center;justify-content:center;width:120px;height:120px;background:#f6f6f6;border:1px solid #ddd;border-radius:4px;color:#777;font-size:12px;">' . esc_html__( 'No image', 'threaddesk' ) . '</div>';
+				}
+				echo '</div>';
+			}
+			echo '</div>';
+		} else {
+			echo '<p><em>' . esc_html__( 'No angle preview images available in this layout payload.', 'threaddesk' ) . '</em></p>';
+		}
+
 		$meta = get_post_meta( $post->ID );
-		echo '<p><strong>' . esc_html__( 'Design + placement/sizing data', 'threaddesk' ) . ':</strong></p><ul>';
+		echo '<details><summary><strong>' . esc_html__( 'Design + placement/sizing data', 'threaddesk' ) . '</strong></summary><ul>';
 		foreach ( $meta as $key => $values ) {
 			if ( false === strpos( $key, 'design' ) && false === strpos( $key, 'placement' ) && false === strpos( $key, 'layout' ) && false === strpos( $key, 'size' ) ) { continue; }
 			$value = isset( $values[0] ) ? maybe_unserialize( $values[0] ) : '';
 			if ( is_array( $value ) || is_object( $value ) ) { $value = wp_json_encode( $value ); }
 			echo '<li><code>' . esc_html( $key ) . '</code>: ' . esc_html( (string) $value ) . '</li>';
 		}
-		echo '</ul>';
+		echo '</ul></details>';
 		$related_designs = $this->find_related_posts_by_id_in_meta( $post->ID, 'tta_design', true );
 		$related_quotes = $this->find_related_posts_by_id_in_meta( $post->ID, 'tta_quote' );
 		$related_invoices = $this->find_related_posts_by_id_in_meta( $post->ID, 'shop_order' );
