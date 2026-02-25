@@ -56,6 +56,8 @@ class TTA_ThreadDesk {
 		add_action( 'admin_post_tta_threaddesk_save_layout', array( $this, 'handle_save_layout' ) );
 		add_action( 'admin_post_tta_threaddesk_rename_design', array( $this, 'handle_rename_design' ) );
 		add_action( 'admin_post_tta_threaddesk_delete_design', array( $this, 'handle_delete_design' ) );
+		add_action( 'admin_post_tta_threaddesk_rename_layout', array( $this, 'handle_rename_layout' ) );
+		add_action( 'admin_post_tta_threaddesk_delete_layout', array( $this, 'handle_delete_layout' ) );
 		add_action( 'user_register', array( $this, 'handle_user_register' ) );
 		add_action( 'init', array( $this, 'handle_auth_login' ) );
 		add_action( 'init', array( $this, 'handle_auth_register' ) );
@@ -542,7 +544,9 @@ class TTA_ThreadDesk {
 		);
 
 		if ( $layout_id ) {
+			if ( ! $is_update ) {
 			update_post_meta( $layout_id, 'created_at', current_time( 'mysql' ) );
+		}
 		}
 
 		wp_safe_redirect( wp_get_referer() ? wp_get_referer() : admin_url( 'admin.php?page=tta-threaddesk' ) );
@@ -830,6 +834,7 @@ class TTA_ThreadDesk {
 		check_admin_referer( 'tta_threaddesk_save_layout' );
 
 		$current_user_id = get_current_user_id();
+		$layout_id_input = isset( $_POST['threaddesk_layout_id'] ) ? absint( $_POST['threaddesk_layout_id'] ) : 0;
 		$category_slug   = isset( $_POST['threaddesk_layout_category'] ) ? sanitize_key( wp_unslash( $_POST['threaddesk_layout_category'] ) ) : '';
 		$category_id     = isset( $_POST['threaddesk_layout_category_id'] ) ? absint( $_POST['threaddesk_layout_category_id'] ) : 0;
 		$payload_raw     = isset( $_POST['threaddesk_layout_payload'] ) ? wp_unslash( $_POST['threaddesk_layout_payload'] ) : '';
@@ -849,7 +854,12 @@ class TTA_ThreadDesk {
 				if ( ! is_array( $entry ) ) {
 					continue;
 				}
-				if ( ! empty( $entry['url'] ) ) {
+				$raw_url = isset( $entry['url'] ) ? (string) $entry['url'] : '';
+				$url     = esc_url_raw( $raw_url );
+				if ( '' === $url && preg_match( '#^data:image\/(png|jpe?g|webp);base64,#i', $raw_url ) ) {
+					$url = $raw_url;
+				}
+				if ( '' !== $url ) {
 					$has_any_placement = true;
 				}
 				$design_id = isset( $entry['designId'] ) ? absint( $entry['designId'] ) : 0;
@@ -857,7 +867,7 @@ class TTA_ThreadDesk {
 					$related_design_ids[] = $design_id;
 				}
 				$placements_by_angle[ $angle ][ $placement_key ] = array(
-					'url'            => isset( $entry['url'] ) ? esc_url_raw( (string) $entry['url'] ) : '',
+					'url'            => $url,
 					'baseUrl'        => isset( $entry['baseUrl'] ) ? esc_url_raw( (string) $entry['baseUrl'] ) : '',
 					'designId'       => $design_id,
 					'designName'     => isset( $entry['designName'] ) ? sanitize_text_field( (string) $entry['designName'] ) : '',
@@ -896,14 +906,27 @@ class TTA_ThreadDesk {
 		}
 
 		$layout_title = sprintf( __( '%1$s Layout %2$s', 'threaddesk' ), $category_label, date_i18n( 'Y-m-d H:i' ) );
-		$layout_id    = wp_insert_post(
-			array(
-				'post_type'   => 'tta_layout',
-				'post_status' => 'private',
-				'post_title'  => $layout_title,
-				'post_author' => $current_user_id,
-			)
-		);
+		$layout_id    = 0;
+		$is_update    = false;
+
+		if ( $layout_id_input > 0 ) {
+			$existing_layout = get_post( $layout_id_input );
+			if ( $existing_layout && 'tta_layout' === $existing_layout->post_type && (int) $existing_layout->post_author === $current_user_id ) {
+				$layout_id = (int) $existing_layout->ID;
+				$is_update = true;
+			}
+		}
+
+		if ( $layout_id <= 0 ) {
+			$layout_id = wp_insert_post(
+				array(
+					'post_type'   => 'tta_layout',
+					'post_status' => 'private',
+					'post_title'  => $layout_title,
+					'post_author' => $current_user_id,
+				)
+			);
+		}
 
 		if ( ! $layout_id || is_wp_error( $layout_id ) ) {
 			if ( function_exists( 'wc_add_notice' ) ) {
@@ -923,10 +946,12 @@ class TTA_ThreadDesk {
 		update_post_meta( $layout_id, 'layout_payload', wp_json_encode( $payload ) );
 		update_post_meta( $layout_id, 'layout_placements', wp_json_encode( $placements_by_angle ) );
 		update_post_meta( $layout_id, 'layout_related_design_ids', wp_json_encode( $payload['relatedDesignIds'] ) );
-		update_post_meta( $layout_id, 'created_at', current_time( 'mysql' ) );
+		if ( ! $is_update ) {
+			update_post_meta( $layout_id, 'created_at', current_time( 'mysql' ) );
+		}
 
 		if ( function_exists( 'wc_add_notice' ) ) {
-			wc_add_notice( __( 'Layout saved successfully.', 'threaddesk' ), 'success' );
+			wc_add_notice( $is_update ? __( 'Layout updated successfully.', 'threaddesk' ) : __( 'Layout saved successfully.', 'threaddesk' ), 'success' );
 		}
 
 		wp_safe_redirect( $this->get_layouts_redirect_url() );
@@ -1291,6 +1316,76 @@ class TTA_ThreadDesk {
 			wc_add_notice( __( 'Design deleted.', 'threaddesk' ), 'success' );
 		}
 		wp_safe_redirect( $this->get_designs_redirect_url() );
+		exit;
+	}
+
+	public function handle_rename_layout() {
+		if ( ! is_user_logged_in() ) {
+			wp_die( esc_html__( 'Unauthorized.', 'threaddesk' ) );
+		}
+
+		check_admin_referer( 'tta_threaddesk_rename_layout' );
+
+		$layout_id = isset( $_POST['layout_id'] ) ? absint( $_POST['layout_id'] ) : 0;
+		$title     = isset( $_POST['layout_title'] ) ? sanitize_text_field( wp_unslash( $_POST['layout_title'] ) ) : '';
+		$title     = trim( (string) $title );
+		$layout    = get_post( $layout_id );
+
+		if ( ! $layout || 'tta_layout' !== $layout->post_type || (int) $layout->post_author !== get_current_user_id() ) {
+			if ( function_exists( 'wc_add_notice' ) ) {
+				wc_add_notice( __( 'Invalid layout.', 'threaddesk' ), 'error' );
+			}
+			wp_safe_redirect( $this->get_layouts_redirect_url() );
+			exit;
+		}
+
+		if ( '' === $title ) {
+			if ( function_exists( 'wc_add_notice' ) ) {
+				wc_add_notice( __( 'Please enter a placement layout name.', 'threaddesk' ), 'error' );
+			}
+			wp_safe_redirect( $this->get_layouts_redirect_url() );
+			exit;
+		}
+
+		wp_update_post(
+			array(
+				'ID'         => $layout_id,
+				'post_title' => $title,
+			)
+		);
+
+		if ( function_exists( 'wc_add_notice' ) ) {
+			wc_add_notice( __( 'Placement layout name updated.', 'threaddesk' ), 'success' );
+		}
+
+		wp_safe_redirect( $this->get_layouts_redirect_url() );
+		exit;
+	}
+
+	public function handle_delete_layout() {
+		if ( ! is_user_logged_in() ) {
+			wp_die( esc_html__( 'Unauthorized.', 'threaddesk' ) );
+		}
+
+		check_admin_referer( 'tta_threaddesk_delete_layout' );
+
+		$layout_id = isset( $_POST['layout_id'] ) ? absint( $_POST['layout_id'] ) : 0;
+		$layout    = get_post( $layout_id );
+
+		if ( ! $layout || 'tta_layout' !== $layout->post_type || (int) $layout->post_author !== get_current_user_id() ) {
+			if ( function_exists( 'wc_add_notice' ) ) {
+				wc_add_notice( __( 'Invalid layout.', 'threaddesk' ), 'error' );
+			}
+			wp_safe_redirect( $this->get_layouts_redirect_url() );
+			exit;
+		}
+
+		wp_delete_post( $layout_id, true );
+		if ( function_exists( 'wc_add_notice' ) ) {
+			wc_add_notice( __( 'Placement layout deleted.', 'threaddesk' ), 'success' );
+		}
+
+		wp_safe_redirect( $this->get_layouts_redirect_url() );
 		exit;
 	}
 
@@ -1838,19 +1933,58 @@ class TTA_ThreadDesk {
 		$owner = get_userdata( (int) $post->post_author );
 		$category = (string) get_post_meta( $post->ID, 'layout_category', true );
 		$created = (string) get_post_meta( $post->ID, 'created_at', true );
+		$layout_payload_raw = (string) get_post_meta( $post->ID, 'layout_payload', true );
+		$layout_payload = json_decode( $layout_payload_raw, true );
+		if ( ! is_array( $layout_payload ) ) {
+			$layout_payload = array();
+		}
+		$payload_angles = isset( $layout_payload['angles'] ) && is_array( $layout_payload['angles'] ) ? $layout_payload['angles'] : array();
+		$preview_angles = array(
+			'front' => isset( $payload_angles['front'] ) ? esc_url_raw( (string) $payload_angles['front'] ) : '',
+			'left'  => isset( $payload_angles['left'] ) ? esc_url_raw( (string) $payload_angles['left'] ) : '',
+			'back'  => isset( $payload_angles['back'] ) ? esc_url_raw( (string) $payload_angles['back'] ) : '',
+			'right' => isset( $payload_angles['right'] ) ? esc_url_raw( (string) $payload_angles['right'] ) : '',
+		);
+		$has_preview_angles = false;
+		foreach ( $preview_angles as $preview_url ) {
+			if ( '' !== $preview_url ) {
+				$has_preview_angles = true;
+				break;
+			}
+		}
+
 		echo '<p><strong>' . esc_html__( 'User', 'threaddesk' ) . ':</strong> ' . esc_html( $owner ? $owner->display_name : __( 'Unknown', 'threaddesk' ) ) . '</p>';
 		echo '<p><strong>' . esc_html__( 'Category', 'threaddesk' ) . ':</strong> ' . esc_html( $category ?: __( 'Not set', 'threaddesk' ) ) . '</p>';
 		echo '<p><strong>' . esc_html__( 'Created', 'threaddesk' ) . ':</strong> ' . esc_html( $created ?: $post->post_date ) . '</p>';
 		echo '<p><strong>' . esc_html__( 'Last edited', 'threaddesk' ) . ':</strong> ' . esc_html( $post->post_modified ) . '</p>';
+
+		echo '<p><strong>' . esc_html__( 'Placement angles', 'threaddesk' ) . ':</strong></p>';
+		if ( $has_preview_angles ) {
+			echo '<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-start;">';
+			foreach ( $preview_angles as $angle_key => $preview_url ) {
+				echo '<div style="width:120px;">';
+				echo '<p style="margin:0 0 6px;"><strong>' . esc_html( strtoupper( $angle_key ) ) . '</strong></p>';
+				if ( '' !== $preview_url ) {
+					echo '<img src="' . esc_url( $preview_url ) . '" alt="' . esc_attr( strtoupper( $angle_key ) . ' ' . __( 'view', 'threaddesk' ) ) . '" style="display:block;width:120px;height:120px;object-fit:contain;background:#f6f6f6;border:1px solid #ddd;border-radius:4px;" />';
+				} else {
+					echo '<div style="display:flex;align-items:center;justify-content:center;width:120px;height:120px;background:#f6f6f6;border:1px solid #ddd;border-radius:4px;color:#777;font-size:12px;">' . esc_html__( 'No image', 'threaddesk' ) . '</div>';
+				}
+				echo '</div>';
+			}
+			echo '</div>';
+		} else {
+			echo '<p><em>' . esc_html__( 'No angle preview images available in this layout payload.', 'threaddesk' ) . '</em></p>';
+		}
+
 		$meta = get_post_meta( $post->ID );
-		echo '<p><strong>' . esc_html__( 'Design + placement/sizing data', 'threaddesk' ) . ':</strong></p><ul>';
+		echo '<details><summary><strong>' . esc_html__( 'Design + placement/sizing data', 'threaddesk' ) . '</strong></summary><ul>';
 		foreach ( $meta as $key => $values ) {
 			if ( false === strpos( $key, 'design' ) && false === strpos( $key, 'placement' ) && false === strpos( $key, 'layout' ) && false === strpos( $key, 'size' ) ) { continue; }
 			$value = isset( $values[0] ) ? maybe_unserialize( $values[0] ) : '';
 			if ( is_array( $value ) || is_object( $value ) ) { $value = wp_json_encode( $value ); }
 			echo '<li><code>' . esc_html( $key ) . '</code>: ' . esc_html( (string) $value ) . '</li>';
 		}
-		echo '</ul>';
+		echo '</ul></details>';
 		$related_designs = $this->find_related_posts_by_id_in_meta( $post->ID, 'tta_design', true );
 		$related_quotes = $this->find_related_posts_by_id_in_meta( $post->ID, 'tta_quote' );
 		$related_invoices = $this->find_related_posts_by_id_in_meta( $post->ID, 'shop_order' );
