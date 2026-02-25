@@ -769,7 +769,19 @@ jQuery(function ($) {
 
 		showChooserStep();
 
-		$(document).on('click', '[data-threaddesk-layout-open]', function () { openLayoutModal(this); });
+		$(document).on('click', '[data-threaddesk-layout-open]', function () {
+			openLayoutModal(this);
+			const requestedCategory = String($(this).attr('data-threaddesk-layout-category-open') || '').trim();
+			if (!requestedCategory) {
+				return;
+			}
+			const categoryButton = layoutModal.find('[data-threaddesk-layout-category]').filter(function () {
+				return String($(this).attr('data-threaddesk-layout-category') || '').trim() === requestedCategory;
+			}).first();
+			if (categoryButton.length) {
+				categoryButton.trigger('click');
+			}
+		});
 		$(document).on('click', '[data-threaddesk-layout-close]', function () { closeLayoutModal(); });
 		$(document).on('click', '[data-threaddesk-layout-angle]', function () { setMainImage($(this).data('threaddesk-layout-angle')); });
 
@@ -2455,7 +2467,7 @@ jQuery(function ($) {
 			}
 			const value = (field.val() || '').trim();
 			if (!value) {
-				const fallback = (field.attr('value') || '').trim() || 'Design';
+				const fallback = String(field.attr('data-threaddesk-title-fallback') || '').trim() || (field.attr('value') || '').trim() || 'Design';
 				field.val(fallback);
 				return;
 			}
@@ -2465,14 +2477,14 @@ jQuery(function ($) {
 			form.trigger('submit');
 		};
 
-		$(document).on('keydown', '[data-threaddesk-design-title-card-input]', function (event) {
+		$(document).on('keydown', '[data-threaddesk-design-title-card-input], [data-threaddesk-layout-title-card-input]', function (event) {
 			if (event.key === 'Enter') {
 				event.preventDefault();
 				submitCardTitleForm(this);
 			}
 		});
 
-		$(document).on('blur', '[data-threaddesk-design-title-card-input]', function () {
+		$(document).on('blur', '[data-threaddesk-design-title-card-input], [data-threaddesk-layout-title-card-input]', function () {
 			submitCardTitleForm(this);
 		});
 	}
