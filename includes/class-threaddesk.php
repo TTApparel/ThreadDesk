@@ -162,6 +162,15 @@ class TTA_ThreadDesk {
 		);
 
 		add_submenu_page(
+			null,
+			__( 'User Detail', 'threaddesk' ),
+			__( 'User Detail', 'threaddesk' ),
+			'manage_woocommerce',
+			'tta-threaddesk-user-detail',
+			array( $this, 'render_admin_user_detail_page' )
+		);
+
+		add_submenu_page(
 			'tta-threaddesk',
 			__( 'User Detail', 'threaddesk' ),
 			__( 'User Detail', 'threaddesk' ),
