@@ -661,7 +661,8 @@ body.threaddesk-modal-open {
 
 .threaddesk__status-list {
 	margin: 0;
-	padding-left: 18px;
+	padding-left: 0;
+	list-style: none;
 	font-size: 13px;
 	line-height: 1.5;
 	color: #444;
@@ -669,6 +670,45 @@ body.threaddesk-modal-open {
 
 .threaddesk__status-list li + li {
 	margin-top: 4px;
+}
+
+.threaddesk__status-list-item {
+	position: relative;
+}
+
+.threaddesk__status-list-title {
+	display: inline-block;
+}
+
+.threaddesk__status-list-mockup-tag {
+	position: absolute;
+	left: calc(100% + 8px);
+	top: 50%;
+	transform: translateY(-50%);
+	background: #fff;
+	border: 1px solid rgba(0, 0, 0, 0.14);
+	box-shadow: 0 6px 18px rgba(0, 0, 0, 0.14);
+	border-radius: 8px;
+	padding: 6px;
+	z-index: 15;
+	min-width: 140px;
+	opacity: 0;
+	pointer-events: none;
+	transition: opacity .15s ease;
+}
+
+.threaddesk__status-list-mockup-tag img {
+	display: block;
+	max-width: 180px;
+	max-height: 160px;
+	width: auto;
+	height: auto;
+	object-fit: contain;
+}
+
+.threaddesk__status-list-item.has-mockup:hover .threaddesk__status-list-mockup-tag,
+.threaddesk__status-list-item.has-mockup:focus-within .threaddesk__status-list-mockup-tag {
+	opacity: 1;
 }
 
 .threaddesk__status-empty {

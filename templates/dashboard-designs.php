@@ -114,6 +114,8 @@ $nav_base = trailingslashit( wc_get_account_endpoint_url( 'thread-desk' ) );
 					<?php $design_settings = get_post_meta( $design->ID, 'design_analysis_settings', true ); ?>
 					<?php $design_svg_url = get_post_meta( $design->ID, 'design_svg_file_url', true ); ?>
 					<?php $design_svg_name = get_post_meta( $design->ID, 'design_svg_file_name', true ); ?>
+					<?php $design_mockup_png = get_post_meta( $design->ID, 'design_mockup_file_url', true ); ?>
+					<?php $design_status_mockup = $design_mockup_png ? $design_mockup_png : $design_preview; ?>
 					<?php $design_status = sanitize_key( (string) get_post_meta( $design->ID, 'design_status', true ) ); ?>
 					<?php if ( ! in_array( $design_status, array( 'pending', 'approved', 'rejected' ), true ) ) : ?>
 						<?php $design_status = 'pending'; ?>
@@ -130,7 +132,10 @@ $nav_base = trailingslashit( wc_get_account_endpoint_url( 'thread-desk' ) );
 					<?php if ( '' === $design_title ) : ?>
 						<?php $design_title = __( 'Design', 'threaddesk' ); ?>
 					<?php endif; ?>
-					<?php $design_status_titles[ $design_status ][] = $design_title; ?>
+					<?php $design_status_titles[ $design_status ][] = array(
+						'title'  => $design_title,
+						'mockup' => $design_status_mockup,
+					); ?>
 					<div class="threaddesk__card threaddesk__card--design">
 						<form class="threaddesk__card-delete" method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
 							<input type="hidden" name="action" value="tta_threaddesk_delete_design" />
@@ -183,8 +188,20 @@ $nav_base = trailingslashit( wc_get_account_endpoint_url( 'thread-desk' ) );
 						</div>
 						<?php if ( ! empty( $design_status_titles[ $status_key ] ) ) : ?>
 							<ul class="threaddesk__status-list">
-								<?php foreach ( $design_status_titles[ $status_key ] as $status_title ) : ?>
-									<li><?php echo esc_html( $status_title ); ?></li>
+								<?php foreach ( $design_status_titles[ $status_key ] as $status_item ) : ?>
+									<?php
+									$status_title = isset( $status_item['title'] ) ? (string) $status_item['title'] : '';
+									$status_mockup = isset( $status_item['mockup'] ) ? (string) $status_item['mockup'] : '';
+									$show_hover_mockup = in_array( $status_key, array( 'pending', 'approved' ), true ) && '' !== $status_mockup;
+									?>
+									<li class="threaddesk__status-list-item<?php echo $show_hover_mockup ? ' has-mockup' : ''; ?>">
+										<span class="threaddesk__status-list-title"><?php echo esc_html( $status_title ); ?></span>
+										<?php if ( $show_hover_mockup ) : ?>
+											<span class="threaddesk__status-list-mockup-tag" role="tooltip" aria-hidden="true">
+												<img src="<?php echo esc_url( $status_mockup ); ?>" alt="" />
+											</span>
+										<?php endif; ?>
+									</li>
 								<?php endforeach; ?>
 							</ul>
 						<?php else : ?>
