@@ -72,6 +72,26 @@ class TTA_ThreadDesk {
 		add_shortcode( 'threaddesk_auth', array( $this, 'render_auth_shortcode' ) );
 	}
 
+	/**
+	 * Prevent missing heartbeat dependency notices when wp-auth-check is enqueued.
+	 *
+	 * @param WP_Scripts $scripts Script registry instance.
+	 *
+	 * @return void
+	 */
+	public function ensure_heartbeat_dependency( $scripts ) {
+		if ( ! $scripts instanceof WP_Scripts ) {
+			return;
+		}
+
+		if ( isset( $scripts->registered['heartbeat'] ) ) {
+			return;
+		}
+
+		$suffix = ( defined( 'SCRIPT_DEBUG' ) && SCRIPT_DEBUG ) ? '' : '.min';
+		$scripts->add( 'heartbeat', includes_url( 'js/heartbeat' . $suffix . '.js' ), array( 'jquery', 'wp-hooks' ), false, 1 );
+	}
+
 	public static function activate() {
 		$instance = self::instance();
 		$instance->register_post_types();
