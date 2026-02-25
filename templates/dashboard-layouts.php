@@ -309,11 +309,17 @@ if ( taxonomy_exists( 'product_cat' ) && is_array( $layout_category_settings ) )
 						if ( '' !== $preview_url ) {
 							$preview_overlay_src = preg_match( '#^data:image/#i', $preview_url ) ? esc_attr( $preview_url ) : esc_url( $preview_url );
 						}
-						$layout_status_titles[ $layout_status ][] = array(
-							'title'  => $layout_title,
-							'reason' => $layout_rejection_reason_text,
-								'mockup' => $preview_overlay_src ? $preview_overlay_src : $preview_base_src,
-						);
+							$layout_status_titles[ $layout_status ][] = array(
+								'title'           => $layout_title,
+								'reason'          => $layout_rejection_reason_text,
+								'preview_base'    => $preview_base_src,
+								'preview_overlay' => $preview_overlay_src,
+								'preview_entries' => $preview_entries,
+								'preview_top'     => $preview_top,
+								'preview_left'    => $preview_left,
+								'preview_width'   => $preview_width,
+								'preview_name'    => $preview_name,
+							);
 						?>
 						<div class="threaddesk__card threaddesk__card--design">
 							<form class="threaddesk__card-delete" method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
@@ -383,16 +389,44 @@ if ( taxonomy_exists( 'product_cat' ) && is_array( $layout_category_settings ) )
 								<?php foreach ( $layout_status_titles[ $status_key ] as $status_item ) : ?>
 									<?php
 									$status_title = isset( $status_item['title'] ) ? (string) $status_item['title'] : '';
-									$status_mockup = isset( $status_item['mockup'] ) ? (string) $status_item['mockup'] : '';
+									$status_preview_base = isset( $status_item['preview_base'] ) ? (string) $status_item['preview_base'] : '';
+									$status_preview_overlay = isset( $status_item['preview_overlay'] ) ? (string) $status_item['preview_overlay'] : '';
+									$status_preview_entries = isset( $status_item['preview_entries'] ) && is_array( $status_item['preview_entries'] ) ? $status_item['preview_entries'] : array();
+									$status_preview_top = isset( $status_item['preview_top'] ) ? (float) $status_item['preview_top'] : 50;
+									$status_preview_left = isset( $status_item['preview_left'] ) ? (float) $status_item['preview_left'] : 50;
+									$status_preview_width = isset( $status_item['preview_width'] ) ? (float) $status_item['preview_width'] : 25;
+									$status_preview_name = isset( $status_item['preview_name'] ) ? (string) $status_item['preview_name'] : '';
 									$status_reason = isset( $status_item['reason'] ) ? (string) $status_item['reason'] : '';
-									$show_hover_mockup = in_array( $status_key, array( 'pending', 'approved' ), true ) && '' !== $status_mockup;
+									$show_hover_mockup = in_array( $status_key, array( 'pending', 'approved' ), true ) && ( '' !== $status_preview_base || '' !== $status_preview_overlay || ! empty( $status_preview_entries ) );
 									$show_hover_reason = 'rejected' === $status_key && '' !== $status_reason;
 									?>
 									<li class="threaddesk__status-list-item<?php echo $show_hover_mockup ? ' has-mockup' : ''; ?><?php echo $show_hover_reason ? ' has-reason' : ''; ?>">
 										<span class="threaddesk__status-list-title"><?php echo esc_html( $status_title ); ?></span>
 										<?php if ( $show_hover_mockup ) : ?>
 											<span class="threaddesk__status-list-mockup-tag" role="tooltip" aria-hidden="true">
-												<img src="<?php echo esc_url( $status_mockup ); ?>" alt="" />
+												<div class="threaddesk__card-design-preview">
+													<?php if ( '' !== $status_preview_base ) : ?>
+														<img class="threaddesk__card-layout-preview-base" src="<?php echo $status_preview_base; ?>" alt="" aria-hidden="true" />
+													<?php endif; ?>
+													<?php if ( ! empty( $status_preview_entries ) ) : ?>
+														<?php foreach ( $status_preview_entries as $status_preview_entry ) : ?>
+															<?php
+															$status_overlay_url = isset( $status_preview_entry['url'] ) ? (string) $status_preview_entry['url'] : '';
+															if ( '' === $status_overlay_url ) {
+																continue;
+															}
+															$status_overlay_src = preg_match( '#^data:image/#i', $status_overlay_url ) ? esc_attr( $status_overlay_url ) : esc_url( $status_overlay_url );
+															$status_overlay_top = isset( $status_preview_entry['top'] ) ? (float) $status_preview_entry['top'] : $status_preview_top;
+															$status_overlay_left = isset( $status_preview_entry['left'] ) ? (float) $status_preview_entry['left'] : $status_preview_left;
+															$status_overlay_width = isset( $status_preview_entry['width'] ) ? (float) $status_preview_entry['width'] : $status_preview_width;
+															$status_overlay_name = isset( $status_preview_entry['designName'] ) ? (string) $status_preview_entry['designName'] : '';
+															?>
+															<img class="threaddesk__card-layout-preview-overlay" src="<?php echo $status_overlay_src; ?>" alt="<?php echo esc_attr( $status_overlay_name ? $status_overlay_name : $status_title ); ?>" style="top: <?php echo esc_attr( number_format( $status_overlay_top, 2, '.', '' ) ); ?>%; left: <?php echo esc_attr( number_format( $status_overlay_left, 2, '.', '' ) ); ?>%; width: <?php echo esc_attr( number_format( $status_overlay_width, 2, '.', '' ) ); ?>%;" />
+														<?php endforeach; ?>
+													<?php elseif ( '' !== $status_preview_overlay ) : ?>
+														<img class="threaddesk__card-layout-preview-overlay" src="<?php echo $status_preview_overlay; ?>" alt="<?php echo esc_attr( $status_preview_name ? $status_preview_name : $status_title ); ?>" style="top: <?php echo esc_attr( number_format( $status_preview_top, 2, '.', '' ) ); ?>%; left: <?php echo esc_attr( number_format( $status_preview_left, 2, '.', '' ) ); ?>%; width: <?php echo esc_attr( number_format( $status_preview_width, 2, '.', '' ) ); ?>%;" />
+													<?php endif; ?>
+												</div>
 											</span>
 										<?php endif; ?>
 										<?php if ( $show_hover_reason ) : ?>
