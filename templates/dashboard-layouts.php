@@ -59,6 +59,21 @@ $placement_slot_labels = array(
 );
 $placement_categories    = array();
 $saved_designs           = array();
+$layout_status_titles    = array(
+	'pending'  => array(),
+	'approved' => array(),
+	'rejected' => array(),
+);
+$layout_status_labels = array(
+	'pending'  => __( 'Pending', 'threaddesk' ),
+	'approved' => __( 'Approved', 'threaddesk' ),
+	'rejected' => __( 'Rejected', 'threaddesk' ),
+);
+$layout_rejection_reason_labels = array(
+	'placement_restrictions' => __( 'Placement restrictions (too close to seams, on zippers, pockets or off garment)', 'threaddesk' ),
+	'overlapping_designs'    => __( 'Overlapping designs', 'threaddesk' ),
+	'other'                  => __( 'Other', 'threaddesk' ),
+);
 
 $resolve_image_ratio = function ( $url ) {
 	$url = is_string( $url ) ? trim( $url ) : '';
@@ -213,6 +228,8 @@ if ( taxonomy_exists( 'product_cat' ) && is_array( $layout_category_settings ) )
 			</form>
 		</div>
 
+		<div class="threaddesk__content-inner">
+			<div class="threaddesk__main">
 		<div class="threaddesk__section">
 			<div class="threaddesk__card-header threaddesk-designer__heading">
 				<h3><?php echo esc_html__( 'Saved Placements', 'threaddesk' ); ?></h3>
@@ -235,6 +252,12 @@ if ( taxonomy_exists( 'product_cat' ) && is_array( $layout_category_settings ) )
 						}
 						$placements_by_angle = isset( $layout_payload['placementsByAngle'] ) && is_array( $layout_payload['placementsByAngle'] ) ? $layout_payload['placementsByAngle'] : array();
 						$layout_angles = isset( $layout_payload['angles'] ) && is_array( $layout_payload['angles'] ) ? $layout_payload['angles'] : array();
+						$layout_status = sanitize_key( (string) get_post_meta( $layout->ID, 'layout_status', true ) );
+						if ( ! in_array( $layout_status, array( 'pending', 'approved', 'rejected' ), true ) ) {
+							$layout_status = 'pending';
+						}
+						$layout_rejection_reason = sanitize_key( (string) get_post_meta( $layout->ID, 'layout_rejection_reason', true ) );
+						$layout_rejection_reason_text = isset( $layout_rejection_reason_labels[ $layout_rejection_reason ] ) ? $layout_rejection_reason_labels[ $layout_rejection_reason ] : '';
 
 						$preview_url  = '';
 						$preview_name = '';
@@ -286,6 +309,10 @@ if ( taxonomy_exists( 'product_cat' ) && is_array( $layout_category_settings ) )
 						if ( '' !== $preview_url ) {
 							$preview_overlay_src = preg_match( '#^data:image/#i', $preview_url ) ? esc_attr( $preview_url ) : esc_url( $preview_url );
 						}
+						$layout_status_titles[ $layout_status ][] = array(
+							'title'  => $layout_title,
+							'reason' => $layout_rejection_reason_text,
+						);
 						?>
 						<div class="threaddesk__card threaddesk__card--design">
 							<form class="threaddesk__card-delete" method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
@@ -326,8 +353,8 @@ if ( taxonomy_exists( 'product_cat' ) && is_array( $layout_category_settings ) )
 								<input type="hidden" name="layout_id" value="<?php echo esc_attr( $layout->ID ); ?>" />
 								<?php wp_nonce_field( 'tta_threaddesk_rename_layout' ); ?>
 								<h5 class="threaddesk__card-title"><input class="threaddesk__card-title-input" type="text" name="layout_title" value="<?php echo esc_attr( $layout_title ); ?>" maxlength="120" data-threaddesk-layout-title-card-input data-threaddesk-title-fallback="<?php echo esc_attr__( 'Placement Layout', 'threaddesk' ); ?>" aria-label="<?php echo esc_attr__( 'Placement layout name', 'threaddesk' ); ?>" /></h5>
-								<p class="threaddesk__card-design-color-count"><?php echo esc_html( sprintf( __( 'Print count: %d', 'threaddesk' ), $print_count ) ); ?></p>
-							</form>
+									<p class="threaddesk__card-design-color-count"><span><?php echo esc_html( sprintf( __( 'Print count: %d', 'threaddesk' ), $print_count ) ); ?></span><span class="threaddesk__card-design-status threaddesk__card-design-status--<?php echo esc_attr( $layout_status ); ?>"><?php echo esc_html( isset( $layout_status_labels[ $layout_status ] ) ? $layout_status_labels[ $layout_status ] : $layout_status_labels['pending'] ); ?></span></p>
+								</form>
 							<div class="threaddesk__card-design-actions">
 								<button type="button" class="threaddesk__button threaddesk__button--small" data-threaddesk-layout-open data-threaddesk-layout-category-open="<?php echo esc_attr( $layout_category ); ?>" data-threaddesk-layout-id="<?php echo esc_attr( $layout->ID ); ?>" data-threaddesk-layout-payload="<?php echo esc_attr( wp_json_encode( $layout_payload ) ); ?>"><?php echo esc_html__( 'Adjust Placements', 'threaddesk' ); ?></button>
 							</div>
@@ -458,6 +485,35 @@ if ( taxonomy_exists( 'product_cat' ) && is_array( $layout_category_settings ) )
 						</div>
 					</div>
 				</div>
+			</div>
+			</div>
+			<div class="threaddesk__aside">
+				<?php foreach ( $layout_status_labels as $status_key => $status_label ) : ?>
+					<div class="threaddesk__card">
+						<div class="threaddesk__card-header">
+							<h4><?php echo esc_html( $status_label ); ?></h4>
+						</div>
+						<?php if ( ! empty( $layout_status_titles[ $status_key ] ) ) : ?>
+							<ul class="threaddesk__status-list">
+								<?php foreach ( $layout_status_titles[ $status_key ] as $status_item ) : ?>
+									<?php
+									$status_title = isset( $status_item['title'] ) ? (string) $status_item['title'] : '';
+									$status_reason = isset( $status_item['reason'] ) ? (string) $status_item['reason'] : '';
+									$show_hover_reason = 'rejected' === $status_key && '' !== $status_reason;
+									?>
+									<li class="threaddesk__status-list-item<?php echo $show_hover_reason ? ' has-reason' : ''; ?>">
+										<span class="threaddesk__status-list-title"><?php echo esc_html( $status_title ); ?></span>
+										<?php if ( $show_hover_reason ) : ?>
+											<span class="threaddesk__status-list-reason-tag" role="tooltip" aria-hidden="true"><?php echo esc_html( $status_reason ); ?></span>
+										<?php endif; ?>
+									</li>
+								<?php endforeach; ?>
+							</ul>
+						<?php else : ?>
+							<p class="threaddesk__status-empty"><?php echo esc_html__( 'No layouts', 'threaddesk' ); ?></p>
+						<?php endif; ?>
+					</div>
+				<?php endforeach; ?>
 			</div>
 		</div>
 	</div>

@@ -44,8 +44,11 @@ class TTA_ThreadDesk {
 		add_action( 'manage_tta_design_posts_custom_column', array( $this, 'render_custom_admin_columns' ), 10, 2 );
 		add_action( 'manage_tta_layout_posts_custom_column', array( $this, 'render_custom_admin_columns' ), 10, 2 );
 		add_action( 'quick_edit_custom_box', array( $this, 'render_design_quick_edit_status_field' ), 10, 2 );
+		add_action( 'quick_edit_custom_box', array( $this, 'render_layout_quick_edit_status_field' ), 10, 2 );
 		add_action( 'admin_footer-edit.php', array( $this, 'render_design_quick_edit_status_script' ) );
+		add_action( 'admin_footer-edit.php', array( $this, 'render_layout_quick_edit_status_script' ) );
 		add_action( 'save_post_tta_design', array( $this, 'handle_design_status_save' ), 10, 2 );
+		add_action( 'save_post_tta_layout', array( $this, 'handle_layout_status_save' ), 10, 2 );
 		add_filter( 'manage_edit-tta_quote_sortable_columns', array( $this, 'filter_quote_sortable_columns' ) );
 		add_filter( 'manage_edit-tta_design_sortable_columns', array( $this, 'filter_design_sortable_columns' ) );
 		add_filter( 'manage_edit-tta_layout_sortable_columns', array( $this, 'filter_layout_sortable_columns' ) );
@@ -225,6 +228,39 @@ class TTA_ThreadDesk {
 	private function get_design_status( $design_id ) {
 		$stored = get_post_meta( (int) $design_id, 'design_status', true );
 		return $this->sanitize_design_status( $stored );
+	}
+
+	private function get_layout_status_options() {
+		return array(
+			'pending'  => __( 'Pending', 'threaddesk' ),
+			'approved' => __( 'Approved', 'threaddesk' ),
+			'rejected' => __( 'Rejected', 'threaddesk' ),
+		);
+	}
+
+	private function get_layout_rejection_reason_options() {
+		return array(
+			'placement_restrictions' => __( 'Placement restrictions (too close to seams, on zippers, pockets or off garment)', 'threaddesk' ),
+			'overlapping_designs'    => __( 'Overlapping designs', 'threaddesk' ),
+			'other'                  => __( 'Other', 'threaddesk' ),
+		);
+	}
+
+	private function sanitize_layout_status( $status ) {
+		$status  = sanitize_key( (string) $status );
+		$options = $this->get_layout_status_options();
+		return isset( $options[ $status ] ) ? $status : 'pending';
+	}
+
+	private function sanitize_layout_rejection_reason( $reason ) {
+		$reason  = sanitize_key( (string) $reason );
+		$options = $this->get_layout_rejection_reason_options();
+		return isset( $options[ $reason ] ) ? $reason : '';
+	}
+
+	private function get_layout_status( $layout_id ) {
+		$stored = get_post_meta( (int) $layout_id, 'layout_status', true );
+		return $this->sanitize_layout_status( $stored );
 	}
 
 	private function render_media_picker_field( $name, $value ) {
@@ -1000,7 +1036,7 @@ class TTA_ThreadDesk {
 			);
 		}
 
-		if ( ! $layout_id || is_wp_error( $layout_id ) ) {
+			if ( ! $layout_id || is_wp_error( $layout_id ) ) {
 			if ( function_exists( 'wc_add_notice' ) ) {
 				wc_add_notice( __( 'Unable to save layout right now.', 'threaddesk' ), 'error' );
 			}
@@ -1075,6 +1111,7 @@ class TTA_ThreadDesk {
 				$design_id = $existing_design_id;
 				$file_name = (string) get_post_meta( $design_id, 'design_file_name', true );
 			}
+			update_post_meta( $layout_id, 'layout_status', 'pending' );
 		}
 
 		$old_original_path = $design_id ? (string) get_post_meta( $design_id, 'design_original_file_path', true ) : '';
@@ -1958,6 +1995,43 @@ class TTA_ThreadDesk {
 		add_meta_box( 'threaddesk_design_status', __( 'Design Status', 'threaddesk' ), array( $this, 'render_design_status_admin_meta_box' ), 'tta_design', 'side', 'high' );
 		add_meta_box( 'threaddesk_layout_detail', __( 'ThreadDesk Layout Details', 'threaddesk' ), array( $this, 'render_layout_admin_meta_box' ), 'tta_layout', 'normal', 'high' );
 		add_meta_box( 'threaddesk_layout_designs', __( 'Designs', 'threaddesk' ), array( $this, 'render_layout_designs_admin_meta_box' ), 'tta_layout', 'side', 'default' );
+		add_meta_box( 'threaddesk_layout_status', __( 'Layout Status', 'threaddesk' ), array( $this, 'render_layout_status_admin_meta_box' ), 'tta_layout', 'side', 'high' );
+	}
+
+	public function render_layout_status_admin_meta_box( $post ) {
+		$status = $this->get_layout_status( $post->ID );
+		$options = $this->get_layout_status_options();
+		$rejection_reason = $this->sanitize_layout_rejection_reason( get_post_meta( $post->ID, 'layout_rejection_reason', true ) );
+		$rejection_reason_options = $this->get_layout_rejection_reason_options();
+		wp_nonce_field( 'tta_threaddesk_layout_status_meta_box', 'tta_threaddesk_layout_status_meta_nonce' );
+		echo '<label for="threaddesk_layout_status_field" class="screen-reader-text">' . esc_html__( 'Layout status', 'threaddesk' ) . '</label>';
+		echo '<select id="threaddesk_layout_status_field" name="threaddesk_layout_status" style="width:100%;">';
+		foreach ( $options as $value => $label ) {
+			echo '<option value="' . esc_attr( $value ) . '" ' . selected( $status, $value, false ) . '>' . esc_html( $label ) . '</option>';
+		}
+		echo '</select>';
+		echo '<p id="threaddesk_layout_rejection_reason_wrap" style="margin-top:10px;' . ( 'rejected' === $status ? '' : 'display:none;' ) . '">';
+		echo '<label for="threaddesk_layout_rejection_reason_field"><strong>' . esc_html__( 'Rejection reason', 'threaddesk' ) . '</strong></label><br />';
+		echo '<select id="threaddesk_layout_rejection_reason_field" name="threaddesk_layout_rejection_reason" style="width:100%;">';
+		echo '<option value="">' . esc_html__( 'Select a reason', 'threaddesk' ) . '</option>';
+		foreach ( $rejection_reason_options as $value => $label ) {
+			echo '<option value="' . esc_attr( $value ) . '" ' . selected( $rejection_reason, $value, false ) . '>' . esc_html( $label ) . '</option>';
+		}
+		echo '</select>';
+		echo '</p>';
+		?>
+		<script>
+		jQuery(function ($) {
+			const $status = $('#threaddesk_layout_status_field');
+			const $reasonWrap = $('#threaddesk_layout_rejection_reason_wrap');
+			const sync = function () {
+				$reasonWrap.toggle(String($status.val() || '') === 'rejected');
+			};
+			$status.on('change', sync);
+			sync();
+		});
+		</script>
+		<?php
 	}
 
 	public function render_design_status_admin_meta_box( $post ) {
@@ -2378,7 +2452,15 @@ class TTA_ThreadDesk {
 	}
 
 	public function filter_layout_admin_columns( $columns ) {
-		return $this->filter_entity_admin_columns( $columns );
+		$columns = $this->filter_entity_admin_columns( $columns );
+		$updated = array();
+		foreach ( $columns as $key => $label ) {
+			$updated[ $key ] = $label;
+			if ( 'tta_internal_ref' === $key ) {
+				$updated['tta_layout_status'] = __( 'Status', 'threaddesk' );
+			}
+		}
+		return $updated;
 	}
 
 	public function render_custom_admin_columns( $column, $post_id ) {
@@ -2417,6 +2499,17 @@ class TTA_ThreadDesk {
 			echo '<span class="threaddesk-design-status" data-threaddesk-design-status="' . esc_attr( $status ) . '" data-threaddesk-design-rejection-reason="' . esc_attr( $rejection_reason ) . '">' . esc_html( isset( $options[ $status ] ) ? $options[ $status ] : $options['pending'] ) . '</span>';
 			return;
 		}
+		if ( 'tta_layout_status' === $column ) {
+			if ( 'tta_layout' !== $post->post_type ) {
+				echo '&mdash;';
+				return;
+			}
+			$status = $this->get_layout_status( $post_id );
+			$options = $this->get_layout_status_options();
+			$rejection_reason = $this->sanitize_layout_rejection_reason( get_post_meta( $post_id, 'layout_rejection_reason', true ) );
+			echo '<span class="threaddesk-layout-status" data-threaddesk-layout-status="' . esc_attr( $status ) . '" data-threaddesk-layout-rejection-reason="' . esc_attr( $rejection_reason ) . '">' . esc_html( isset( $options[ $status ] ) ? $options[ $status ] : $options['pending'] ) . '</span>';
+			return;
+		}
 	}
 
 	private function filter_entity_sortable_columns( $columns ) {
@@ -2437,7 +2530,9 @@ class TTA_ThreadDesk {
 	}
 
 	public function filter_layout_sortable_columns( $columns ) {
-		return $this->filter_entity_sortable_columns( $columns );
+		$columns = $this->filter_entity_sortable_columns( $columns );
+		$columns['tta_layout_status'] = 'tta_layout_status';
+		return $columns;
 	}
 
 	public function handle_admin_sorting_queries( $query ) {
@@ -2460,6 +2555,11 @@ class TTA_ThreadDesk {
 		}
 		if ( 'tta_design_status' === $orderby && 'tta_design' === $post_type ) {
 			$query->set( 'meta_key', 'design_status' );
+			$query->set( 'orderby', 'meta_value' );
+			return;
+		}
+		if ( 'tta_layout_status' === $orderby && 'tta_layout' === $post_type ) {
+			$query->set( 'meta_key', 'layout_status' );
 			$query->set( 'orderby', 'meta_value' );
 		}
 	}
@@ -2534,6 +2634,76 @@ class TTA_ThreadDesk {
 		<?php
 	}
 
+	public function render_layout_quick_edit_status_field( $column_name, $post_type ) {
+		if ( 'tta_layout_status' !== $column_name || 'tta_layout' !== $post_type ) {
+			return;
+		}
+		$options = $this->get_layout_status_options();
+		$rejection_reason_options = $this->get_layout_rejection_reason_options();
+		wp_nonce_field( 'tta_threaddesk_layout_status_quick_edit', 'tta_threaddesk_layout_status_nonce' );
+		echo '<fieldset class="inline-edit-col-right">';
+		echo '<div class="inline-edit-col">';
+		echo '<label class="inline-edit-group">';
+		echo '<span class="title">' . esc_html__( 'Layout status', 'threaddesk' ) . '</span>';
+		echo '<select name="threaddesk_layout_status">';
+		foreach ( $options as $value => $label ) {
+			echo '<option value="' . esc_attr( $value ) . '">' . esc_html( $label ) . '</option>';
+		}
+		echo '</select>';
+		echo '</label>';
+		echo '<label class="inline-edit-group" data-threaddesk-layout-quickedit-reason-wrap style="display:none;">';
+		echo '<span class="title">' . esc_html__( 'Rejection reason', 'threaddesk' ) . '</span>';
+		echo '<select name="threaddesk_layout_rejection_reason">';
+		echo '<option value="">' . esc_html__( 'Select a reason', 'threaddesk' ) . '</option>';
+		foreach ( $rejection_reason_options as $value => $label ) {
+			echo '<option value="' . esc_attr( $value ) . '">' . esc_html( $label ) . '</option>';
+		}
+		echo '</select>';
+		echo '</label>';
+		echo '</div>';
+		echo '</fieldset>';
+	}
+
+	public function render_layout_quick_edit_status_script() {
+		$screen = function_exists( 'get_current_screen' ) ? get_current_screen() : null;
+		if ( ! $screen || 'edit-tta_layout' !== $screen->id ) {
+			return;
+		}
+		?>
+		<script>
+		jQuery(function ($) {
+			const $wpInlineEdit = inlineEditPost.edit;
+			const syncReasonVisibility = function ($row) {
+				const status = String($row.find('select[name="threaddesk_layout_status"]').val() || '').toLowerCase();
+				$row.find('[data-threaddesk-layout-quickedit-reason-wrap]').toggle(status === 'rejected');
+			};
+			inlineEditPost.edit = function (postId) {
+				$wpInlineEdit.apply(this, arguments);
+				let id = 0;
+				if (typeof(postId) === 'object') {
+					id = parseInt(this.getId(postId), 10);
+				} else {
+					id = parseInt(postId, 10);
+				}
+				if (!id) { return; }
+				const $editRow = $('#edit-' + id);
+				const $postRow = $('#post-' + id);
+				const rawStatus = String(($postRow.find('.threaddesk-layout-status').attr('data-threaddesk-layout-status') || 'pending')).toLowerCase();
+				const rawReason = String(($postRow.find('.threaddesk-layout-status').attr('data-threaddesk-layout-rejection-reason') || '')).toLowerCase();
+				const status = rawStatus === 'approved' || rawStatus === 'rejected' ? rawStatus : 'pending';
+				$editRow.find('select[name="threaddesk_layout_status"]').val(status);
+				$editRow.find('select[name="threaddesk_layout_rejection_reason"]').val(rawReason);
+				syncReasonVisibility($editRow);
+			};
+
+			$(document).on('change', 'tr.inline-editor select[name="threaddesk_layout_status"]', function () {
+				syncReasonVisibility($(this).closest('tr.inline-editor'));
+			});
+		});
+		</script>
+		<?php
+	}
+
 	public function handle_design_status_save( $post_id, $post ) {
 		if ( ! $post || 'tta_design' !== $post->post_type ) {
 			return;
@@ -2562,6 +2732,37 @@ class TTA_ThreadDesk {
 			update_post_meta( $post_id, 'design_rejection_reason', $reason );
 		} else {
 			delete_post_meta( $post_id, 'design_rejection_reason' );
+		}
+	}
+
+	public function handle_layout_status_save( $post_id, $post ) {
+		if ( ! $post || 'tta_layout' !== $post->post_type ) {
+			return;
+		}
+		if ( defined( 'DOING_AUTOSAVE' ) && DOING_AUTOSAVE ) {
+			return;
+		}
+		if ( ! current_user_can( 'edit_post', $post_id ) ) {
+			return;
+		}
+		if ( ! isset( $_POST['threaddesk_layout_status'] ) ) {
+			return;
+		}
+		$has_quick_edit_nonce = isset( $_POST['tta_threaddesk_layout_status_nonce'] ) && wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['tta_threaddesk_layout_status_nonce'] ) ), 'tta_threaddesk_layout_status_quick_edit' );
+		$has_meta_box_nonce   = isset( $_POST['tta_threaddesk_layout_status_meta_nonce'] ) && wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['tta_threaddesk_layout_status_meta_nonce'] ) ), 'tta_threaddesk_layout_status_meta_box' );
+		if ( ! $has_quick_edit_nonce && ! $has_meta_box_nonce ) {
+			return;
+		}
+		$status = $this->sanitize_layout_status( wp_unslash( $_POST['threaddesk_layout_status'] ) );
+		$reason = isset( $_POST['threaddesk_layout_rejection_reason'] ) ? $this->sanitize_layout_rejection_reason( wp_unslash( $_POST['threaddesk_layout_rejection_reason'] ) ) : '';
+		if ( 'rejected' === $status && '' === $reason ) {
+			return;
+		}
+		update_post_meta( $post_id, 'layout_status', $status );
+		if ( 'rejected' === $status ) {
+			update_post_meta( $post_id, 'layout_rejection_reason', $reason );
+		} else {
+			delete_post_meta( $post_id, 'layout_rejection_reason' );
 		}
 		$status = $this->sanitize_design_status( wp_unslash( $_POST['threaddesk_design_status'] ) );
 		update_post_meta( $post_id, 'design_status', $status );
