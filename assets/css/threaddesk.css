@@ -714,8 +714,8 @@ body.threaddesk-modal-open {
 }
 
 .threaddesk__status-list-mockup-tag .threaddesk__card-layout-preview-base {
-	top: 50%;
-	left: 50%;
+	top: 50% !important;
+	left: 50% !important;
 	inset: auto;
 	width: auto;
 	height: auto;
