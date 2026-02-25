@@ -201,6 +201,21 @@ class TTA_ThreadDesk {
 		);
 	}
 
+	private function get_design_rejection_reason_options() {
+		return array(
+			'low_resolution' => __( 'The design file is of too low a resolution to proceed to printing.', 'threaddesk' ),
+			'copyright_risk' => __( 'The design is copyrighted and is at risk of infringement.', 'threaddesk' ),
+			'detail_concerns' => __( 'Gradients/Transparencies/Fine detail concerns', 'threaddesk' ),
+			'other'          => __( 'Other (a representative will be in contact with you in the coming days)', 'threaddesk' ),
+		);
+	}
+
+	private function sanitize_design_rejection_reason( $reason ) {
+		$reason  = sanitize_key( (string) $reason );
+		$options = $this->get_design_rejection_reason_options();
+		return isset( $options[ $reason ] ) ? $reason : '';
+	}
+
 	private function sanitize_design_status( $status ) {
 		$status  = sanitize_key( (string) $status );
 		$options = $this->get_design_status_options();
@@ -1948,6 +1963,8 @@ class TTA_ThreadDesk {
 	public function render_design_status_admin_meta_box( $post ) {
 		$status = $this->get_design_status( $post->ID );
 		$options = $this->get_design_status_options();
+		$rejection_reason = $this->sanitize_design_rejection_reason( get_post_meta( $post->ID, 'design_rejection_reason', true ) );
+		$rejection_reason_options = $this->get_design_rejection_reason_options();
 		wp_nonce_field( 'tta_threaddesk_design_status_meta_box', 'tta_threaddesk_design_status_meta_nonce' );
 		echo '<label for="threaddesk_design_status_field" class="screen-reader-text">' . esc_html__( 'Design status', 'threaddesk' ) . '</label>';
 		echo '<select id="threaddesk_design_status_field" name="threaddesk_design_status" style="width:100%;">';
@@ -1955,6 +1972,28 @@ class TTA_ThreadDesk {
 			echo '<option value="' . esc_attr( $value ) . '" ' . selected( $status, $value, false ) . '>' . esc_html( $label ) . '</option>';
 		}
 		echo '</select>';
+		echo '<p id="threaddesk_design_rejection_reason_wrap" style="margin-top:10px;' . ( 'rejected' === $status ? '' : 'display:none;' ) . '">';
+		echo '<label for="threaddesk_design_rejection_reason_field"><strong>' . esc_html__( 'Rejection reason', 'threaddesk' ) . '</strong></label><br />';
+		echo '<select id="threaddesk_design_rejection_reason_field" name="threaddesk_design_rejection_reason" style="width:100%;">';
+		echo '<option value="">' . esc_html__( 'Select a reason', 'threaddesk' ) . '</option>';
+		foreach ( $rejection_reason_options as $value => $label ) {
+			echo '<option value="' . esc_attr( $value ) . '" ' . selected( $rejection_reason, $value, false ) . '>' . esc_html( $label ) . '</option>';
+		}
+		echo '</select>';
+		echo '</p>';
+		?>
+		<script>
+		jQuery(function ($) {
+			const $status = $('#threaddesk_design_status_field');
+			const $reasonWrap = $('#threaddesk_design_rejection_reason_wrap');
+			const sync = function () {
+				$reasonWrap.toggle(String($status.val() || '') === 'rejected');
+			};
+			$status.on('change', sync);
+			sync();
+		});
+		</script>
+		<?php
 	}
 
 	public function render_design_admin_meta_box( $post ) {
@@ -2374,7 +2413,8 @@ class TTA_ThreadDesk {
 			}
 			$status = $this->get_design_status( $post_id );
 			$options = $this->get_design_status_options();
-			echo '<span class="threaddesk-design-status" data-threaddesk-design-status="' . esc_attr( $status ) . '">' . esc_html( isset( $options[ $status ] ) ? $options[ $status ] : $options['pending'] ) . '</span>';
+			$rejection_reason = $this->sanitize_design_rejection_reason( get_post_meta( $post_id, 'design_rejection_reason', true ) );
+			echo '<span class="threaddesk-design-status" data-threaddesk-design-status="' . esc_attr( $status ) . '" data-threaddesk-design-rejection-reason="' . esc_attr( $rejection_reason ) . '">' . esc_html( isset( $options[ $status ] ) ? $options[ $status ] : $options['pending'] ) . '</span>';
 			return;
 		}
 	}
@@ -2429,6 +2469,7 @@ class TTA_ThreadDesk {
 			return;
 		}
 		$options = $this->get_design_status_options();
+		$rejection_reason_options = $this->get_design_rejection_reason_options();
 		wp_nonce_field( 'tta_threaddesk_design_status_quick_edit', 'tta_threaddesk_design_status_nonce' );
 		echo '<fieldset class="inline-edit-col-right">';
 		echo '<div class="inline-edit-col">';
@@ -2436,6 +2477,15 @@ class TTA_ThreadDesk {
 		echo '<span class="title">' . esc_html__( 'Design status', 'threaddesk' ) . '</span>';
 		echo '<select name="threaddesk_design_status">';
 		foreach ( $options as $value => $label ) {
+			echo '<option value="' . esc_attr( $value ) . '">' . esc_html( $label ) . '</option>';
+		}
+		echo '</select>';
+		echo '</label>';
+		echo '<label class="inline-edit-group" data-threaddesk-quickedit-reason-wrap style="display:none;">';
+		echo '<span class="title">' . esc_html__( 'Rejection reason', 'threaddesk' ) . '</span>';
+		echo '<select name="threaddesk_design_rejection_reason">';
+		echo '<option value="">' . esc_html__( 'Select a reason', 'threaddesk' ) . '</option>';
+		foreach ( $rejection_reason_options as $value => $label ) {
 			echo '<option value="' . esc_attr( $value ) . '">' . esc_html( $label ) . '</option>';
 		}
 		echo '</select>';
@@ -2453,6 +2503,10 @@ class TTA_ThreadDesk {
 		<script>
 		jQuery(function ($) {
 			const $wpInlineEdit = inlineEditPost.edit;
+			const syncReasonVisibility = function ($row) {
+				const status = String($row.find('select[name="threaddesk_design_status"]').val() || '').toLowerCase();
+				$row.find('[data-threaddesk-quickedit-reason-wrap]').toggle(status === 'rejected');
+			};
 			inlineEditPost.edit = function (postId) {
 				$wpInlineEdit.apply(this, arguments);
 				let id = 0;
@@ -2465,9 +2519,16 @@ class TTA_ThreadDesk {
 				const $editRow = $('#edit-' + id);
 				const $postRow = $('#post-' + id);
 				const rawStatus = String(($postRow.find('.threaddesk-design-status').attr('data-threaddesk-design-status') || 'pending')).toLowerCase();
+				const rawReason = String(($postRow.find('.threaddesk-design-status').attr('data-threaddesk-design-rejection-reason') || '')).toLowerCase();
 				const status = rawStatus === 'approved' || rawStatus === 'rejected' ? rawStatus : 'pending';
 				$editRow.find('select[name="threaddesk_design_status"]').val(status);
+				$editRow.find('select[name="threaddesk_design_rejection_reason"]').val(rawReason);
+				syncReasonVisibility($editRow);
 			};
+
+			$(document).on('change', 'tr.inline-editor select[name="threaddesk_design_status"]', function () {
+				syncReasonVisibility($(this).closest('tr.inline-editor'));
+			});
 		});
 		</script>
 		<?php
@@ -2490,6 +2551,17 @@ class TTA_ThreadDesk {
 		$has_meta_box_nonce   = isset( $_POST['tta_threaddesk_design_status_meta_nonce'] ) && wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['tta_threaddesk_design_status_meta_nonce'] ) ), 'tta_threaddesk_design_status_meta_box' );
 		if ( ! $has_quick_edit_nonce && ! $has_meta_box_nonce ) {
 			return;
+		}
+		$status = $this->sanitize_design_status( wp_unslash( $_POST['threaddesk_design_status'] ) );
+		$reason = isset( $_POST['threaddesk_design_rejection_reason'] ) ? $this->sanitize_design_rejection_reason( wp_unslash( $_POST['threaddesk_design_rejection_reason'] ) ) : '';
+		if ( 'rejected' === $status && '' === $reason ) {
+			return;
+		}
+		update_post_meta( $post_id, 'design_status', $status );
+		if ( 'rejected' === $status ) {
+			update_post_meta( $post_id, 'design_rejection_reason', $reason );
+		} else {
+			delete_post_meta( $post_id, 'design_rejection_reason' );
 		}
 		$status = $this->sanitize_design_status( wp_unslash( $_POST['threaddesk_design_status'] ) );
 		update_post_meta( $post_id, 'design_status', $status );
