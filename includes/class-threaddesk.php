@@ -766,8 +766,14 @@ class TTA_ThreadDesk {
 
 		check_admin_referer( 'tta_threaddesk_avatar_upload' );
 
-		$avatar_name = isset( $_FILES['threaddesk_avatar']['name'] ) ? trim( (string) $_FILES['threaddesk_avatar']['name'] ) : '';
-		if ( '' === $avatar_name ) {
+		$avatar_file  = isset( $_FILES['threaddesk_avatar'] ) && is_array( $_FILES['threaddesk_avatar'] ) ? $_FILES['threaddesk_avatar'] : null;
+		$avatar_name  = isset( $avatar_file['name'] ) ? trim( (string) $avatar_file['name'] ) : '';
+		$avatar_error = isset( $avatar_file['error'] ) ? (int) $avatar_file['error'] : UPLOAD_ERR_NO_FILE;
+		$avatar_tmp   = isset( $avatar_file['tmp_name'] ) ? trim( (string) $avatar_file['tmp_name'] ) : '';
+		if ( '' === $avatar_name || UPLOAD_ERR_OK !== $avatar_error || '' === $avatar_tmp || ! is_uploaded_file( $avatar_tmp ) ) {
+			if ( function_exists( 'wc_add_notice' ) ) {
+				wc_add_notice( __( 'Avatar upload failed.', 'threaddesk' ), 'error' );
+			}
 			wp_safe_redirect( wc_get_account_endpoint_url( 'thread-desk' ) );
 			exit;
 		}
@@ -775,7 +781,7 @@ class TTA_ThreadDesk {
 		require_once ABSPATH . 'wp-admin/includes/file.php';
 		require_once ABSPATH . 'wp-admin/includes/image.php';
 
-		$upload = wp_handle_upload( $_FILES['threaddesk_avatar'], array( 'test_form' => false ) );
+		$upload = wp_handle_upload( $avatar_file, array( 'test_form' => false ) );
 
 		if ( ! is_array( $upload ) || isset( $upload['error'] ) ) {
 			if ( function_exists( 'wc_add_notice' ) ) {
@@ -1202,10 +1208,21 @@ class TTA_ThreadDesk {
 		$old_svg_path      = $design_id ? (string) get_post_meta( $design_id, 'design_svg_file_path', true ) : '';
 		$old_mockup_path   = $design_id ? (string) get_post_meta( $design_id, 'design_mockup_file_path', true ) : '';
 
-		$design_upload_name = isset( $_FILES['threaddesk_design_file']['name'] ) ? trim( (string) $_FILES['threaddesk_design_file']['name'] ) : '';
+		$design_file        = isset( $_FILES['threaddesk_design_file'] ) && is_array( $_FILES['threaddesk_design_file'] ) ? $_FILES['threaddesk_design_file'] : null;
+		$design_upload_name = isset( $design_file['name'] ) ? trim( (string) $design_file['name'] ) : '';
 		if ( '' !== $design_upload_name ) {
+			$design_upload_error = isset( $design_file['error'] ) ? (int) $design_file['error'] : UPLOAD_ERR_NO_FILE;
+			$design_upload_tmp   = isset( $design_file['tmp_name'] ) ? trim( (string) $design_file['tmp_name'] ) : '';
+			if ( UPLOAD_ERR_OK !== $design_upload_error || '' === $design_upload_tmp || ! is_uploaded_file( $design_upload_tmp ) ) {
+				if ( function_exists( 'wc_add_notice' ) ) {
+					wc_add_notice( __( 'Design upload failed. Please try again.', 'threaddesk' ), 'error' );
+				}
+				wp_safe_redirect( $redirect_url );
+				exit;
+			}
+
 			require_once ABSPATH . 'wp-admin/includes/file.php';
-			$upload = wp_handle_upload( $_FILES['threaddesk_design_file'], array( 'test_form' => false ) );
+			$upload = wp_handle_upload( $design_file, array( 'test_form' => false ) );
 			if ( ! is_array( $upload ) || isset( $upload['error'] ) ) {
 				if ( function_exists( 'wc_add_notice' ) ) {
 					wc_add_notice( __( 'Design upload failed. Please try again.', 'threaddesk' ), 'error' );
