@@ -73,6 +73,7 @@ class TTA_ThreadDesk {
 		add_action( 'init', array( $this, 'handle_auth_register' ) );
 		add_shortcode( 'threaddesk', array( $this, 'render_shortcode' ) );
 		add_shortcode( 'threaddesk_auth', array( $this, 'render_auth_shortcode' ) );
+		add_shortcode( 'threaddesk_screenprint', array( $this, 'render_screenprint_shortcode' ) );
 	}
 
 	/**
@@ -575,6 +576,10 @@ class TTA_ThreadDesk {
 					<tr>
 						<td><code>[threaddesk_auth]</code></td>
 						<td><?php echo esc_html__( 'Use in your header or account menu to display the login/register modal and account links.', 'threaddesk' ); ?></td>
+					</tr>
+					<tr>
+						<td><code>[threaddesk_screenprint]</code></td>
+						<td><?php echo esc_html__( 'Use on single product pages to let logged-in users apply saved layouts as screenprint previews on the current product images.', 'threaddesk' ); ?></td>
 					</tr>
 				</tbody>
 			</table>
@@ -1655,6 +1660,168 @@ class TTA_ThreadDesk {
 		$this->render->render_section( $section );
 
 		return ob_get_clean();
+	}
+
+
+	public function render_screenprint_shortcode() {
+		if ( ! function_exists( 'is_product' ) || ! is_product() ) {
+			return '';
+		}
+
+		if ( ! is_user_logged_in() ) {
+			return '<p>' . esc_html__( 'Please log in to use saved screenprint layouts.', 'threaddesk' ) . '</p>';
+		}
+
+		$product_id = get_the_ID();
+		$product = function_exists( 'wc_get_product' ) ? wc_get_product( $product_id ) : false;
+		if ( ! $product ) {
+			return '';
+		}
+
+		$user_id = get_current_user_id();
+		$product_term_ids = wp_get_post_terms( $product_id, 'product_cat', array( 'fields' => 'ids' ) );
+		$product_term_slugs = wp_get_post_terms( $product_id, 'product_cat', array( 'fields' => 'slugs' ) );
+		$product_term_ids = is_array( $product_term_ids ) ? array_map( 'absint', $product_term_ids ) : array();
+		$product_term_slugs = is_array( $product_term_slugs ) ? array_map( 'sanitize_key', $product_term_slugs ) : array();
+
+		$layout_posts = get_posts(
+			array(
+				'post_type'      => 'tta_layout',
+				'author'         => $user_id,
+				'posts_per_page' => 100,
+				'post_status'    => array( 'private', 'publish' ),
+			)
+		);
+
+		$layout_items = array();
+		foreach ( $layout_posts as $layout_post ) {
+			$layout_category_id = (int) get_post_meta( $layout_post->ID, 'layout_category_id', true );
+			$layout_category_slug = sanitize_key( (string) get_post_meta( $layout_post->ID, 'layout_category', true ) );
+			$matches_category = false;
+			if ( $layout_category_id > 0 && in_array( $layout_category_id, $product_term_ids, true ) ) {
+				$matches_category = true;
+			}
+			if ( ! $matches_category && '' !== $layout_category_slug && in_array( $layout_category_slug, $product_term_slugs, true ) ) {
+				$matches_category = true;
+			}
+			if ( ! $matches_category ) {
+				continue;
+			}
+
+			$payload_raw = get_post_meta( $layout_post->ID, 'layout_payload', true );
+			$payload = json_decode( (string) $payload_raw, true );
+			$placements = isset( $payload['placementsByAngle'] ) && is_array( $payload['placementsByAngle'] ) ? $payload['placementsByAngle'] : array();
+			if ( empty( $placements ) ) {
+				continue;
+			}
+
+			$layout_items[] = array(
+				'id' => (int) $layout_post->ID,
+				'title' => (string) $layout_post->post_title,
+				'category_id' => $layout_category_id,
+				'category_slug' => $layout_category_slug,
+				'placementsByAngle' => $placements,
+			);
+		}
+
+		$product_images = $this->get_screenprint_product_images( $product );
+		$instance_id = 'threaddesk-screenprint-' . wp_rand( 1000, 99999 );
+
+		wp_enqueue_style( 'threaddesk', THREDDESK_URL . 'assets/css/threaddesk.css', array(), THREDDESK_VERSION );
+		wp_enqueue_script( 'threaddesk', THREDDESK_URL . 'assets/js/threaddesk.js', array( 'jquery' ), THREDDESK_VERSION, true );
+
+		ob_start();
+		?>
+		<div class="threaddesk-screenprint" id="<?php echo esc_attr( $instance_id ); ?>" data-threaddesk-screenprint-layouts="<?php echo esc_attr( wp_json_encode( $layout_items ) ); ?>" data-threaddesk-screenprint-images="<?php echo esc_attr( wp_json_encode( $product_images ) ); ?>">
+			<button type="button" class="button threaddesk-screenprint__open"><?php echo esc_html__( 'Apply Saved Screenprint Layout', 'threaddesk' ); ?></button>
+			<div class="threaddesk-layout-modal" aria-hidden="true">
+				<div class="threaddesk-auth-modal__overlay" data-threaddesk-screenprint-close></div>
+				<div class="threaddesk-auth-modal__panel" role="dialog" aria-modal="true" aria-label="<?php echo esc_attr__( 'Screenprint layout chooser', 'threaddesk' ); ?>">
+					<div class="threaddesk-auth-modal__actions"><button type="button" class="threaddesk-auth-modal__close" data-threaddesk-screenprint-close>&times;</button></div>
+					<div class="threaddesk-layout-modal__content is-active">
+						<h3><?php echo esc_html__( 'Choose one of your saved layouts', 'threaddesk' ); ?></h3>
+						<div class="threaddesk-layout-modal__options" data-threaddesk-screenprint-options></div>
+						<div class="threaddesk-screenprint__viewer" data-threaddesk-screenprint-viewer hidden>
+							<div class="threaddesk-screenprint__angles">
+								<button type="button" class="button" data-threaddesk-screenprint-angle="front"><?php echo esc_html__( 'Front', 'threaddesk' ); ?></button>
+								<button type="button" class="button" data-threaddesk-screenprint-angle="left"><?php echo esc_html__( 'Side', 'threaddesk' ); ?></button>
+								<button type="button" class="button" data-threaddesk-screenprint-angle="back"><?php echo esc_html__( 'Back', 'threaddesk' ); ?></button>
+							</div>
+							<div class="threaddesk-screenprint__stage" data-threaddesk-screenprint-stage>
+								<img src="" alt="" data-threaddesk-screenprint-main />
+								<div class="threaddesk-screenprint__overlay" data-threaddesk-screenprint-overlay></div>
+							</div>
+						</div>
+						<?php if ( empty( $layout_items ) ) : ?>
+							<p class="threaddesk-layout-modal__empty"><?php echo esc_html__( 'No saved layouts match this product categories yet.', 'threaddesk' ); ?></p>
+						<?php endif; ?>
+					</div>
+				</div>
+			</div>
+		</div>
+		<script>
+		(function(){
+			const root=document.getElementById(<?php echo wp_json_encode( $instance_id ); ?>); if(!root){return;}
+			const layouts=JSON.parse(root.getAttribute('data-threaddesk-screenprint-layouts')||'[]');
+			const images=JSON.parse(root.getAttribute('data-threaddesk-screenprint-images')||'{}');
+			const modal=root.querySelector('.threaddesk-layout-modal');
+			const options=root.querySelector('[data-threaddesk-screenprint-options]');
+			const viewer=root.querySelector('[data-threaddesk-screenprint-viewer]');
+			const main=root.querySelector('[data-threaddesk-screenprint-main]');
+			const overlayWrap=root.querySelector('[data-threaddesk-screenprint-overlay]');
+			let selected=null; let angle='front';
+			const openBtn=root.querySelector('.threaddesk-screenprint__open');
+			openBtn&&openBtn.addEventListener('click',()=>{modal.classList.add('is-active');modal.setAttribute('aria-hidden','false');});
+			root.querySelectorAll('[data-threaddesk-screenprint-close]').forEach((el)=>el.addEventListener('click',()=>{modal.classList.remove('is-active');modal.setAttribute('aria-hidden','true');}));
+			const render=()=>{
+				if(!selected){return;}
+				const map=selected.placementsByAngle||{};
+				const entries=Array.isArray(map[angle])?map[angle]:[];
+				main.src=images[angle]||images.front||'';
+				overlayWrap.innerHTML='';
+				entries.forEach((entry)=>{
+					const src=String(entry.sourceUrl||entry.designUrl||entry.previewUrl||entry.preview||'').trim();
+					if(!src){return;}
+					const img=document.createElement('img');
+					img.src=src; img.alt=''; img.setAttribute('aria-hidden','true');
+					img.style.position='absolute'; img.style.top=(Number(entry.top||0)).toFixed(2)+'%'; img.style.left=(Number(entry.left||0)).toFixed(2)+'%'; img.style.width=(Number(entry.width||0)).toFixed(2)+'%';
+					overlayWrap.appendChild(img);
+				});
+			};
+			(layouts||[]).forEach((layout)=>{
+				const btn=document.createElement('button'); btn.type='button'; btn.className='threaddesk-layout-modal__option'; btn.textContent=layout.title||('Layout #'+layout.id);
+				btn.addEventListener('click',()=>{selected=layout; viewer.hidden=false; render();});
+				options.appendChild(btn);
+			});
+			root.querySelectorAll('[data-threaddesk-screenprint-angle]').forEach((btn)=>btn.addEventListener('click',()=>{angle=btn.getAttribute('data-threaddesk-screenprint-angle')||'front'; render();}));
+		})();
+		</script>
+		<?php
+		return ob_get_clean();
+	}
+
+	private function get_screenprint_product_images( $product ) {
+		$product_id = $product && is_callable( array( $product, 'get_id' ) ) ? (int) $product->get_id() : 0;
+		$front_id   = $product_id ? (int) get_post_thumbnail_id( $product_id ) : 0;
+		$front_url  = $front_id ? wp_get_attachment_image_url( $front_id, 'large' ) : '';
+		$gallery_ids = $product && is_callable( array( $product, 'get_gallery_image_ids' ) ) ? (array) $product->get_gallery_image_ids() : array();
+		$side_url   = ! empty( $gallery_ids[0] ) ? wp_get_attachment_image_url( (int) $gallery_ids[0], 'large' ) : '';
+		$back_url   = ! empty( $gallery_ids[1] ) ? wp_get_attachment_image_url( (int) $gallery_ids[1], 'large' ) : '';
+		if ( '' === $front_url ) {
+			$front_url = $side_url ? $side_url : $back_url;
+		}
+		if ( '' === $side_url ) {
+			$side_url = $front_url;
+		}
+		if ( '' === $back_url ) {
+			$back_url = $side_url ? $side_url : $front_url;
+		}
+
+		return array(
+			'front' => (string) $front_url,
+			'left'  => (string) $side_url,
+			'back'  => (string) $back_url,
+		);
 	}
 
 	public function render_auth_shortcode() {

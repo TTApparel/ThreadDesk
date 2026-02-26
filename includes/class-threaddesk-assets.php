@@ -45,6 +45,6 @@ class TTA_ThreadDesk_Assets {
 			return false;
 		}
 
-		return has_shortcode( $post->post_content, 'threaddesk' );
+		return has_shortcode( $post->post_content, 'threaddesk' ) || has_shortcode( $post->post_content, 'threaddesk_screenprint' ) || has_shortcode( $post->post_content, 'threaddesk_auth' );
 	}
 }
