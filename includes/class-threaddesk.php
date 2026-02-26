@@ -766,7 +766,8 @@ class TTA_ThreadDesk {
 
 		check_admin_referer( 'tta_threaddesk_avatar_upload' );
 
-		if ( empty( $_FILES['threaddesk_avatar']['name'] ) ) {
+		$avatar_name = isset( $_FILES['threaddesk_avatar']['name'] ) ? trim( (string) $_FILES['threaddesk_avatar']['name'] ) : '';
+		if ( '' === $avatar_name ) {
 			wp_safe_redirect( wc_get_account_endpoint_url( 'thread-desk' ) );
 			exit;
 		}
@@ -833,7 +834,7 @@ class TTA_ThreadDesk {
 		}
 
 		$user    = get_userdata( $user_id );
-		$login   = $user ? $user->user_login : 'user-' . (string) $user_id;
+		$login   = $user ? (string) $user->user_login : 'user-' . (string) $user_id;
 		$folder  = sanitize_file_name( $login );
 		if ( '' === $folder ) {
 			$folder = 'user-' . (string) $user_id;
@@ -1201,7 +1202,8 @@ class TTA_ThreadDesk {
 		$old_svg_path      = $design_id ? (string) get_post_meta( $design_id, 'design_svg_file_path', true ) : '';
 		$old_mockup_path   = $design_id ? (string) get_post_meta( $design_id, 'design_mockup_file_path', true ) : '';
 
-		if ( ! empty( $_FILES['threaddesk_design_file']['name'] ) ) {
+		$design_upload_name = isset( $_FILES['threaddesk_design_file']['name'] ) ? trim( (string) $_FILES['threaddesk_design_file']['name'] ) : '';
+		if ( '' !== $design_upload_name ) {
 			require_once ABSPATH . 'wp-admin/includes/file.php';
 			$upload = wp_handle_upload( $_FILES['threaddesk_design_file'], array( 'test_form' => false ) );
 			if ( ! is_array( $upload ) || isset( $upload['error'] ) ) {
