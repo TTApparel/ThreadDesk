@@ -170,8 +170,6 @@ class TTA_ThreadDesk {
 		);
 
 
-
-
 		add_submenu_page(
 			'tta-threaddesk',
 			__( 'Users', 'threaddesk' ),
@@ -181,17 +179,7 @@ class TTA_ThreadDesk {
 			array( $this, 'render_admin_users_page' )
 		);
 
-		add_submenu_page(
-			'tta-threaddesk',
-			__( 'User Detail', 'threaddesk' ),
-			__( 'User Detail', 'threaddesk' ),
-			'manage_woocommerce',
-			'tta-threaddesk-user-detail',
-			array( $this, 'render_admin_user_detail_page' )
-		);
-
-		// Register a hidden fallback so direct admin.php?page=tta-threaddesk-user-detail
-		// requests resolve even when the visible submenu entry is removed.
+		// Hidden page used when navigating from the Users table into a specific profile.
 		add_submenu_page(
 			'',
 			__( 'User Detail', 'threaddesk' ),
@@ -211,7 +199,6 @@ class TTA_ThreadDesk {
 		);
 
 		remove_submenu_page( 'tta-threaddesk', 'tta-threaddesk' );
-		remove_submenu_page( 'tta-threaddesk', 'tta-threaddesk-user-detail' );
 		remove_submenu_page( 'woocommerce', 'tta-threaddesk' );
 	}
 
