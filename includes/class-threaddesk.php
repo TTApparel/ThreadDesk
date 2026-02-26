@@ -64,7 +64,6 @@ class TTA_ThreadDesk {
 		add_action( 'admin_post_tta_threaddesk_delete_design', array( $this, 'handle_delete_design' ) );
 		add_action( 'admin_post_tta_threaddesk_rename_layout', array( $this, 'handle_rename_layout' ) );
 		add_action( 'admin_post_tta_threaddesk_delete_layout', array( $this, 'handle_delete_layout' ) );
-		add_action( 'admin_post_tta_threaddesk_admin_save_user', array( $this, 'handle_admin_save_user' ) );
 		add_action( 'user_register', array( $this, 'handle_user_register' ) );
 		add_action( 'init', array( $this, 'handle_auth_login' ) );
 		add_action( 'init', array( $this, 'handle_auth_register' ) );
@@ -203,7 +202,7 @@ class TTA_ThreadDesk {
 
 
 	public function enqueue_admin_assets( $hook ) {
-		if ( 'toplevel_page_tta-threaddesk' !== $hook && false === strpos( (string) $hook, 'tta-threaddesk-settings' ) && false === strpos( (string) $hook, 'tta-threaddesk-user-detail' ) ) {
+		if ( 'toplevel_page_tta-threaddesk' !== $hook && false === strpos( (string) $hook, 'tta-threaddesk-settings' ) ) {
 			return;
 		}
 
