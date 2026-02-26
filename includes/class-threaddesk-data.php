@@ -10,6 +10,8 @@ class TTA_ThreadDesk_Data {
 		$user    = get_user_by( 'id', $user_id );
 
 		$stats = $this->get_order_stats( $user_id );
+		$activity_page = isset( $_GET['td_activity_page'] ) ? absint( wp_unslash( $_GET['td_activity_page'] ) ) : 1;
+		$activity_pagination = $this->get_recent_activity_page( $user_id, 10, $activity_page );
 
 		$data = array(
 			'user'              => $user,
@@ -22,7 +24,8 @@ class TTA_ThreadDesk_Data {
 			'design_count'      => $this->get_post_count( 'tta_design', $user_id ),
 			'layout_count'      => $this->get_post_count( 'tta_layout', $user_id ),
 			'quotes_count'      => $this->get_post_count( 'tta_quote', $user_id ),
-			'recent_activity'   => $this->get_recent_activity( $user_id ),
+			'recent_activity'   => isset( $activity_pagination['entries'] ) ? $activity_pagination['entries'] : array(),
+			'recent_activity_pagination' => $activity_pagination,
 			'quotes'            => $this->get_user_quotes( $user_id ),
 			'designs'           => $this->get_user_designs( $user_id ),
 			'layouts'           => $this->get_user_layouts( $user_id ),
@@ -142,37 +145,136 @@ class TTA_ThreadDesk_Data {
 		);
 	}
 
-	public function get_recent_activity( $user_id ) {
-		$activity = array();
+
+	public static function append_user_activity( $user_id, $label, $context = '' ) {
+		$user_id = absint( $user_id );
+		$label   = sanitize_text_field( (string) $label );
+		$context = sanitize_key( (string) $context );
+		if ( $user_id <= 0 || '' === $label ) {
+			return;
+		}
+
+		$events = get_user_meta( $user_id, 'tta_threaddesk_activity_log', true );
+		$events = is_array( $events ) ? $events : array();
+		$events[] = array(
+			'label'     => $label,
+			'context'   => $context,
+			'timestamp' => current_time( 'timestamp' ),
+			'date'      => current_time( get_option( 'date_format' ) ),
+		);
+
+		if ( count( $events ) > 250 ) {
+			$events = array_slice( $events, -250 );
+		}
+
+		update_user_meta( $user_id, 'tta_threaddesk_activity_log', $events );
+	}
+
+	public function get_stored_user_activity( $user_id, $limit = 25 ) {
+		$events = get_user_meta( $user_id, 'tta_threaddesk_activity_log', true );
+		$events = is_array( $events ) ? $events : array();
+		$normalized = array();
+
+		foreach ( $events as $event ) {
+			if ( ! is_array( $event ) ) {
+				continue;
+			}
+			$label = isset( $event['label'] ) ? sanitize_text_field( (string) $event['label'] ) : '';
+			if ( '' === $label ) {
+				continue;
+			}
+			$timestamp = isset( $event['timestamp'] ) ? (int) $event['timestamp'] : 0;
+			if ( $timestamp <= 0 ) {
+				$date_raw = isset( $event['date'] ) ? (string) $event['date'] : '';
+				$timestamp = $date_raw ? strtotime( $date_raw ) : 0;
+			}
+			$date = $timestamp > 0 ? wp_date( get_option( 'date_format' ), $timestamp ) : current_time( get_option( 'date_format' ) );
+			$normalized[] = array(
+				'label'     => $label,
+				'date'      => $date,
+				'timestamp' => $timestamp,
+				'context'   => isset( $event['context'] ) ? sanitize_key( (string) $event['context'] ) : '',
+			);
+		}
+
+		usort(
+			$normalized,
+			function ( $a, $b ) {
+				return (int) $b['timestamp'] - (int) $a['timestamp'];
+			}
+		);
+
+		if ( $limit > 0 ) {
+			$normalized = array_slice( $normalized, 0, absint( $limit ) );
+		}
+
+		return $normalized;
+	}
+
+
+	public function get_recent_activity( $user_id, $limit = 6 ) {
+		$activity = $this->get_stored_user_activity( $user_id, 0 );
 		$orders   = $this->get_user_orders( $user_id );
 		$quotes   = $this->get_user_quotes( $user_id );
 
 		foreach ( $orders as $order ) {
+			$created_date = $order->get_date_created();
+			$created_ts   = $created_date ? $created_date->getTimestamp() : current_time( 'timestamp' );
 			$activity[] = array(
-				'label' => sprintf( __( '#%1$s Order placed', 'threaddesk' ), $order->get_order_number() ),
-				'date'  => $order->get_date_created()->date_i18n( get_option( 'date_format' ) ),
+				'label'     => sprintf( __( '#%1$s Order placed', 'threaddesk' ), $order->get_order_number() ),
+				'date'      => wp_date( get_option( 'date_format' ), $created_ts ),
+				'timestamp' => $created_ts,
 			);
+
+			$paid_date = $order->get_date_paid();
+			$paid_ts   = $paid_date ? $paid_date->getTimestamp() : $created_ts;
 			$activity[] = array(
-				'label' => sprintf( __( '#%1$s Payment made', 'threaddesk' ), $order->get_order_number() ),
-				'date'  => $order->get_date_paid() ? $order->get_date_paid()->date_i18n( get_option( 'date_format' ) ) : $order->get_date_created()->date_i18n( get_option( 'date_format' ) ),
+				'label'     => sprintf( __( '#%1$s Payment made', 'threaddesk' ), $order->get_order_number() ),
+				'date'      => wp_date( get_option( 'date_format' ), $paid_ts ),
+				'timestamp' => $paid_ts,
 			);
 		}
 
 		foreach ( $quotes as $quote ) {
+			$quote_ts = get_post_time( 'U', true, $quote );
 			$activity[] = array(
-				'label' => sprintf( __( 'Quote created: %s', 'threaddesk' ), $quote->post_title ),
-				'date'  => get_the_date( get_option( 'date_format' ), $quote ),
+				'label'     => sprintf( __( 'Quote created: %s', 'threaddesk' ), $quote->post_title ),
+				'date'      => wp_date( get_option( 'date_format' ), $quote_ts ? $quote_ts : current_time( 'timestamp' ) ),
+				'timestamp' => $quote_ts ? $quote_ts : current_time( 'timestamp' ),
 			);
 		}
 
 		usort(
 			$activity,
 			function ( $a, $b ) {
-				return strtotime( $b['date'] ) - strtotime( $a['date'] );
+				return (int) ( isset( $b['timestamp'] ) ? $b['timestamp'] : 0 ) - (int) ( isset( $a['timestamp'] ) ? $a['timestamp'] : 0 );
 			}
 		);
 
-		return array_slice( $activity, 0, 6 );
+		if ( $limit > 0 ) {
+			$activity = array_slice( $activity, 0, absint( $limit ) );
+		}
+
+		return $activity;
+	}
+
+
+	public function get_recent_activity_page( $user_id, $per_page = 10, $page = 1 ) {
+		$per_page = max( 1, absint( $per_page ) );
+		$page     = max( 1, absint( $page ) );
+		$all      = $this->get_recent_activity( $user_id, 0 );
+		$total    = count( $all );
+		$pages    = max( 1, (int) ceil( $total / $per_page ) );
+		$page     = min( $page, $pages );
+		$offset   = ( $page - 1 ) * $per_page;
+
+		return array(
+			'entries'     => array_slice( $all, $offset, $per_page ),
+			'page'        => $page,
+			'per_page'    => $per_page,
+			'total'       => $total,
+			'total_pages' => $pages,
+		);
 	}
 
 	public function get_account_links() {

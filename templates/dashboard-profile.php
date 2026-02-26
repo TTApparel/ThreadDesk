@@ -104,6 +104,11 @@ $format_price = function ( $amount ) use ( $currency ) {
 
 	return esc_html( number_format_i18n( (float) $amount, 2 ) . ' ' . $currency );
 };
+
+$recent_activity_pagination = isset( $context['recent_activity_pagination'] ) && is_array( $context['recent_activity_pagination'] ) ? $context['recent_activity_pagination'] : array();
+$activity_current_page      = isset( $recent_activity_pagination['page'] ) ? max( 1, (int) $recent_activity_pagination['page'] ) : 1;
+$activity_total_pages       = isset( $recent_activity_pagination['total_pages'] ) ? max( 1, (int) $recent_activity_pagination['total_pages'] ) : 1;
+$activity_base_url          = add_query_arg( 'td_section', 'profile', $nav_base );
 ?>
 <div class="threaddesk">
 	<div class="threaddesk__sidebar">
@@ -150,16 +155,16 @@ $format_price = function ( $amount ) use ( $currency ) {
 						<strong><?php echo esc_html( ! empty( $stats['last_order'] ) ? $stats['last_order'] : __( 'No orders yet', 'threaddesk' ) ); ?></strong>
 					</div>
 					<div class="threaddesk__stat">
-						<span><?php echo esc_html__( 'Average Order', 'threaddesk' ); ?></span>
+						<span><?php echo esc_html__( 'Average', 'threaddesk' ); ?></span>
 						<strong><?php echo wp_kses_post( $format_price( isset( $stats['avg_order'] ) ? $stats['avg_order'] : 0 ) ); ?></strong>
 						<small><?php echo esc_html( sprintf( __( '%d orders', 'threaddesk' ), isset( $stats['order_count'] ) ? $stats['order_count'] : 0 ) ); ?></small>
 					</div>
 					<div class="threaddesk__stat">
-						<span><?php echo esc_html__( 'Lifetime Spend', 'threaddesk' ); ?></span>
+						<span><?php echo esc_html__( 'Lifetime', 'threaddesk' ); ?></span>
 						<strong><?php echo wp_kses_post( $format_price( isset( $stats['lifetime'] ) ? $stats['lifetime'] : 0 ) ); ?></strong>
 					</div>
 					<div class="threaddesk__stat">
-						<span><?php echo esc_html__( 'Outstanding Balance', 'threaddesk' ); ?></span>
+						<span><?php echo esc_html__( 'Outstanding', 'threaddesk' ); ?></span>
 						<strong><?php echo wp_kses_post( $format_price( isset( $context['outstanding_total'] ) ? $context['outstanding_total'] : 0 ) ); ?></strong>
 						<small class="threaddesk__stat-note"><?php echo esc_html__( 'All Paid Up', 'threaddesk' ); ?></small>
 					</div>
@@ -167,15 +172,15 @@ $format_price = function ( $amount ) use ( $currency ) {
 
 				<div class="threaddesk__secondary-stats">
 					<div>
-						<span><?php echo esc_html__( 'Number of Designs', 'threaddesk' ); ?></span>
+						<span><?php echo esc_html__( 'Designs', 'threaddesk' ); ?></span>
 						<strong><?php echo esc_html( (int) $context['design_count'] ); ?></strong>
 					</div>
 					<div>
-						<span><?php echo esc_html__( 'Saved Layouts', 'threaddesk' ); ?></span>
+						<span><?php echo esc_html__( 'Layouts', 'threaddesk' ); ?></span>
 						<strong><?php echo esc_html( (int) $context['layout_count'] ); ?></strong>
 					</div>
 					<div>
-						<span><?php echo esc_html__( 'Artwork Approvals', 'threaddesk' ); ?></span>
+						<span><?php echo esc_html__( 'Approvals', 'threaddesk' ); ?></span>
 						<strong><?php echo esc_html__( '0', 'threaddesk' ); ?></strong>
 						<small><?php echo esc_html__( '0 unapproved', 'threaddesk' ); ?></small>
 					</div>
@@ -208,6 +213,17 @@ $format_price = function ( $amount ) use ( $currency ) {
 						<?php endif; ?>
 					</tbody>
 				</table>
+				<?php if ( $activity_total_pages > 1 ) : ?>
+					<div class="threaddesk__pagination" style="margin:12px 0;display:flex;gap:10px;align-items:center;">
+						<?php if ( $activity_current_page > 1 ) : ?>
+							<a class="button" href="<?php echo esc_url( add_query_arg( 'td_activity_page', $activity_current_page - 1, $activity_base_url ) ); ?>"><?php echo esc_html__( 'Previous', 'threaddesk' ); ?></a>
+						<?php endif; ?>
+						<span><?php echo esc_html( sprintf( __( 'Page %1$d of %2$d', 'threaddesk' ), $activity_current_page, $activity_total_pages ) ); ?></span>
+						<?php if ( $activity_current_page < $activity_total_pages ) : ?>
+							<a class="button" href="<?php echo esc_url( add_query_arg( 'td_activity_page', $activity_current_page + 1, $activity_base_url ) ); ?>"><?php echo esc_html__( 'Next', 'threaddesk' ); ?></a>
+						<?php endif; ?>
+					</div>
+				<?php endif; ?>
 			</div>
 			<div class="threaddesk__aside">
 					<div class="threaddesk__card">
