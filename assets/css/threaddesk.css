@@ -1895,3 +1895,45 @@ body.threaddesk-modal-open {
 		flex-wrap: wrap;
 	}
 }
+
+.threaddesk-layout-modal__options {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+	gap: 10px;
+	margin-bottom: 14px;
+}
+
+.threaddesk-screenprint__viewer {
+	margin-top: 10px;
+}
+
+.threaddesk-screenprint__angles {
+	display: flex;
+	gap: 8px;
+	margin-bottom: 10px;
+}
+
+.threaddesk-screenprint__stage {
+	position: relative;
+	max-width: 540px;
+	width: 100%;
+}
+
+.threaddesk-screenprint__stage > img {
+	width: 100%;
+	height: auto;
+	display: block;
+	border-radius: 8px;
+	border: 1px solid #ddd;
+}
+
+.threaddesk-screenprint__overlay {
+	position: absolute;
+	inset: 0;
+	pointer-events: none;
+}
+
+.threaddesk-screenprint__overlay img {
+	position: absolute;
+	height: auto;
+}
