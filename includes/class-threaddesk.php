@@ -2149,7 +2149,7 @@ class TTA_ThreadDesk {
 		echo '<tr><th><label for="tta_td_user_email">' . esc_html__( 'Email', 'threaddesk' ) . '</label></th><td><input name="user_email" id="tta_td_user_email" type="email" class="regular-text" value="' . esc_attr( (string) $user->user_email ) . '" /></td></tr>';
 		echo '<tr><th><label for="tta_td_user_login">' . esc_html__( 'Username', 'threaddesk' ) . '</label></th><td><input id="tta_td_user_login" type="text" class="regular-text" value="' . esc_attr( (string) $user->user_login ) . '" readonly /></td></tr>';
 		echo '<tr><th><label for="tta_td_company">' . esc_html__( 'Company', 'threaddesk' ) . '</label></th><td><input name="company" id="tta_td_company" type="text" class="regular-text" value="' . esc_attr( $company ) . '" /></td></tr>';
-		echo '<tr><th><label for="tta_td_avatar_id">' . esc_html__( 'Profile Photo', 'threaddesk' ) . '</label></th><td>';
+		echo '<tr><th><label for="tta_td_avatar_select">' . esc_html__( 'Profile Photo', 'threaddesk' ) . '</label></th><td>';
 		echo '<input name="avatar_id" id="tta_td_avatar_id" type="hidden" value="' . esc_attr( (string) $avatar_id ) . '" />';
 		echo '<button type="button" class="button" id="tta_td_avatar_select">' . esc_html__( 'Select / Change Photo', 'threaddesk' ) . '</button> ';
 		echo '<button type="button" class="button-link" id="tta_td_avatar_remove">' . esc_html__( 'Remove', 'threaddesk' ) . '</button>';
