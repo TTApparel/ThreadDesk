@@ -193,7 +193,7 @@ class TTA_ThreadDesk {
 		// Register a hidden fallback so direct admin.php?page=tta-threaddesk-user-detail
 		// requests resolve even when the visible submenu entry is removed.
 		add_submenu_page(
-			'',
+			null,
 			__( 'User Detail', 'threaddesk' ),
 			__( 'User Detail', 'threaddesk' ),
 			'manage_woocommerce',
