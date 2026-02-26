@@ -178,8 +178,9 @@ class TTA_ThreadDesk {
 			array( $this, 'render_admin_users_page' )
 		);
 
+		// Hidden page used when navigating from the Users table into a specific profile.
 		add_submenu_page(
-			'tta-threaddesk',
+			'',
 			__( 'User Detail', 'threaddesk' ),
 			__( 'User Detail', 'threaddesk' ),
 			'manage_woocommerce',
