@@ -207,7 +207,7 @@ class TTA_ThreadDesk {
 
 
 	public function enqueue_admin_assets( $hook ) {
-		if ( 'toplevel_page_tta-threaddesk' !== $hook && false === strpos( (string) $hook, 'tta-threaddesk-settings' ) && false === strpos( (string) $hook, 'tta-threaddesk-user-detail' ) ) {
+		if ( 'toplevel_page_tta-threaddesk' !== $hook && false === strpos( (string) $hook, 'tta-threaddesk-settings' ) ) {
 			return;
 		}
 
