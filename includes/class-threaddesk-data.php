@@ -10,6 +10,8 @@ class TTA_ThreadDesk_Data {
 		$user    = get_user_by( 'id', $user_id );
 
 		$stats = $this->get_order_stats( $user_id );
+		$activity_page = isset( $_GET['td_activity_page'] ) ? absint( wp_unslash( $_GET['td_activity_page'] ) ) : 1;
+		$activity_pagination = $this->get_recent_activity_page( $user_id, 10, $activity_page );
 
 		$data = array(
 			'user'              => $user,
@@ -22,7 +24,8 @@ class TTA_ThreadDesk_Data {
 			'design_count'      => $this->get_post_count( 'tta_design', $user_id ),
 			'layout_count'      => $this->get_post_count( 'tta_layout', $user_id ),
 			'quotes_count'      => $this->get_post_count( 'tta_quote', $user_id ),
-			'recent_activity'   => $this->get_recent_activity( $user_id ),
+			'recent_activity'   => isset( $activity_pagination['entries'] ) ? $activity_pagination['entries'] : array(),
+			'recent_activity_pagination' => $activity_pagination,
 			'quotes'            => $this->get_user_quotes( $user_id ),
 			'designs'           => $this->get_user_designs( $user_id ),
 			'layouts'           => $this->get_user_layouts( $user_id ),
@@ -253,6 +256,25 @@ class TTA_ThreadDesk_Data {
 		}
 
 		return $activity;
+	}
+
+
+	public function get_recent_activity_page( $user_id, $per_page = 10, $page = 1 ) {
+		$per_page = max( 1, absint( $per_page ) );
+		$page     = max( 1, absint( $page ) );
+		$all      = $this->get_recent_activity( $user_id, 0 );
+		$total    = count( $all );
+		$pages    = max( 1, (int) ceil( $total / $per_page ) );
+		$page     = min( $page, $pages );
+		$offset   = ( $page - 1 ) * $per_page;
+
+		return array(
+			'entries'     => array_slice( $all, $offset, $per_page ),
+			'page'        => $page,
+			'per_page'    => $per_page,
+			'total'       => $total,
+			'total_pages' => $pages,
+		);
 	}
 
 	public function get_account_links() {

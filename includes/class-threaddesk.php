@@ -66,6 +66,8 @@ class TTA_ThreadDesk {
 		add_action( 'admin_post_tta_threaddesk_delete_design', array( $this, 'handle_delete_design' ) );
 		add_action( 'admin_post_tta_threaddesk_rename_layout', array( $this, 'handle_rename_layout' ) );
 		add_action( 'admin_post_tta_threaddesk_delete_layout', array( $this, 'handle_delete_layout' ) );
+		add_action( 'admin_post_tta_threaddesk_admin_save_user', array( $this, 'handle_admin_save_user' ) );
+		add_action( 'admin_post_tta_threaddesk_export_activity_csv', array( $this, 'handle_admin_export_activity_csv' ) );
 		add_action( 'user_register', array( $this, 'handle_user_register' ) );
 		add_action( 'init', array( $this, 'handle_auth_login' ) );
 		add_action( 'init', array( $this, 'handle_auth_register' ) );
@@ -2119,8 +2121,21 @@ class TTA_ThreadDesk {
 		echo '<tr><td><a href="' . esc_url( add_query_arg( 'td_user_section', 'orders', $base_detail_url ) ) . '">' . esc_html__( 'Orders', 'threaddesk' ) . '</a>: ' . esc_html( (string) $order_count ) . '</td><td>' . esc_html__( 'Lifetime Value', 'threaddesk' ) . ': ' . esc_html( function_exists( 'wc_price' ) ? wp_strip_all_tags( wc_price( isset( $stats['lifetime'] ) ? (float) $stats['lifetime'] : 0 ) ) : number_format_i18n( isset( $stats['lifetime'] ) ? (float) $stats['lifetime'] : 0, 2 ) ) . '</td></tr>';
 		echo '</tbody></table>';
 
-		$recent_events = $this->data->get_recent_activity( $user_id, 25 );
+		$activity_page = isset( $_GET['td_activity_page'] ) ? absint( wp_unslash( $_GET['td_activity_page'] ) ) : 1;
+		$activity_data = $this->data->get_recent_activity_page( $user_id, 10, $activity_page );
+		$recent_events = isset( $activity_data['entries'] ) ? $activity_data['entries'] : array();
 		echo '<h2>' . esc_html__( 'Recent Activity', 'threaddesk' ) . '</h2>';
+		$export_url = wp_nonce_url(
+			add_query_arg(
+				array(
+					'action'  => 'tta_threaddesk_export_activity_csv',
+					'user_id' => $user_id,
+				),
+				admin_url( 'admin-post.php' )
+			),
+			'tta_threaddesk_export_activity_csv_' . $user_id
+		);
+		echo '<p><a class="button" href="' . esc_url( $export_url ) . '">' . esc_html__( 'Export Activity CSV', 'threaddesk' ) . '</a></p>';
 		if ( empty( $recent_events ) ) {
 			echo '<p>' . esc_html__( 'No recent activity logged.', 'threaddesk' ) . '</p>';
 		} else {
@@ -2131,6 +2146,21 @@ class TTA_ThreadDesk {
 				echo '<tr><td>' . esc_html( $event_date ) . '</td><td>' . esc_html( $event_label ) . '</td></tr>';
 			}
 			echo '</tbody></table>';
+			$total_pages = isset( $activity_data['total_pages'] ) ? (int) $activity_data['total_pages'] : 1;
+			$current_page = isset( $activity_data['page'] ) ? (int) $activity_data['page'] : 1;
+			if ( $total_pages > 1 ) {
+				echo '<p>';
+				if ( $current_page > 1 ) {
+					$prev_url = add_query_arg( 'td_activity_page', $current_page - 1, $base_detail_url );
+					echo '<a class="button" href="' . esc_url( $prev_url ) . '">' . esc_html__( 'Previous', 'threaddesk' ) . '</a> ';
+				}
+				echo '<span>' . esc_html( sprintf( __( 'Page %1$d of %2$d', 'threaddesk' ), $current_page, $total_pages ) ) . '</span>';
+				if ( $current_page < $total_pages ) {
+					$next_url = add_query_arg( 'td_activity_page', $current_page + 1, $base_detail_url );
+					echo ' <a class="button" href="' . esc_url( $next_url ) . '">' . esc_html__( 'Next', 'threaddesk' ) . '</a>';
+				}
+				echo '</p>';
+			}
 		}
 
 		if ( in_array( $active_section, array( 'designs', 'layouts', 'quotes', 'orders' ), true ) ) {
@@ -2365,6 +2395,44 @@ class TTA_ThreadDesk {
 				admin_url( 'admin.php' )
 			)
 		);
+		exit;
+	}
+
+
+	public function handle_admin_export_activity_csv() {
+		if ( ! current_user_can( 'manage_woocommerce' ) ) {
+			wp_die( esc_html__( 'Unauthorized.', 'threaddesk' ) );
+		}
+
+		$user_id = isset( $_GET['user_id'] ) ? absint( wp_unslash( $_GET['user_id'] ) ) : 0;
+		if ( $user_id <= 0 ) {
+			wp_die( esc_html__( 'User not found.', 'threaddesk' ) );
+		}
+
+		$nonce = isset( $_GET['_wpnonce'] ) ? sanitize_text_field( wp_unslash( $_GET['_wpnonce'] ) ) : '';
+		if ( ! wp_verify_nonce( $nonce, 'tta_threaddesk_export_activity_csv_' . $user_id ) ) {
+			wp_die( esc_html__( 'Security check failed.', 'threaddesk' ) );
+		}
+
+		$events = $this->data->get_recent_activity( $user_id, 0 );
+		nocache_headers();
+		header( 'Content-Type: text/csv; charset=utf-8' );
+		header( 'Content-Disposition: attachment; filename="threaddesk-activity-user-' . $user_id . '.csv"' );
+
+		$output = fopen( 'php://output', 'w' );
+		if ( false === $output ) {
+			exit;
+		}
+
+		fputcsv( $output, array( 'Date', 'Event', 'Context' ) );
+		foreach ( $events as $event ) {
+			$date    = isset( $event['date'] ) ? (string) $event['date'] : '';
+			$label   = isset( $event['label'] ) ? (string) $event['label'] : '';
+			$context = isset( $event['context'] ) ? (string) $event['context'] : '';
+			fputcsv( $output, array( $date, $label, $context ) );
+		}
+
+		fclose( $output );
 		exit;
 	}
 
