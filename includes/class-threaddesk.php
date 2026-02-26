@@ -34,7 +34,7 @@ class TTA_ThreadDesk {
 		add_action( 'init', array( $this, 'load_textdomain' ) );
 		add_action( 'admin_menu', array( $this, 'register_settings_page' ) );
 		add_action( 'admin_init', array( $this, 'register_settings' ) );
-		add_action( 'admin_enqueue_scripts', array( $this, 'enqueue_admin_assets' ) );
+		add_action( 'admin_enqueue_scripts', array( $this, 'enqueue_admin_assets' ), 1 );
 		add_action( 'add_meta_boxes', array( $this, 'register_admin_meta_boxes' ) );
 		add_action( 'save_post', array( $this, 'maybe_assign_internal_reference' ), 10, 3 );
 		add_filter( 'manage_edit-tta_quote_columns', array( $this, 'filter_quote_admin_columns' ) );
@@ -217,11 +217,13 @@ class TTA_ThreadDesk {
 			return;
 		}
 
-		if ( wp_script_is( 'wp-auth-check', 'registered' ) && ! wp_script_is( 'heartbeat', 'registered' ) ) {
-			$suffix = ( defined( 'SCRIPT_DEBUG' ) && SCRIPT_DEBUG ) ? '' : '.min';
-			wp_register_script( 'heartbeat', includes_url( 'js/heartbeat' . $suffix . '.js' ), array( 'jquery', 'wp-hooks' ), false, true );
+		if ( ! wp_script_is( 'heartbeat', 'registered' ) ) {
+			$scripts = wp_scripts();
+			if ( $scripts instanceof WP_Scripts ) {
+				$suffix = ( defined( 'SCRIPT_DEBUG' ) && SCRIPT_DEBUG ) ? '' : '.min';
+				$scripts->add( 'heartbeat', includes_url( 'js/heartbeat' . $suffix . '.js' ), array( 'jquery', 'wp-hooks' ), false, 1 );
+			}
 		}
-
 		if ( wp_script_is( 'heartbeat', 'registered' ) ) {
 			wp_enqueue_script( 'heartbeat' );
 		}
@@ -754,7 +756,16 @@ class TTA_ThreadDesk {
 
 		$upload = wp_handle_upload( $_FILES['threaddesk_avatar'], array( 'test_form' => false ) );
 
-		if ( isset( $upload['error'] ) ) {
+		if ( ! is_array( $upload ) || isset( $upload['error'] ) ) {
+			if ( function_exists( 'wc_add_notice' ) ) {
+				wc_add_notice( __( 'Avatar upload failed.', 'threaddesk' ), 'error' );
+			}
+			wp_safe_redirect( wc_get_account_endpoint_url( 'thread-desk' ) );
+			exit;
+		}
+
+		$uploaded_file_path = isset( $upload['file'] ) ? trim( (string) $upload['file'] ) : '';
+		if ( '' === $uploaded_file_path ) {
 			if ( function_exists( 'wc_add_notice' ) ) {
 				wc_add_notice( __( 'Avatar upload failed.', 'threaddesk' ), 'error' );
 			}
@@ -764,16 +775,16 @@ class TTA_ThreadDesk {
 
 		$attachment_id = wp_insert_attachment(
 			array(
-				'post_mime_type' => $upload['type'],
-				'post_title'     => sanitize_file_name( wp_basename( $upload['file'] ) ),
+				'post_mime_type' => isset( $upload['type'] ) ? (string) $upload['type'] : '',
+				'post_title'     => sanitize_file_name( wp_basename( $uploaded_file_path ) ),
 				'post_content'   => '',
 				'post_status'    => 'inherit',
 			),
-			$upload['file']
+			$uploaded_file_path
 		);
 
 		if ( $attachment_id ) {
-			$metadata = wp_generate_attachment_metadata( $attachment_id, $upload['file'] );
+			$metadata = wp_generate_attachment_metadata( $attachment_id, $uploaded_file_path );
 			wp_update_attachment_metadata( $attachment_id, $metadata );
 			update_user_meta( get_current_user_id(), 'tta_threaddesk_avatar_id', $attachment_id );
 		}
@@ -1164,7 +1175,6 @@ class TTA_ThreadDesk {
 				$design_id = $existing_design_id;
 				$file_name = (string) get_post_meta( $design_id, 'design_file_name', true );
 			}
-			update_post_meta( $layout_id, 'layout_status', 'pending' );
 		}
 
 		$old_original_path = $design_id ? (string) get_post_meta( $design_id, 'design_original_file_path', true ) : '';
@@ -1174,14 +1184,24 @@ class TTA_ThreadDesk {
 		if ( ! empty( $_FILES['threaddesk_design_file']['name'] ) ) {
 			require_once ABSPATH . 'wp-admin/includes/file.php';
 			$upload = wp_handle_upload( $_FILES['threaddesk_design_file'], array( 'test_form' => false ) );
-			if ( isset( $upload['error'] ) ) {
+			if ( ! is_array( $upload ) || isset( $upload['error'] ) ) {
 				if ( function_exists( 'wc_add_notice' ) ) {
 					wc_add_notice( __( 'Design upload failed. Please try again.', 'threaddesk' ), 'error' );
 				}
 				wp_safe_redirect( $redirect_url );
 				exit;
 			}
-			$file_name = sanitize_file_name( wp_basename( $upload['file'] ) );
+
+			$uploaded_file_path = isset( $upload['file'] ) ? trim( (string) $upload['file'] ) : '';
+			if ( '' === $uploaded_file_path ) {
+				if ( function_exists( 'wc_add_notice' ) ) {
+					wc_add_notice( __( 'Design upload failed. Please try again.', 'threaddesk' ), 'error' );
+				}
+				wp_safe_redirect( $redirect_url );
+				exit;
+			}
+
+			$file_name = sanitize_file_name( wp_basename( $uploaded_file_path ) );
 		}
 
 		if ( 0 === $design_id ) {
@@ -1257,19 +1277,20 @@ class TTA_ThreadDesk {
 		$color_count = isset( $_POST['threaddesk_design_color_count'] ) ? absint( $_POST['threaddesk_design_color_count'] ) : count( $palette );
 		$svg_markup  = isset( $_POST['threaddesk_design_svg_markup'] ) ? wp_unslash( $_POST['threaddesk_design_svg_markup'] ) : '';
 		$mockup_png_data = isset( $_POST['threaddesk_design_mockup_png_data'] ) ? wp_unslash( $_POST['threaddesk_design_mockup_png_data'] ) : '';
-		if ( $upload && isset( $upload['file'] ) ) {
-			$incoming_name      = sanitize_file_name( wp_basename( $upload['file'] ) );
+		if ( $upload && isset( $upload['file'] ) && '' !== trim( (string) $upload['file'] ) ) {
+			$incoming_file_path = trim( (string) $upload['file'] );
+			$incoming_name      = sanitize_file_name( wp_basename( $incoming_file_path ) );
 			$incoming_extension = strtolower( pathinfo( $incoming_name, PATHINFO_EXTENSION ) );
 			$target_seed_name   = $incoming_name;
 			$target_name        = wp_unique_filename( $storage['dir'], $target_seed_name );
 			$target_path        = trailingslashit( $storage['dir'] ) . $target_name;
 			$target_url         = trailingslashit( $storage['url'] ) . rawurlencode( $target_name );
-			$move_succeeded     = @rename( $upload['file'], $target_path );
+			$move_succeeded     = @rename( $incoming_file_path, $target_path );
 
 			if ( ! $move_succeeded ) {
-				$move_succeeded = @copy( $upload['file'], $target_path );
+				$move_succeeded = @copy( $incoming_file_path, $target_path );
 				if ( $move_succeeded ) {
-					@unlink( $upload['file'] );
+					@unlink( $incoming_file_path );
 				}
 			}
 
@@ -2633,7 +2654,8 @@ class TTA_ThreadDesk {
 	}
 
 	private function get_image_dimensions_from_url( $url ) {
-		if ( ! $url ) { return __( 'Unknown', 'threaddesk' ); }
+		$url = is_string( $url ) ? trim( $url ) : '';
+		if ( '' === $url ) { return __( 'Unknown', 'threaddesk' ); }
 		$uploads = wp_upload_dir();
 		$baseurl = isset( $uploads['baseurl'] ) ? (string) $uploads['baseurl'] : '';
 		$basedir = isset( $uploads['basedir'] ) ? (string) $uploads['basedir'] : '';
