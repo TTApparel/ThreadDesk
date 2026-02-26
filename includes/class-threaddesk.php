@@ -210,13 +210,6 @@ class TTA_ThreadDesk {
 			return;
 		}
 
-		if ( ! wp_script_is( 'heartbeat', 'registered' ) ) {
-			$scripts = wp_scripts();
-			if ( $scripts instanceof WP_Scripts ) {
-				$suffix = ( defined( 'SCRIPT_DEBUG' ) && SCRIPT_DEBUG ) ? '' : '.min';
-				$scripts->add( 'heartbeat', includes_url( 'js/heartbeat' . $suffix . '.js' ), array( 'jquery', 'wp-hooks' ), false, 1 );
-			}
-		}
 		if ( wp_script_is( 'heartbeat', 'registered' ) ) {
 			wp_enqueue_script( 'heartbeat' );
 		}
