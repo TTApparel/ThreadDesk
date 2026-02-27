@@ -1917,10 +1917,20 @@ body.threaddesk-modal-open {
 }
 
 .threaddesk-screenprint .threaddesk-layout-modal__options {
-	display: flex;
-	flex-wrap: wrap;
-	align-items: flex-start;
+	display: grid;
+	grid-template-columns: minmax(0, 260px);
+	justify-content: center;
+	justify-items: center;
 	gap: 14px;
+	margin: 0 auto 14px;
+	width: 100%;
+}
+
+@media (min-width: 980px) {
+	.threaddesk-screenprint .threaddesk-layout-modal__options {
+		grid-template-columns: repeat(3, minmax(0, 260px));
+		max-width: 808px;
+	}
 }
 
 .threaddesk-screenprint-option {
@@ -1928,8 +1938,8 @@ body.threaddesk-modal-open {
 	border: 1px solid transparent;
 	cursor: pointer;
 	text-align: left;
-	width: fit-content;
-	max-width: 100%;
+	width: 100%;
+	max-width: 260px;
 	margin: 0;
 	transition: border-color .15s ease;
 }

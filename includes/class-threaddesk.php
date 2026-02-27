@@ -1895,7 +1895,7 @@ class TTA_ThreadDesk {
 				<div class="threaddesk-auth-modal__panel" role="dialog" aria-modal="true" aria-label="<?php echo esc_attr__( 'Screenprint layout chooser', 'threaddesk' ); ?>">
 					<div class="threaddesk-auth-modal__actions"><button type="button" class="threaddesk-auth-modal__close" data-threaddesk-screenprint-close>&times;</button></div>
 					<div class="threaddesk-layout-modal__content is-active" data-threaddesk-screenprint-step="chooser" aria-hidden="false">
-						<h3><?php echo esc_html__( 'Choose one of your saved layouts', 'threaddesk' ); ?></h3>
+						<h3><?php echo esc_html__( 'Choose from your saved layouts', 'threaddesk' ); ?></h3>
 						<div class="threaddesk-layout-modal__options" data-threaddesk-screenprint-options></div>
 						<?php if ( empty( $layout_items ) ) : ?>
 							<p class="threaddesk-layout-modal__empty"><?php echo esc_html__( 'No saved layouts match this product categories yet.', 'threaddesk' ); ?></p>
