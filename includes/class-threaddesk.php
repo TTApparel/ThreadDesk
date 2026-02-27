@@ -1875,6 +1875,7 @@ class TTA_ThreadDesk {
 		$create_layout_url = $this->get_layouts_redirect_url(
 			array(
 				'td_layout_return' => '1',
+				'td_layout_step' => 'placements',
 				'td_layout_category' => $default_category_slug,
 			)
 		);

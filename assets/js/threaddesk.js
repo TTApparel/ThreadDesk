@@ -1091,6 +1091,7 @@ jQuery(function ($) {
 				if (matchedCategory.length) { categoryButton = matchedCategory; }
 			}
 			categoryButton.trigger('click');
+			const desiredStep = String(params.get('td_layout_step') || '').trim().toLowerCase();
 			const desiredPlacement = String(params.get('td_layout_placement') || '').trim();
 			if (desiredPlacement) {
 				const placementButton = layoutModal.find('.threaddesk-layout-viewer__placement-option').filter(function () {
@@ -1099,16 +1100,17 @@ jQuery(function ($) {
 				if (placementButton.length) {
 					placementButton.trigger('click');
 				} else {
-					setPanelStep('designs');
+					setPanelStep(desiredStep === 'placements' ? 'placements' : 'designs');
 				}
 			} else {
-				setPanelStep('designs');
+				setPanelStep(desiredStep === 'placements' ? 'placements' : 'designs');
 			}
 
 			try {
 				const cleanedUrl = new URL(window.location.href);
 				cleanedUrl.searchParams.delete('td_layout_return');
 				cleanedUrl.searchParams.delete('td_layout_category');
+				cleanedUrl.searchParams.delete('td_layout_step');
 				cleanedUrl.searchParams.delete('td_layout_placement');
 				window.history.replaceState({}, document.title, cleanedUrl.toString());
 			} catch (e) {}
