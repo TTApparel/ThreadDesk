@@ -957,13 +957,6 @@ jQuery(function ($) {
 				setMainImage(String(savedPayload.currentAngle || 'front').trim() || 'front');
 			}
 
-			if (!categoryButton.length && !savedPayload) {
-				const firstCategoryButton = layoutModal.find('[data-threaddesk-layout-category]').first();
-				if (firstCategoryButton.length) {
-					firstCategoryButton.trigger('click');
-				}
-			}
-
 			if (savedPayload) {
 				const savedAngles = savedPayload.angles && typeof savedPayload.angles === 'object' ? savedPayload.angles : {};
 				if (savedAngles && Object.keys(savedAngles).length) {
