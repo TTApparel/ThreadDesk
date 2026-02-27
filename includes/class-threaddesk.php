@@ -1857,7 +1857,7 @@ class TTA_ThreadDesk {
 		<div class="threaddesk-screenprint" id="<?php echo esc_attr( $instance_id ); ?>" data-threaddesk-screenprint-layouts="<?php echo esc_attr( wp_json_encode( $layout_items ) ); ?>" data-threaddesk-screenprint-images-by-color="<?php echo esc_attr( wp_json_encode( $screenprint_images_by_color ) ); ?>" data-threaddesk-screenprint-initial-color="<?php echo esc_attr( $initial_color_key ); ?>">
 			<div class="threaddesk-screenprint__color-picker" style="display:flex;flex-wrap:wrap;gap:10px;align-items:stretch;">
 				<?php foreach ( $screenprint_color_choices as $choice_index => $choice ) : ?>
-					<button type="button" class="threaddesk-screenprint__open-color" data-threaddesk-screenprint-open-color="<?php echo esc_attr( $choice['key'] ); ?>" style="display:flex;flex-direction:column;align-items:center;gap:6px;padding:8px;width:120px;border:1px solid #dcdcde;background:#fff;border-radius:4px;cursor:pointer;<?php echo 0 === (int) $choice_index ? 'box-shadow:0 0 0 1px #2271b1;' : ''; ?>">
+					<button type="button" class="threaddesk-screenprint__open-color" data-threaddesk-screenprint-open-color="<?php echo esc_attr( $choice['key'] ); ?>" style="display:flex;flex-direction:column;align-items:center;gap:6px;padding:8px 0;width:80px;border:1px solid #dcdcde;background:#fff;border-radius:4px;cursor:pointer;<?php echo 0 === (int) $choice_index ? 'box-shadow:0 0 0 1px #2271b1;' : ''; ?>">
 						<?php if ( ! empty( $choice['image'] ) ) : ?>
 							<img src="<?php echo esc_url( $choice['image'] ); ?>" alt="<?php echo esc_attr( $choice['label'] ); ?>" style="width:56px;height:56px;object-fit:cover;border-radius:3px;" />
 						<?php else : ?>
