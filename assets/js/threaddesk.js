@@ -819,7 +819,7 @@ jQuery(function ($) {
 				Object.keys(entries).forEach(function (placementKey) {
 					const entry = entries[placementKey];
 					if (!entry || typeof entry !== 'object') { return; }
-					const url = String(entry.url || '').trim();
+					const url = String(entry.url || entry.sourceUrl || entry.designUrl || entry.previewUrl || entry.preview || '').trim();
 					if (!url) { return; }
 					const key = String(placementKey || entry.placementKey || '').trim();
 					if (!key) { return; }
