@@ -2000,12 +2000,14 @@ body.threaddesk-modal-open {
 
 .threaddesk-layout-viewer__stage.threaddesk-screenprint__stage {
 	min-height: 420px;
+	aspect-ratio: 4 / 5;
 }
 
 .threaddesk-screenprint__stage > img {
 	width: 100%;
-	height: auto;
+	height: 100%;
 	display: block;
+	object-fit: contain;
 	border-radius: 8px;
 	border: 1px solid #ddd;
 }

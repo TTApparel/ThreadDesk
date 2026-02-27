@@ -1875,8 +1875,10 @@ class TTA_ThreadDesk {
 			const selectedLabel=root.querySelector('[data-threaddesk-screenprint-selected]');
 			const main=root.querySelector('[data-threaddesk-screenprint-main]');
 			const overlayWrap=root.querySelector('[data-threaddesk-screenprint-overlay]');
+			const stage=root.querySelector('[data-threaddesk-screenprint-stage]');
 			const angleThumbs=root.querySelectorAll('[data-threaddesk-screenprint-angle-image]');
 			let selected=null; let angle='front';
+			let stageRatioLocked=false;
 			const openBtn=root.querySelector('.threaddesk-screenprint__open');
 			const setStep=(step)=>{
 				const showChooser=step==='chooser';
@@ -1887,11 +1889,22 @@ class TTA_ThreadDesk {
 			openBtn&&openBtn.addEventListener('click',()=>{modal.classList.add('is-active');modal.setAttribute('aria-hidden','false');setStep('chooser');});
 			root.querySelectorAll('[data-threaddesk-screenprint-close]').forEach((el)=>el.addEventListener('click',()=>{modal.classList.remove('is-active');modal.setAttribute('aria-hidden','true');setStep('chooser');}));
 			root.querySelectorAll('[data-threaddesk-screenprint-back]').forEach((el)=>el.addEventListener('click',()=>setStep('chooser')));
+			const lockStageRatio=(src)=>{
+				if(stageRatioLocked||!stage||!src){return;}
+				const probe=new Image();
+				probe.addEventListener('load',()=>{
+					if(stageRatioLocked||!probe.naturalWidth||!probe.naturalHeight){return;}
+					stage.style.aspectRatio=probe.naturalWidth+' / '+probe.naturalHeight;
+					stageRatioLocked=true;
+				});
+				probe.src=src;
+			};
 			const render=()=>{
 				if(!selected){return;}
 				const map=selected.placementsByAngle||{};
 				const entries=Array.isArray(map[angle])?map[angle]:[];
 				main.src=images[angle]||images.front||'';
+				lockStageRatio(main.src);
 				main.style.display=main.src?'block':'none';
 				overlayWrap.innerHTML='';
 				entries.forEach((entry)=>{
