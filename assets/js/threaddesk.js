@@ -220,6 +220,22 @@ jQuery(function ($) {
 			const targetAngle = getPlacementAngleTarget(selectedPlacementKey);
 			const savedEntry = targetAngle && selectedPlacementKey ? ((savedPlacementsByAngle[targetAngle] || {})[selectedPlacementKey] || null) : null;
 			removePlacementButton.prop('hidden', !(isAdjustMode && savedEntry && savedEntry.url));
+
+			if (isAdjustMode && savedEntry && savedEntry.url) {
+				const activeSrc = String(selectedDesignSourceUrl || designOverlay.attr('src') || '').trim();
+				const fallbackSrc = String(savedEntry.url || '').trim();
+				const resolvedSrc = activeSrc || fallbackSrc;
+				if (resolvedSrc) {
+					selectedDesignSourceUrl = resolvedSrc;
+					if (designOverlay.prop('hidden') || !String(designOverlay.attr('src') || '').trim()) {
+						applySelectedDesign(resolvedSrc, {
+							top: Number(savedEntry.top || 0),
+							left: Number(savedEntry.left || 0),
+							width: Number(savedEntry.width || 0),
+						});
+					}
+				}
+			}
 		};
 
 		const getPlacementAbbreviation = function (placementLabel, placementKey) {
@@ -1236,7 +1252,9 @@ jQuery(function ($) {
 
 		const startDrag = function (event) {
 			if (!isAdjustMode) { return; }
-			if (!selectedDesignSourceUrl) { return; }
+			const activeSource = String(selectedDesignSourceUrl || designOverlay.attr('src') || '').trim();
+			if (!activeSource) { return; }
+			selectedDesignSourceUrl = activeSource;
 			dragState = { active: true };
 			designOverlay.addClass('is-dragging');
 			event.preventDefault();
