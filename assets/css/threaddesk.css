@@ -1893,6 +1893,10 @@ body.threaddesk-modal-open {
 	.threaddesk-layout-viewer {
 		grid-template-columns: 1fr;
 	}
+	.threaddesk-layout-viewer__stage.threaddesk-screenprint__stage {
+		min-height: 300px;
+	}
+
 
 	.threaddesk-layout-viewer__design-panel {
 		width: 100%;
@@ -1992,6 +1996,10 @@ body.threaddesk-modal-open {
 	position: relative;
 	max-width: 540px;
 	width: 100%;
+}
+
+.threaddesk-layout-viewer__stage.threaddesk-screenprint__stage {
+	min-height: 420px;
 }
 
 .threaddesk-screenprint__stage > img {
