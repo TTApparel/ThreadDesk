@@ -1726,9 +1726,22 @@ class TTA_ThreadDesk {
 
 			$payload_raw = get_post_meta( $layout_post->ID, 'layout_payload', true );
 			$payload = json_decode( (string) $payload_raw, true );
+			if ( ! is_array( $payload ) ) {
+				$payload = array();
+			}
 			$placements = isset( $payload['placementsByAngle'] ) && is_array( $payload['placementsByAngle'] ) ? $payload['placementsByAngle'] : array();
 			if ( empty( $placements ) ) {
+				$legacy_placements_raw = get_post_meta( $layout_post->ID, 'layout_placements', true );
+				$legacy_placements = json_decode( (string) $legacy_placements_raw, true );
+				if ( is_array( $legacy_placements ) ) {
+					$placements = $legacy_placements;
+				}
+			}
+			if ( empty( $placements ) ) {
 				continue;
+			}
+			if ( empty( $payload['placementsByAngle'] ) ) {
+				$payload['placementsByAngle'] = $placements;
 			}
 
 			$layout_angles = isset( $payload['angles'] ) && is_array( $payload['angles'] ) ? $payload['angles'] : array();
@@ -1938,7 +1951,7 @@ class TTA_ThreadDesk {
 			const overlayWrap=root.querySelector('[data-threaddesk-screenprint-overlay]');
 			const stage=root.querySelector('[data-threaddesk-screenprint-stage]');
 			const angleThumbs=root.querySelectorAll('[data-threaddesk-screenprint-angle-image]');
-			let selected=null; let angle='front'; let selectedColor=initialColorKey;
+			let selected=null; let angle='front'; let selectedColor=initialColorKey; let stageRatioLocked=false;
 			if(!selectedColor||!imageMap[selectedColor]){const keys=Object.keys(imageMap||{}); selectedColor=keys.length?keys[0]:'';}
 			let images=(imageMap&&imageMap[selectedColor])?imageMap[selectedColor]:{};
 			const setStep=(step)=>{
