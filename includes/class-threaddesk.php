@@ -1797,7 +1797,56 @@ class TTA_ThreadDesk {
 			);
 		}
 
-		$product_images = $this->get_screenprint_product_images( $product );
+		$default_product_images = $this->get_screenprint_product_images( $product );
+		$product_color_options  = $this->get_product_color_options( $product_id );
+		$product_postbox_views  = $this->get_product_postbox_views( $product_id );
+		$product_postbox_colors = isset( $product_postbox_views['colors'] ) && is_array( $product_postbox_views['colors'] ) ? $product_postbox_views['colors'] : array();
+		$screenprint_color_choices = array();
+		$screenprint_images_by_color = array();
+
+		if ( empty( $product_color_options ) ) {
+			$product_color_options = array(
+				'default' => __( 'Default', 'threaddesk' ),
+			);
+		}
+
+		foreach ( $product_color_options as $color_key => $color_label ) {
+			$normalized_key = sanitize_key( (string) $color_key );
+			if ( '' === $normalized_key ) {
+				continue;
+			}
+			$config = isset( $product_postbox_colors[ $normalized_key ] ) && is_array( $product_postbox_colors[ $normalized_key ] ) ? $product_postbox_colors[ $normalized_key ] : array();
+			$front_image = isset( $config['front_image'] ) ? (string) $config['front_image'] : '';
+			$front_fallback = isset( $config['front_fallback_url'] ) ? (string) $config['front_fallback_url'] : '';
+			$back_image = isset( $config['back_image'] ) ? (string) $config['back_image'] : '';
+			$back_fallback = isset( $config['back_fallback_url'] ) ? (string) $config['back_fallback_url'] : '';
+			$side_image = isset( $config['side_image'] ) ? (string) $config['side_image'] : '';
+			$side_fallback = isset( $config['side_fallback_url'] ) ? (string) $config['side_fallback_url'] : '';
+
+			$images_for_color = array(
+				'front' => $front_image ? $front_image : ( $front_fallback ? $front_fallback : (string) $default_product_images['front'] ),
+				'left'  => $side_image ? $side_image : ( $side_fallback ? $side_fallback : (string) $default_product_images['left'] ),
+				'back'  => $back_image ? $back_image : ( $back_fallback ? $back_fallback : (string) $default_product_images['back'] ),
+			);
+
+			$screenprint_images_by_color[ $normalized_key ] = $images_for_color;
+			$screenprint_color_choices[] = array(
+				'key'   => $normalized_key,
+				'label' => sanitize_text_field( (string) $color_label ),
+				'image' => (string) $images_for_color['front'],
+			);
+		}
+
+		if ( empty( $screenprint_images_by_color ) ) {
+			$screenprint_images_by_color['default'] = $default_product_images;
+			$screenprint_color_choices[] = array(
+				'key'   => 'default',
+				'label' => __( 'Default', 'threaddesk' ),
+				'image' => (string) $default_product_images['front'],
+			);
+		}
+
+		$initial_color_key = (string) $screenprint_color_choices[0]['key'];
 		$instance_id = 'threaddesk-screenprint-' . wp_rand( 1000, 99999 );
 
 		wp_enqueue_style( 'threaddesk', THREDDESK_URL . 'assets/css/threaddesk.css', array(), THREDDESK_VERSION );
@@ -1805,8 +1854,19 @@ class TTA_ThreadDesk {
 
 		ob_start();
 		?>
-		<div class="threaddesk-screenprint" id="<?php echo esc_attr( $instance_id ); ?>" data-threaddesk-screenprint-layouts="<?php echo esc_attr( wp_json_encode( $layout_items ) ); ?>" data-threaddesk-screenprint-images="<?php echo esc_attr( wp_json_encode( $product_images ) ); ?>">
-			<button type="button" class="threaddesk-screenprint__open"><?php echo esc_html__( 'Screen Printing', 'threaddesk' ); ?></button>
+		<div class="threaddesk-screenprint" id="<?php echo esc_attr( $instance_id ); ?>" data-threaddesk-screenprint-layouts="<?php echo esc_attr( wp_json_encode( $layout_items ) ); ?>" data-threaddesk-screenprint-images-by-color="<?php echo esc_attr( wp_json_encode( $screenprint_images_by_color ) ); ?>" data-threaddesk-screenprint-initial-color="<?php echo esc_attr( $initial_color_key ); ?>">
+			<div class="threaddesk-screenprint__color-picker" style="display:flex;flex-wrap:wrap;gap:10px;align-items:stretch;">
+				<?php foreach ( $screenprint_color_choices as $choice_index => $choice ) : ?>
+					<button type="button" class="threaddesk-screenprint__open-color" data-threaddesk-screenprint-open-color="<?php echo esc_attr( $choice['key'] ); ?>" style="display:flex;flex-direction:column;align-items:center;gap:6px;padding:8px;min-width:88px;border:1px solid #dcdcde;background:#fff;border-radius:4px;cursor:pointer;<?php echo 0 === (int) $choice_index ? 'box-shadow:0 0 0 1px #2271b1;' : ''; ?>">
+						<?php if ( ! empty( $choice['image'] ) ) : ?>
+							<img src="<?php echo esc_url( $choice['image'] ); ?>" alt="<?php echo esc_attr( $choice['label'] ); ?>" style="width:56px;height:56px;object-fit:cover;border-radius:3px;" />
+						<?php else : ?>
+							<span style="display:inline-flex;width:56px;height:56px;align-items:center;justify-content:center;background:#f0f0f1;border-radius:3px;color:#666;">—</span>
+						<?php endif; ?>
+						<span style="font-size:12px;font-weight:600;"><?php echo esc_html( $choice['label'] ); ?></span>
+					</button>
+				<?php endforeach; ?>
+			</div>
 			<div class="threaddesk-layout-modal" aria-hidden="true">
 				<div class="threaddesk-auth-modal__overlay" data-threaddesk-screenprint-close></div>
 				<div class="threaddesk-auth-modal__panel" role="dialog" aria-modal="true" aria-label="<?php echo esc_attr__( 'Screenprint layout chooser', 'threaddesk' ); ?>">
@@ -1864,7 +1924,8 @@ class TTA_ThreadDesk {
 		(function(){
 			const root=document.getElementById(<?php echo wp_json_encode( $instance_id ); ?>); if(!root){return;}
 			const layouts=JSON.parse(root.getAttribute('data-threaddesk-screenprint-layouts')||'[]');
-			const images=JSON.parse(root.getAttribute('data-threaddesk-screenprint-images')||'{}');
+			const imageMap=JSON.parse(root.getAttribute('data-threaddesk-screenprint-images-by-color')||'{}');
+			const initialColorKey=String(root.getAttribute('data-threaddesk-screenprint-initial-color')||'').trim();
 			const i18nNoPreview=<?php echo wp_json_encode( __( 'No placement preview', 'threaddesk' ) ); ?>;
 			const i18nPrintCountLabel=<?php echo wp_json_encode( __( 'Print count', 'threaddesk' ) ); ?>;
 			const i18nSelectedPrefix=<?php echo wp_json_encode( __( 'Selected layout', 'threaddesk' ) ); ?>;
@@ -1877,16 +1938,24 @@ class TTA_ThreadDesk {
 			const overlayWrap=root.querySelector('[data-threaddesk-screenprint-overlay]');
 			const stage=root.querySelector('[data-threaddesk-screenprint-stage]');
 			const angleThumbs=root.querySelectorAll('[data-threaddesk-screenprint-angle-image]');
-			let selected=null; let angle='front';
-			let stageRatioLocked=false;
-			const openBtn=root.querySelector('.threaddesk-screenprint__open');
+			let selected=null; let angle='front'; let selectedColor=initialColorKey;
+			if(!selectedColor||!imageMap[selectedColor]){const keys=Object.keys(imageMap||{}); selectedColor=keys.length?keys[0]:'';}
+			let images=(imageMap&&imageMap[selectedColor])?imageMap[selectedColor]:{};
 			const setStep=(step)=>{
 				const showChooser=step==='chooser';
 				if(chooserStep){chooserStep.hidden=!showChooser;chooserStep.classList.toggle('is-active',showChooser);chooserStep.setAttribute('aria-hidden',showChooser?'false':'true');}
 				if(viewerStep){viewerStep.hidden=showChooser;viewerStep.classList.toggle('is-active',!showChooser);viewerStep.setAttribute('aria-hidden',showChooser?'true':'false');}
 			};
-			angleThumbs.forEach((img)=>{const key=img.getAttribute('data-threaddesk-screenprint-angle-image')||'front';img.src=images[key]||images.front||'';});
-			openBtn&&openBtn.addEventListener('click',()=>{modal.classList.add('is-active');modal.setAttribute('aria-hidden','false');setStep('chooser');});
+			const syncAngleThumbs=()=>{angleThumbs.forEach((img)=>{const key=img.getAttribute('data-threaddesk-screenprint-angle-image')||'front';img.src=images[key]||images.front||'';});};
+			syncAngleThumbs();
+			root.querySelectorAll('[data-threaddesk-screenprint-open-color]').forEach((btn)=>btn.addEventListener('click',()=>{
+				selectedColor=String(btn.getAttribute('data-threaddesk-screenprint-open-color')||'').trim();
+				images=(imageMap&&imageMap[selectedColor])?imageMap[selectedColor]:{};
+				syncAngleThumbs();
+				root.querySelectorAll('[data-threaddesk-screenprint-open-color]').forEach((item)=>{item.style.boxShadow='none';});
+				btn.style.boxShadow='0 0 0 1px #2271b1';
+				modal.classList.add('is-active');modal.setAttribute('aria-hidden','false');setStep('chooser');
+			}));
 			root.querySelectorAll('[data-threaddesk-screenprint-close]').forEach((el)=>el.addEventListener('click',()=>{modal.classList.remove('is-active');modal.setAttribute('aria-hidden','true');setStep('chooser');}));
 			root.querySelectorAll('[data-threaddesk-screenprint-back]').forEach((el)=>el.addEventListener('click',()=>setStep('chooser')));
 			const lockStageRatio=(src)=>{
