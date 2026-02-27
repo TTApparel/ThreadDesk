@@ -748,25 +748,7 @@ jQuery(function ($) {
 			if (!payloadRaw) { return null; }
 			try {
 				const parsed = JSON.parse(payloadRaw);
-				if (!parsed || typeof parsed !== 'object') { return null; }
-				const candidatePlacements = parsed.placementsByAngle || parsed.layout_placements || parsed.layoutPlacements || parsed.placements || {};
-				const normalizedPlacementsByAngle = {};
-				Object.keys(candidatePlacements).forEach(function (angleKey) {
-					const entries = candidatePlacements[angleKey];
-					if (!entries || typeof entries !== 'object') { return; }
-					const normalizedAngle = String(angleKey || '').trim();
-					if (!normalizedAngle) { return; }
-					normalizedPlacementsByAngle[normalizedAngle] = {};
-					Object.keys(entries).forEach(function (entryKey) {
-						const entry = entries[entryKey];
-						if (!entry || typeof entry !== 'object') { return; }
-						const normalizedKey = String(entry.placementKey || entry.key || entry.placement || entryKey || '').trim();
-						if (!normalizedKey) { return; }
-						normalizedPlacementsByAngle[normalizedAngle][normalizedKey] = entry;
-					});
-				});
-				parsed.placementsByAngle = normalizedPlacementsByAngle;
-				return parsed;
+				return parsed && typeof parsed === 'object' ? parsed : null;
 			} catch (e) {
 				return null;
 			}
@@ -811,9 +793,9 @@ jQuery(function ($) {
 					const key = String(placementKey || entry.placementKey || '').trim();
 					if (!key) { return; }
 					const cfg = {
-						top: Number(entry.top || entry.y || 0),
-						left: Number(entry.left || entry.x || 0),
-						width: Number(entry.width || entry.size || 0),
+						top: Number(entry.top || 0),
+						left: Number(entry.left || 0),
+						width: Number(entry.width || 0),
 					};
 					savedPlacementsByAngle[normalizedAngle][key] = {
 						url: url,
