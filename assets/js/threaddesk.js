@@ -131,6 +131,13 @@ jQuery(function ($) {
 			back: layoutModal.find('[data-threaddesk-layout-angle-image="back"]'),
 			right: layoutModal.find('[data-threaddesk-layout-angle-image="right"]'),
 		};
+
+		const syncAnglePreviewThumbs = function () {
+			angleImages.front.attr('src', currentAngles.front || '').css('transform', 'none');
+			angleImages.back.attr('src', currentAngles.back || '').css('transform', 'none');
+			angleImages.left.attr('src', currentAngles.left || '').css('transform', sideConfiguredAsRight ? 'scaleX(-1)' : 'none');
+			angleImages.right.attr('src', currentAngles.right || '').css('transform', sideConfiguredAsRight ? 'none' : 'scaleX(-1)');
+		};
 		const placementList = layoutModal.find('[data-threaddesk-layout-placement-list]');
 		const placementEmpty = layoutModal.find('[data-threaddesk-layout-placement-empty]');
 		const saveLayoutForm = layoutModal.find('[data-threaddesk-layout-save-layout-form]');
@@ -245,11 +252,20 @@ jQuery(function ($) {
 		};
 
 		const buildLayoutPayload = function () {
+			const placementOptions = [];
+			placementList.find('.threaddesk-layout-viewer__placement-option').each(function () {
+				const option = $(this);
+				const key = String(option.attr('data-threaddesk-layout-placement-key') || '').trim();
+				const label = String(option.attr('data-threaddesk-layout-placement-label') || '').trim();
+				if (!key || !label) { return; }
+				placementOptions.push({ key: key, label: label });
+			});
 			const payload = {
 				category: selectedCategorySlug,
 				categoryId: Number(selectedCategoryId || 0),
 				angles: currentAngles,
 				currentAngle: currentAngle,
+				placements: placementOptions,
 				placementsByAngle: savedPlacementsByAngle,
 				savedAt: new Date().toISOString(),
 			};
@@ -890,9 +906,15 @@ jQuery(function ($) {
 				saveLayoutIdField.val(String(existingLayoutId));
 			}
 
-			const categoryButton = requestedCategory ? layoutModal.find('[data-threaddesk-layout-category]').filter(function () {
+			let categoryButton = requestedCategory ? layoutModal.find('[data-threaddesk-layout-category]').filter(function () {
 				return String($(this).attr('data-threaddesk-layout-category') || '').trim() === requestedCategory;
 			}).first() : $();
+			if (!categoryButton.length && savedPayload && Number(savedPayload.categoryId || 0) > 0) {
+				const requestedCategoryId = Number(savedPayload.categoryId || 0);
+				categoryButton = layoutModal.find('[data-threaddesk-layout-category]').filter(function () {
+					return Number($(this).attr('data-threaddesk-layout-category-id') || 0) === requestedCategoryId;
+				}).first();
+			}
 
 			if (categoryButton.length) {
 				categoryButton.trigger('click');
@@ -912,13 +934,28 @@ jQuery(function ($) {
 						right: String(savedAngles.right || '').trim(),
 					};
 				}
-				const fallbackPlacements = getPlacementOptionsFromSavedPayload(savedPayload);
+				const payloadPlacementOptions = Array.isArray(savedPayload.placements) ? savedPayload.placements : [];
+				const fallbackPlacements = payloadPlacementOptions.length ? payloadPlacementOptions : getPlacementOptionsFromSavedPayload(savedPayload);
 				renderPlacementOptions(fallbackPlacements);
 				showViewerStep();
 				setMainImage(String(savedPayload.currentAngle || 'front').trim() || 'front');
 			}
 
 			if (savedPayload) {
+				const savedAngles = savedPayload.angles && typeof savedPayload.angles === 'object' ? savedPayload.angles : {};
+				if (savedAngles && Object.keys(savedAngles).length) {
+					currentAngles = {
+						front: String(savedAngles.front || '').trim(),
+						left: String(savedAngles.left || '').trim(),
+						back: String(savedAngles.back || '').trim(),
+						right: String(savedAngles.right || '').trim(),
+					};
+					const payloadSideLabel = String(savedPayload.sideLabel || '').toLowerCase();
+					if (payloadSideLabel === 'left' || payloadSideLabel === 'right') {
+						sideConfiguredAsRight = payloadSideLabel === 'right';
+					}
+					syncAnglePreviewThumbs();
+				}
 				applySavedLayoutPayload(savedPayload);
 				const preferredAngle = String(savedPayload.currentAngle || '').trim();
 				if (preferredAngle) {
@@ -961,10 +998,7 @@ jQuery(function ($) {
 			if (hasSide) { visibleAngles.push('left'); }
 			if (hasBack) { visibleAngles.push('back'); }
 			if (hasSide) { visibleAngles.push('right'); }
-			angleImages.front.attr('src', currentAngles.front).css('transform', 'none');
-			angleImages.back.attr('src', currentAngles.back).css('transform', 'none');
-			angleImages.left.attr('src', currentAngles.left).css('transform', sideIsRight ? 'scaleX(-1)' : 'none');
-			angleImages.right.attr('src', currentAngles.right).css('transform', sideIsRight ? 'none' : 'scaleX(-1)');
+			syncAnglePreviewThumbs();
 			renderPlacementOptions(placements);
 			setPanelStep('placements');
 			showViewerStep();
