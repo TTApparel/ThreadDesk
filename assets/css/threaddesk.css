@@ -2020,9 +2020,17 @@ body.threaddesk-modal-open {
 	position: absolute;
 	inset: 0;
 	pointer-events: none;
+	z-index: 2;
 }
 
 .threaddesk-screenprint__overlay img {
 	position: absolute;
 	height: auto;
+}
+
+.threaddesk-layout-viewer__angle-image-wrap > img[data-threaddesk-screenprint-angle-image] {
+	width: 100%;
+	height: 100%;
+	object-fit: contain;
+	display: block;
 }
