@@ -1769,6 +1769,9 @@ class TTA_ThreadDesk {
 			if ( ! isset( $layout_status_labels[ $layout_status ] ) ) {
 				$layout_status = 'pending';
 			}
+			if ( 'rejected' === $layout_status ) {
+				continue;
+			}
 
 			$layout_items[] = array(
 				'id' => (int) $layout_post->ID,
