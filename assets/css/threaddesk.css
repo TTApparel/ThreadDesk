@@ -1903,6 +1903,72 @@ body.threaddesk-modal-open {
 	margin-bottom: 14px;
 }
 
+.threaddesk-screenprint .threaddesk-layout-modal__options {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: flex-start;
+	gap: 14px;
+}
+
+.threaddesk-screenprint-option {
+	appearance: none;
+	border: 1px solid transparent;
+	cursor: pointer;
+	text-align: left;
+	width: fit-content;
+	max-width: 100%;
+	margin: 0;
+	transition: border-color .15s ease;
+}
+
+.threaddesk-screenprint-option:hover,
+.threaddesk-screenprint-option:focus-visible {
+	border-color: #000;
+	outline: none;
+}
+
+.threaddesk-screenprint-option .threaddesk__card-design-preview {
+	width: 260px;
+	max-width: 100%;
+}
+
+.threaddesk-screenprint-option .threaddesk__card-design-color-count {
+	margin: 8px 0 0 !important;
+}
+
+.threaddesk-screenprint-option__title {
+	margin: 8px 0 0;
+	padding: 0;
+	border: 0;
+	border-radius: 0;
+	font-size: 16px;
+	line-height: 1.3;
+	font-weight: 700;
+	color: #222;
+	text-transform: uppercase;
+	text-align: center;
+}
+
+.threaddesk-screenprint__open {
+	appearance: none;
+	background: #ebebeb;
+	border: 0;
+	border-radius: 6px;
+	color: #2f2f2f;
+	cursor: pointer;
+	display: inline-flex;
+	font-size: 40px;
+	font-weight: 700;
+	line-height: 1.1;
+	padding: 14px 24px;
+}
+
+.threaddesk-screenprint__open:hover,
+.threaddesk-screenprint__open:focus-visible {
+	background: #dfdfdf;
+	color: #222;
+}
+
 .threaddesk-screenprint__viewer {
 	margin-top: 10px;
 }
