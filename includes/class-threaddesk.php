@@ -2083,10 +2083,13 @@ class TTA_ThreadDesk {
 				createBtn.appendChild(createTitle);
 				createBtn.appendChild(createMeta);
 				createBtn.addEventListener('click',()=>{
-					const layoutOpen=document.querySelector('[data-threaddesk-layout-open]');
+					const localScope=root.closest('.product')||document;
+					const layoutOpen=localScope.querySelector('[data-threaddesk-layout-open]')||document.querySelector('[data-threaddesk-layout-open]');
 					if(!layoutOpen){return;}
 					if(createLayoutCategory){layoutOpen.setAttribute('data-threaddesk-layout-category-open', createLayoutCategory);}
-					layoutOpen.click();
+					if(modal){modal.classList.remove('is-active');modal.setAttribute('aria-hidden','true');}
+					document.body.classList.remove('threaddesk-modal-open');
+					window.setTimeout(()=>{layoutOpen.click();},0);
 				});
 				options.appendChild(createBtn);
 			}
