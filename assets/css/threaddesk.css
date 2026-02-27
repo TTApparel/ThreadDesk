@@ -1903,6 +1903,27 @@ body.threaddesk-modal-open {
 	margin-bottom: 14px;
 }
 
+
+.threaddesk-screenprint__open {
+	appearance: none;
+	background: #ebebeb;
+	border: 0;
+	border-radius: 6px;
+	color: #2f2f2f;
+	cursor: pointer;
+	display: inline-flex;
+	font-size: 40px;
+	font-weight: 700;
+	line-height: 1.1;
+	padding: 14px 24px;
+}
+
+.threaddesk-screenprint__open:hover,
+.threaddesk-screenprint__open:focus-visible {
+	background: #dfdfdf;
+	color: #222;
+}
+
 .threaddesk-screenprint__viewer {
 	margin-top: 10px;
 }

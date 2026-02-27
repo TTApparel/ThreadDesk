@@ -1733,7 +1733,7 @@ class TTA_ThreadDesk {
 		ob_start();
 		?>
 		<div class="threaddesk-screenprint" id="<?php echo esc_attr( $instance_id ); ?>" data-threaddesk-screenprint-layouts="<?php echo esc_attr( wp_json_encode( $layout_items ) ); ?>" data-threaddesk-screenprint-images="<?php echo esc_attr( wp_json_encode( $product_images ) ); ?>">
-			<button type="button" class="button threaddesk-screenprint__open"><?php echo esc_html__( 'Apply Saved Screenprint Layout', 'threaddesk' ); ?></button>
+			<button type="button" class="threaddesk-screenprint__open"><?php echo esc_html__( 'Screen Printing', 'threaddesk' ); ?></button>
 			<div class="threaddesk-layout-modal" aria-hidden="true">
 				<div class="threaddesk-auth-modal__overlay" data-threaddesk-screenprint-close></div>
 				<div class="threaddesk-auth-modal__panel" role="dialog" aria-modal="true" aria-label="<?php echo esc_attr__( 'Screenprint layout chooser', 'threaddesk' ); ?>">
