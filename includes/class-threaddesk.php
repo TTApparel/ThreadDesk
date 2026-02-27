@@ -3496,7 +3496,7 @@ class TTA_ThreadDesk {
 		$color_count = count( $unique_palette );
 		$uploaded_at = (string) get_post_meta( $post->ID, 'created_at', true );
 		$owner = get_userdata( (int) $post->post_author );
-		$dimensions = $this->get_image_dimensions_from_url( $mockup_url );
+		$dimensions = $this->get_visible_image_dimensions_from_url( $mockup_url );
 		echo '<p><strong>' . esc_html__( 'Owner', 'threaddesk' ) . ':</strong> ' . esc_html( $owner ? $owner->display_name : __( 'Unknown', 'threaddesk' ) ) . '</p>';
 		echo '<p><strong>' . esc_html__( 'Uploaded', 'threaddesk' ) . ':</strong> ' . esc_html( $uploaded_at ?: $post->post_date ) . '</p>';
 		echo '<p><strong>' . esc_html__( 'Color count', 'threaddesk' ) . ':</strong> ' . esc_html( (string) $color_count ) . '</p>';
@@ -3730,6 +3730,74 @@ class TTA_ThreadDesk {
 		$size = @getimagesize( $path );
 		if ( ! is_array( $size ) || empty( $size[0] ) || empty( $size[1] ) ) { return __( 'Unknown', 'threaddesk' ); }
 		return (int) $size[0] . ':' . (int) $size[1];
+	}
+
+	private function get_visible_image_dimensions_from_url( $url ) {
+		$url = is_string( $url ) ? trim( $url ) : '';
+		if ( '' === $url ) {
+			return __( 'Unknown', 'threaddesk' );
+		}
+
+		$uploads = wp_upload_dir();
+		$baseurl = isset( $uploads['baseurl'] ) ? (string) $uploads['baseurl'] : '';
+		$basedir = isset( $uploads['basedir'] ) ? (string) $uploads['basedir'] : '';
+		$path = '';
+		if ( $baseurl && 0 === strpos( $url, $baseurl ) ) {
+			$path = $basedir . substr( $url, strlen( $baseurl ) );
+		}
+		if ( ! $path || ! file_exists( $path ) ) {
+			return __( 'Unknown', 'threaddesk' );
+		}
+
+		$size = @getimagesize( $path );
+		if ( ! is_array( $size ) || empty( $size[0] ) || empty( $size[1] ) ) {
+			return __( 'Unknown', 'threaddesk' );
+		}
+
+		$full_width = (int) $size[0];
+		$full_height = (int) $size[1];
+		$mime = isset( $size['mime'] ) ? (string) $size['mime'] : '';
+
+		if ( 'image/png' !== $mime || ! function_exists( 'imagecreatefrompng' ) ) {
+			return $full_width . ':' . $full_height;
+		}
+
+		$image = @imagecreatefrompng( $path );
+		if ( false === $image ) {
+			return $full_width . ':' . $full_height;
+		}
+
+		$min_x = $full_width;
+		$min_y = $full_height;
+		$max_x = -1;
+		$max_y = -1;
+
+		for ( $y = 0; $y < $full_height; $y++ ) {
+			for ( $x = 0; $x < $full_width; $x++ ) {
+				$rgba = imagecolorat( $image, $x, $y );
+				$alpha = ( $rgba & 0x7F000000 ) >> 24;
+				if ( $alpha < 127 ) {
+					if ( $x < $min_x ) { $min_x = $x; }
+					if ( $y < $min_y ) { $min_y = $y; }
+					if ( $x > $max_x ) { $max_x = $x; }
+					if ( $y > $max_y ) { $max_y = $y; }
+				}
+			}
+		}
+
+		imagedestroy( $image );
+
+		if ( $max_x < $min_x || $max_y < $min_y ) {
+			return __( 'Unknown', 'threaddesk' );
+		}
+
+		$visible_width = ( $max_x - $min_x ) + 1;
+		$visible_height = ( $max_y - $min_y ) + 1;
+		if ( $visible_width <= 0 || $visible_height <= 0 ) {
+			return __( 'Unknown', 'threaddesk' );
+		}
+
+		return $visible_width . ':' . $visible_height;
 	}
 
 	private function find_related_posts_by_id_in_meta( $id, $post_type, $reverse = false ) {
