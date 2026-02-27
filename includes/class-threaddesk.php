@@ -2852,8 +2852,11 @@ class TTA_ThreadDesk {
 			}
 			$normalized[ $key ] = array(
 				'front_image' => isset( $row['front_image'] ) ? esc_url_raw( $row['front_image'] ) : '',
+				'front_fallback_url' => isset( $row['front_fallback_url'] ) ? esc_url_raw( $row['front_fallback_url'] ) : '',
 				'back_image'  => isset( $row['back_image'] ) ? esc_url_raw( $row['back_image'] ) : '',
+				'back_fallback_url' => isset( $row['back_fallback_url'] ) ? esc_url_raw( $row['back_fallback_url'] ) : '',
 				'side_image'  => isset( $row['side_image'] ) ? esc_url_raw( $row['side_image'] ) : '',
+				'side_fallback_url' => isset( $row['side_fallback_url'] ) ? esc_url_raw( $row['side_fallback_url'] ) : '',
 				'side_label'  => ( isset( $row['side_label'] ) && 'right' === sanitize_key( (string) $row['side_label'] ) ) ? 'right' : 'left',
 			);
 		}
@@ -2891,29 +2894,39 @@ class TTA_ThreadDesk {
 				<?php $row = isset( $saved_colors[ $color_key ] ) && is_array( $saved_colors[ $color_key ] ) ? $saved_colors[ $color_key ] : array(); ?>
 				<div class="threaddesk-product-postbox__panel" data-threaddesk-product-color-panel="<?php echo esc_attr( $color_key ); ?>" <?php echo $is_first_panel ? '' : 'hidden'; ?> style="padding:12px;border:1px solid #dcdcde;background:#fff;">
 					<p><strong><?php echo esc_html( sprintf( __( '%s views', 'threaddesk' ), $color_label ) ); ?></strong></p>
-					<table class="form-table" role="presentation">
-						<tr>
-							<th scope="row"><?php echo esc_html__( 'Front image', 'threaddesk' ); ?></th>
-							<td><?php $this->render_media_picker_field( "tta_threaddesk_product_postbox[colors][{$color_key}][front_image]", isset( $row['front_image'] ) ? $row['front_image'] : '' ); ?></td>
-						</tr>
-						<tr>
-							<th scope="row"><?php echo esc_html__( 'Back image', 'threaddesk' ); ?></th>
-							<td><?php $this->render_media_picker_field( "tta_threaddesk_product_postbox[colors][{$color_key}][back_image]", isset( $row['back_image'] ) ? $row['back_image'] : '' ); ?></td>
-						</tr>
-						<tr>
-							<th scope="row"><?php echo esc_html__( 'Side image', 'threaddesk' ); ?></th>
-							<td><?php $this->render_media_picker_field( "tta_threaddesk_product_postbox[colors][{$color_key}][side_image]", isset( $row['side_image'] ) ? $row['side_image'] : '' ); ?></td>
-						</tr>
-						<tr>
-							<th scope="row"><?php echo esc_html__( 'Side view represents', 'threaddesk' ); ?></th>
-							<td>
-								<select name="tta_threaddesk_product_postbox[colors][<?php echo esc_attr( $color_key ); ?>][side_label]">
+					<div style="display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap;">
+						<div style="flex:1 1 250px;min-width:220px;">
+							<p><strong><?php echo esc_html__( 'Front image', 'threaddesk' ); ?></strong></p>
+							<?php $this->render_media_picker_field( "tta_threaddesk_product_postbox[colors][{$color_key}][front_image]", isset( $row['front_image'] ) ? $row['front_image'] : '' ); ?>
+							<p>
+								<label for="tta_threaddesk_product_postbox_front_fallback_<?php echo esc_attr( $color_key ); ?>"><strong><?php echo esc_html__( 'Fallback link', 'threaddesk' ); ?></strong></label><br />
+								<input id="tta_threaddesk_product_postbox_front_fallback_<?php echo esc_attr( $color_key ); ?>" type="url" class="regular-text" name="tta_threaddesk_product_postbox[colors][<?php echo esc_attr( $color_key ); ?>][front_fallback_url]" value="<?php echo esc_url( isset( $row['front_fallback_url'] ) ? $row['front_fallback_url'] : '' ); ?>" placeholder="https://" />
+							</p>
+						</div>
+						<div style="flex:1 1 250px;min-width:220px;">
+							<p><strong><?php echo esc_html__( 'Back image', 'threaddesk' ); ?></strong></p>
+							<?php $this->render_media_picker_field( "tta_threaddesk_product_postbox[colors][{$color_key}][back_image]", isset( $row['back_image'] ) ? $row['back_image'] : '' ); ?>
+							<p>
+								<label for="tta_threaddesk_product_postbox_back_fallback_<?php echo esc_attr( $color_key ); ?>"><strong><?php echo esc_html__( 'Fallback link', 'threaddesk' ); ?></strong></label><br />
+								<input id="tta_threaddesk_product_postbox_back_fallback_<?php echo esc_attr( $color_key ); ?>" type="url" class="regular-text" name="tta_threaddesk_product_postbox[colors][<?php echo esc_attr( $color_key ); ?>][back_fallback_url]" value="<?php echo esc_url( isset( $row['back_fallback_url'] ) ? $row['back_fallback_url'] : '' ); ?>" placeholder="https://" />
+							</p>
+						</div>
+						<div style="flex:1 1 250px;min-width:220px;">
+							<p><strong><?php echo esc_html__( 'Side image', 'threaddesk' ); ?></strong></p>
+							<?php $this->render_media_picker_field( "tta_threaddesk_product_postbox[colors][{$color_key}][side_image]", isset( $row['side_image'] ) ? $row['side_image'] : '' ); ?>
+							<p>
+								<label for="tta_threaddesk_product_postbox_side_fallback_<?php echo esc_attr( $color_key ); ?>"><strong><?php echo esc_html__( 'Fallback link', 'threaddesk' ); ?></strong></label><br />
+								<input id="tta_threaddesk_product_postbox_side_fallback_<?php echo esc_attr( $color_key ); ?>" type="url" class="regular-text" name="tta_threaddesk_product_postbox[colors][<?php echo esc_attr( $color_key ); ?>][side_fallback_url]" value="<?php echo esc_url( isset( $row['side_fallback_url'] ) ? $row['side_fallback_url'] : '' ); ?>" placeholder="https://" />
+							</p>
+							<p>
+								<label for="tta_threaddesk_product_postbox_side_label_<?php echo esc_attr( $color_key ); ?>"><strong><?php echo esc_html__( 'Side view represents', 'threaddesk' ); ?></strong></label><br />
+								<select id="tta_threaddesk_product_postbox_side_label_<?php echo esc_attr( $color_key ); ?>" name="tta_threaddesk_product_postbox[colors][<?php echo esc_attr( $color_key ); ?>][side_label]">
 									<option value="left" <?php selected( isset( $row['side_label'] ) ? $row['side_label'] : 'left', 'left' ); ?>><?php echo esc_html__( 'Left', 'threaddesk' ); ?></option>
 									<option value="right" <?php selected( isset( $row['side_label'] ) ? $row['side_label'] : 'left', 'right' ); ?>><?php echo esc_html__( 'Right', 'threaddesk' ); ?></option>
 								</select>
-							</td>
-						</tr>
-					</table>
+							</p>
+						</div>
+					</div>
 				</div>
 				<?php $is_first_panel = false; ?>
 			<?php endforeach; ?>
@@ -2984,8 +2997,11 @@ class TTA_ThreadDesk {
 			$row = isset( $raw_colors[ $color_key ] ) && is_array( $raw_colors[ $color_key ] ) ? $raw_colors[ $color_key ] : array();
 			$sanitized_colors[ $color_key ] = array(
 				'front_image' => isset( $row['front_image'] ) ? esc_url_raw( $row['front_image'] ) : '',
+				'front_fallback_url' => isset( $row['front_fallback_url'] ) ? esc_url_raw( $row['front_fallback_url'] ) : '',
 				'back_image'  => isset( $row['back_image'] ) ? esc_url_raw( $row['back_image'] ) : '',
+				'back_fallback_url' => isset( $row['back_fallback_url'] ) ? esc_url_raw( $row['back_fallback_url'] ) : '',
 				'side_image'  => isset( $row['side_image'] ) ? esc_url_raw( $row['side_image'] ) : '',
+				'side_fallback_url' => isset( $row['side_fallback_url'] ) ? esc_url_raw( $row['side_fallback_url'] ) : '',
 				'side_label'  => ( isset( $row['side_label'] ) && 'right' === sanitize_key( (string) $row['side_label'] ) ) ? 'right' : 'left',
 			);
 		}
