@@ -1905,7 +1905,27 @@ body.threaddesk-modal-open {
 	}
 
 	.threaddesk-layout-viewer__angles {
-		flex-wrap: wrap;
+		flex-wrap: nowrap;
+		gap: 8px;
+		width: 100%;
+		justify-content: space-between;
+	}
+
+	.threaddesk-layout-viewer__angle {
+		flex: 1 1 0;
+		min-width: 0;
+		width: auto;
+		padding: 6px 4px;
+		gap: 6px;
+	}
+
+	.threaddesk-layout-viewer__angle-image-wrap {
+		width: 42px;
+		height: 58px;
+	}
+
+	.threaddesk-layout-viewer__angle span {
+		font-size: 10px;
 	}
 }
 
