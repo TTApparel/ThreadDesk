@@ -1879,6 +1879,15 @@ body.threaddesk-modal-open {
 	align-items:start;
 }
 
+.threaddesk-layout-modal [data-threaddesk-screenprint-step] {
+	display: none;
+}
+
+.threaddesk-layout-modal [data-threaddesk-screenprint-step].is-active {
+	display: grid;
+	align-items: start;
+}
+
 
 @media (max-width: 900px) {
 	.threaddesk-layout-viewer {
