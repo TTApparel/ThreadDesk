@@ -1903,6 +1903,12 @@ class TTA_ThreadDesk {
 									</div>
 									<span><?php echo esc_html__( 'Back', 'threaddesk' ); ?></span>
 								</button>
+								<button type="button" class="threaddesk-layout-viewer__angle" data-threaddesk-screenprint-angle="right">
+									<div class="threaddesk-layout-viewer__angle-image-wrap">
+										<img src="" alt="" data-threaddesk-screenprint-angle-image="right" />
+									</div>
+									<span><?php echo esc_html__( 'Right', 'threaddesk' ); ?></span>
+								</button>
 							</div>
 						</div>
 						<div class="threaddesk-layout-viewer__design-panel">
@@ -1930,6 +1936,7 @@ class TTA_ThreadDesk {
 			const selectedLabel=root.querySelector('[data-threaddesk-screenprint-selected]');
 			const main=root.querySelector('[data-threaddesk-screenprint-main]');
 			const overlayWrap=root.querySelector('[data-threaddesk-screenprint-overlay]');
+			const stage=root.querySelector('[data-threaddesk-screenprint-stage]');
 			const angleThumbs=root.querySelectorAll('[data-threaddesk-screenprint-angle-image]');
 			let selected=null; let angle='front'; let selectedColor=initialColorKey;
 			if(!selectedColor||!imageMap[selectedColor]){const keys=Object.keys(imageMap||{}); selectedColor=keys.length?keys[0]:'';}
@@ -1951,11 +1958,22 @@ class TTA_ThreadDesk {
 			}));
 			root.querySelectorAll('[data-threaddesk-screenprint-close]').forEach((el)=>el.addEventListener('click',()=>{modal.classList.remove('is-active');modal.setAttribute('aria-hidden','true');setStep('chooser');}));
 			root.querySelectorAll('[data-threaddesk-screenprint-back]').forEach((el)=>el.addEventListener('click',()=>setStep('chooser')));
+			const lockStageRatio=(src)=>{
+				if(stageRatioLocked||!stage||!src){return;}
+				const probe=new Image();
+				probe.addEventListener('load',()=>{
+					if(stageRatioLocked||!probe.naturalWidth||!probe.naturalHeight){return;}
+					stage.style.aspectRatio=probe.naturalWidth+' / '+probe.naturalHeight;
+					stageRatioLocked=true;
+				});
+				probe.src=src;
+			};
 			const render=()=>{
 				if(!selected){return;}
 				const map=selected.placementsByAngle||{};
 				const entries=Array.isArray(map[angle])?map[angle]:[];
 				main.src=images[angle]||images.front||'';
+				lockStageRatio(main.src);
 				main.style.display=main.src?'block':'none';
 				overlayWrap.innerHTML='';
 				entries.forEach((entry)=>{
@@ -2039,6 +2057,7 @@ class TTA_ThreadDesk {
 		$gallery_ids = $product && is_callable( array( $product, 'get_gallery_image_ids' ) ) ? (array) $product->get_gallery_image_ids() : array();
 		$side_url   = ! empty( $gallery_ids[0] ) ? wp_get_attachment_image_url( (int) $gallery_ids[0], 'large' ) : '';
 		$back_url   = ! empty( $gallery_ids[1] ) ? wp_get_attachment_image_url( (int) $gallery_ids[1], 'large' ) : '';
+		$right_url  = ! empty( $gallery_ids[2] ) ? wp_get_attachment_image_url( (int) $gallery_ids[2], 'large' ) : '';
 		if ( '' === $front_url ) {
 			$front_url = $side_url ? $side_url : $back_url;
 		}
@@ -2048,11 +2067,15 @@ class TTA_ThreadDesk {
 		if ( '' === $back_url ) {
 			$back_url = $side_url ? $side_url : $front_url;
 		}
+		if ( '' === $right_url ) {
+			$right_url = $side_url ? $side_url : $front_url;
+		}
 
 		return array(
 			'front' => (string) $front_url,
 			'left'  => (string) $side_url,
 			'back'  => (string) $back_url,
+			'right' => (string) $right_url,
 		);
 	}
 

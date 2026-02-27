@@ -1879,11 +1879,24 @@ body.threaddesk-modal-open {
 	align-items:start;
 }
 
+.threaddesk-layout-modal [data-threaddesk-screenprint-step] {
+	display: none;
+}
+
+.threaddesk-layout-modal [data-threaddesk-screenprint-step].is-active {
+	display: grid;
+	align-items: start;
+}
+
 
 @media (max-width: 900px) {
 	.threaddesk-layout-viewer {
 		grid-template-columns: 1fr;
 	}
+	.threaddesk-layout-viewer__stage.threaddesk-screenprint__stage {
+		min-height: 300px;
+	}
+
 
 	.threaddesk-layout-viewer__design-panel {
 		width: 100%;
@@ -1985,10 +1998,16 @@ body.threaddesk-modal-open {
 	width: 100%;
 }
 
+.threaddesk-layout-viewer__stage.threaddesk-screenprint__stage {
+	min-height: 420px;
+	aspect-ratio: 4 / 5;
+}
+
 .threaddesk-screenprint__stage > img {
 	width: 100%;
-	height: auto;
+	height: 100%;
 	display: block;
+	object-fit: contain;
 	border-radius: 8px;
 	border: 1px solid #ddd;
 }
