@@ -51,6 +51,7 @@ class TTA_ThreadDesk {
 		add_action( 'admin_footer-edit.php', array( $this, 'render_layout_quick_edit_status_script' ) );
 		add_action( 'save_post_tta_design', array( $this, 'handle_design_status_save' ), 10, 2 );
 		add_action( 'save_post_tta_layout', array( $this, 'handle_layout_status_save' ), 10, 2 );
+		add_action( 'save_post_product', array( $this, 'handle_product_postbox_save' ), 10, 2 );
 		add_filter( 'manage_edit-tta_quote_sortable_columns', array( $this, 'filter_quote_sortable_columns' ) );
 		add_filter( 'manage_edit-tta_design_sortable_columns', array( $this, 'filter_design_sortable_columns' ) );
 		add_filter( 'manage_edit-tta_layout_sortable_columns', array( $this, 'filter_layout_sortable_columns' ) );
@@ -208,7 +209,16 @@ class TTA_ThreadDesk {
 
 
 	public function enqueue_admin_assets( $hook ) {
-		if ( 'toplevel_page_tta-threaddesk' !== $hook && false === strpos( (string) $hook, 'tta-threaddesk-settings' ) ) {
+		$is_thread_desk_screen = 'toplevel_page_tta-threaddesk' === $hook || false !== strpos( (string) $hook, 'tta-threaddesk-settings' );
+		$product_post_id       = isset( $_GET['post'] ) ? absint( wp_unslash( $_GET['post'] ) ) : 0;
+		$product_post_type     = '';
+		if ( isset( $_GET['post_type'] ) ) {
+			$product_post_type = sanitize_key( wp_unslash( $_GET['post_type'] ) );
+		} elseif ( $product_post_id > 0 ) {
+			$product_post_type = get_post_type( $product_post_id );
+		}
+		$is_product_editor     = in_array( (string) $hook, array( 'post.php', 'post-new.php' ), true ) && 'product' === $product_post_type;
+		if ( ! $is_product_editor && ! $is_thread_desk_screen ) {
 			return;
 		}
 
@@ -2762,6 +2772,241 @@ class TTA_ThreadDesk {
 		add_meta_box( 'threaddesk_layout_detail', __( 'ThreadDesk Layout Details', 'threaddesk' ), array( $this, 'render_layout_admin_meta_box' ), 'tta_layout', 'normal', 'high' );
 		add_meta_box( 'threaddesk_layout_designs', __( 'Designs', 'threaddesk' ), array( $this, 'render_layout_designs_admin_meta_box' ), 'tta_layout', 'side', 'default' );
 		add_meta_box( 'threaddesk_layout_status', __( 'Layout Status', 'threaddesk' ), array( $this, 'render_layout_status_admin_meta_box' ), 'tta_layout', 'side', 'high' );
+		add_meta_box( 'threaddesk_product_postbox', __( 'ThreadDesk Product Postbox', 'threaddesk' ), array( $this, 'render_product_postbox_meta_box' ), 'product', 'normal', 'default' );
+	}
+
+	private function get_product_color_options( $product_id ) {
+		$options = array();
+		$product = function_exists( 'wc_get_product' ) ? wc_get_product( $product_id ) : false;
+		if ( ! $product || ! is_callable( array( $product, 'get_attributes' ) ) ) {
+			return $options;
+		}
+
+		$attributes = (array) $product->get_attributes();
+		$color_attribute = null;
+		foreach ( $attributes as $attribute ) {
+			if ( ! $attribute || ! is_object( $attribute ) || ! method_exists( $attribute, 'get_name' ) ) {
+				continue;
+			}
+			$attribute_name = sanitize_key( (string) $attribute->get_name() );
+			if ( in_array( $attribute_name, array( 'pa_color', 'color' ), true ) ) {
+				$color_attribute = $attribute;
+				break;
+			}
+		}
+
+		if ( ! $color_attribute ) {
+			return $options;
+		}
+
+		if ( method_exists( $color_attribute, 'is_taxonomy' ) && $color_attribute->is_taxonomy() ) {
+			$taxonomy = (string) $color_attribute->get_name();
+			$terms = wc_get_product_terms( $product_id, $taxonomy, array( 'fields' => 'all' ) );
+			if ( ! is_wp_error( $terms ) ) {
+				foreach ( $terms as $term ) {
+					if ( ! $term instanceof WP_Term ) {
+						continue;
+					}
+					$key = sanitize_key( (string) $term->slug );
+					$label = sanitize_text_field( (string) $term->name );
+					if ( '' === $key || '' === $label ) {
+						continue;
+					}
+					$options[ $key ] = $label;
+				}
+			}
+		} elseif ( method_exists( $color_attribute, 'get_options' ) ) {
+			foreach ( (array) $color_attribute->get_options() as $raw_label ) {
+				$label = sanitize_text_field( (string) $raw_label );
+				$key   = sanitize_title( $label );
+				if ( '' === $key || '' === $label ) {
+					continue;
+				}
+				$options[ $key ] = $label;
+			}
+		}
+
+		return $options;
+	}
+
+	public function get_product_postbox_views( $product_id ) {
+		$stored = get_post_meta( (int) $product_id, 'tta_threaddesk_product_postbox', true );
+		$stored = is_array( $stored ) ? $stored : array();
+		$colors = isset( $stored['colors'] ) && is_array( $stored['colors'] ) ? $stored['colors'] : array();
+		$normalized = array();
+		foreach ( $colors as $color_key => $row ) {
+			$key = sanitize_key( (string) $color_key );
+			if ( '' === $key || ! is_array( $row ) ) {
+				continue;
+			}
+			$normalized[ $key ] = array(
+				'front_image' => isset( $row['front_image'] ) ? esc_url_raw( $row['front_image'] ) : '',
+				'front_fallback_url' => isset( $row['front_fallback_url'] ) ? esc_url_raw( $row['front_fallback_url'] ) : '',
+				'back_image'  => isset( $row['back_image'] ) ? esc_url_raw( $row['back_image'] ) : '',
+				'back_fallback_url' => isset( $row['back_fallback_url'] ) ? esc_url_raw( $row['back_fallback_url'] ) : '',
+				'side_image'  => isset( $row['side_image'] ) ? esc_url_raw( $row['side_image'] ) : '',
+				'side_fallback_url' => isset( $row['side_fallback_url'] ) ? esc_url_raw( $row['side_fallback_url'] ) : '',
+				'side_label'  => ( isset( $row['side_label'] ) && 'right' === sanitize_key( (string) $row['side_label'] ) ) ? 'right' : 'left',
+			);
+		}
+
+		return array( 'colors' => $normalized );
+	}
+
+	public function render_product_postbox_meta_box( $post ) {
+		$product_id = $post instanceof WP_Post ? (int) $post->ID : 0;
+		if ( $product_id <= 0 ) {
+			return;
+		}
+
+		$colors = $this->get_product_color_options( $product_id );
+		$views  = $this->get_product_postbox_views( $product_id );
+		$saved_colors = isset( $views['colors'] ) && is_array( $views['colors'] ) ? $views['colors'] : array();
+		wp_nonce_field( 'tta_threaddesk_product_postbox_save', 'tta_threaddesk_product_postbox_nonce' );
+		?>
+		<p><?php echo esc_html__( 'Configure per-color FRONT, BACK, and SIDE mockup images for this product. SIDE is treated as Left by default.', 'threaddesk' ); ?></p>
+		<?php if ( empty( $colors ) ) : ?>
+			<p><em><?php echo esc_html__( 'No Color attribute values were found on this product. Add a Color attribute (global pa_color or custom Color) to enable tabs.', 'threaddesk' ); ?></em></p>
+			<?php return; ?>
+		<?php endif; ?>
+		<div class="threaddesk-product-postbox" data-threaddesk-product-postbox>
+			<div class="threaddesk-auth-modal__tabs" role="tablist" style="margin-bottom:16px;">
+				<?php $is_first = true; ?>
+				<?php foreach ( $colors as $color_key => $color_label ) : ?>
+					<button type="button" class="threaddesk-auth-modal__tab<?php echo $is_first ? ' is-active' : ''; ?>" data-threaddesk-product-color-tab="<?php echo esc_attr( $color_key ); ?>" role="tab" aria-selected="<?php echo $is_first ? 'true' : 'false'; ?>"><?php echo esc_html( $color_label ); ?></button>
+					<?php $is_first = false; ?>
+				<?php endforeach; ?>
+			</div>
+
+			<?php $is_first_panel = true; ?>
+			<?php foreach ( $colors as $color_key => $color_label ) : ?>
+				<?php $row = isset( $saved_colors[ $color_key ] ) && is_array( $saved_colors[ $color_key ] ) ? $saved_colors[ $color_key ] : array(); ?>
+				<div class="threaddesk-product-postbox__panel" data-threaddesk-product-color-panel="<?php echo esc_attr( $color_key ); ?>" <?php echo $is_first_panel ? '' : 'hidden'; ?> style="padding:12px;border:1px solid #dcdcde;background:#fff;">
+					<p><strong><?php echo esc_html( sprintf( __( '%s views', 'threaddesk' ), $color_label ) ); ?></strong></p>
+					<div style="display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap;">
+						<div style="flex:1 1 250px;min-width:220px;">
+							<p><strong><?php echo esc_html__( 'Front image', 'threaddesk' ); ?></strong></p>
+							<?php $this->render_media_picker_field( "tta_threaddesk_product_postbox[colors][{$color_key}][front_image]", isset( $row['front_image'] ) ? $row['front_image'] : '' ); ?>
+							<p>
+								<label for="tta_threaddesk_product_postbox_front_fallback_<?php echo esc_attr( $color_key ); ?>"><strong><?php echo esc_html__( 'Fallback link', 'threaddesk' ); ?></strong></label><br />
+								<input id="tta_threaddesk_product_postbox_front_fallback_<?php echo esc_attr( $color_key ); ?>" type="url" class="regular-text" name="tta_threaddesk_product_postbox[colors][<?php echo esc_attr( $color_key ); ?>][front_fallback_url]" value="<?php echo esc_url( isset( $row['front_fallback_url'] ) ? $row['front_fallback_url'] : '' ); ?>" placeholder="https://" />
+							</p>
+						</div>
+						<div style="flex:1 1 250px;min-width:220px;">
+							<p><strong><?php echo esc_html__( 'Back image', 'threaddesk' ); ?></strong></p>
+							<?php $this->render_media_picker_field( "tta_threaddesk_product_postbox[colors][{$color_key}][back_image]", isset( $row['back_image'] ) ? $row['back_image'] : '' ); ?>
+							<p>
+								<label for="tta_threaddesk_product_postbox_back_fallback_<?php echo esc_attr( $color_key ); ?>"><strong><?php echo esc_html__( 'Fallback link', 'threaddesk' ); ?></strong></label><br />
+								<input id="tta_threaddesk_product_postbox_back_fallback_<?php echo esc_attr( $color_key ); ?>" type="url" class="regular-text" name="tta_threaddesk_product_postbox[colors][<?php echo esc_attr( $color_key ); ?>][back_fallback_url]" value="<?php echo esc_url( isset( $row['back_fallback_url'] ) ? $row['back_fallback_url'] : '' ); ?>" placeholder="https://" />
+							</p>
+						</div>
+						<div style="flex:1 1 250px;min-width:220px;">
+							<p><strong><?php echo esc_html__( 'Side image', 'threaddesk' ); ?></strong></p>
+							<?php $this->render_media_picker_field( "tta_threaddesk_product_postbox[colors][{$color_key}][side_image]", isset( $row['side_image'] ) ? $row['side_image'] : '' ); ?>
+							<p>
+								<label for="tta_threaddesk_product_postbox_side_fallback_<?php echo esc_attr( $color_key ); ?>"><strong><?php echo esc_html__( 'Fallback link', 'threaddesk' ); ?></strong></label><br />
+								<input id="tta_threaddesk_product_postbox_side_fallback_<?php echo esc_attr( $color_key ); ?>" type="url" class="regular-text" name="tta_threaddesk_product_postbox[colors][<?php echo esc_attr( $color_key ); ?>][side_fallback_url]" value="<?php echo esc_url( isset( $row['side_fallback_url'] ) ? $row['side_fallback_url'] : '' ); ?>" placeholder="https://" />
+							</p>
+							<p>
+								<label for="tta_threaddesk_product_postbox_side_label_<?php echo esc_attr( $color_key ); ?>"><strong><?php echo esc_html__( 'Side view represents', 'threaddesk' ); ?></strong></label><br />
+								<select id="tta_threaddesk_product_postbox_side_label_<?php echo esc_attr( $color_key ); ?>" name="tta_threaddesk_product_postbox[colors][<?php echo esc_attr( $color_key ); ?>][side_label]">
+									<option value="left" <?php selected( isset( $row['side_label'] ) ? $row['side_label'] : 'left', 'left' ); ?>><?php echo esc_html__( 'Left', 'threaddesk' ); ?></option>
+									<option value="right" <?php selected( isset( $row['side_label'] ) ? $row['side_label'] : 'left', 'right' ); ?>><?php echo esc_html__( 'Right', 'threaddesk' ); ?></option>
+								</select>
+							</p>
+						</div>
+					</div>
+				</div>
+				<?php $is_first_panel = false; ?>
+			<?php endforeach; ?>
+		</div>
+		<script>
+		jQuery(function ($) {
+			const wrapper = $('[data-threaddesk-product-postbox]');
+			if (!wrapper.length) { return; }
+
+			const switchColorPanel = function (key) {
+				wrapper.find('[data-threaddesk-product-color-tab]').removeClass('is-active').attr('aria-selected', 'false');
+				wrapper.find('[data-threaddesk-product-color-tab="' + key + '"]').addClass('is-active').attr('aria-selected', 'true');
+				wrapper.find('[data-threaddesk-product-color-panel]').attr('hidden', 'hidden');
+				wrapper.find('[data-threaddesk-product-color-panel="' + key + '"]').removeAttr('hidden');
+			};
+
+			wrapper.on('click', '[data-threaddesk-product-color-tab]', function () {
+				switchColorPanel(String($(this).attr('data-threaddesk-product-color-tab') || ''));
+			});
+
+			wrapper.on('click', '[data-threaddesk-media-select]', function (event) {
+				event.preventDefault();
+				const fieldWrap = $(this).closest('.threaddesk-media-picker-field');
+				const input = fieldWrap.find('[data-threaddesk-media-input]');
+				const preview = fieldWrap.find('[data-threaddesk-media-preview]');
+				const frame = wp.media({ title: 'Select image', button: { text: 'Use image' }, multiple: false, library: { type: 'image' } });
+				frame.on('select', function () {
+					const attachment = frame.state().get('selection').first().toJSON();
+					const url = attachment.url || '';
+					input.val(url);
+					if (url) {
+						preview.attr('src', url).show();
+					}
+				});
+				frame.open();
+			});
+
+			wrapper.on('click', '[data-threaddesk-media-clear]', function (event) {
+				event.preventDefault();
+				const fieldWrap = $(this).closest('.threaddesk-media-picker-field');
+				fieldWrap.find('[data-threaddesk-media-input]').val('');
+				fieldWrap.find('[data-threaddesk-media-preview]').attr('src', '').hide();
+			});
+		});
+		</script>
+		<?php
+	}
+
+	public function handle_product_postbox_save( $post_id, $post ) {
+		if ( ! $post || 'product' !== $post->post_type ) {
+			return;
+		}
+		if ( defined( 'DOING_AUTOSAVE' ) && DOING_AUTOSAVE ) {
+			return;
+		}
+		if ( ! current_user_can( 'edit_post', $post_id ) ) {
+			return;
+		}
+		if ( ! isset( $_POST['tta_threaddesk_product_postbox_nonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['tta_threaddesk_product_postbox_nonce'] ) ), 'tta_threaddesk_product_postbox_save' ) ) {
+			return;
+		}
+
+		$raw = isset( $_POST['tta_threaddesk_product_postbox'] ) ? wp_unslash( $_POST['tta_threaddesk_product_postbox'] ) : array();
+		$raw_colors = is_array( $raw ) && isset( $raw['colors'] ) && is_array( $raw['colors'] ) ? $raw['colors'] : array();
+		$valid_colors = $this->get_product_color_options( $post_id );
+		$sanitized_colors = array();
+		foreach ( $valid_colors as $color_key => $color_label ) {
+			$row = isset( $raw_colors[ $color_key ] ) && is_array( $raw_colors[ $color_key ] ) ? $raw_colors[ $color_key ] : array();
+			$sanitized_colors[ $color_key ] = array(
+				'front_image' => isset( $row['front_image'] ) ? esc_url_raw( $row['front_image'] ) : '',
+				'front_fallback_url' => isset( $row['front_fallback_url'] ) ? esc_url_raw( $row['front_fallback_url'] ) : '',
+				'back_image'  => isset( $row['back_image'] ) ? esc_url_raw( $row['back_image'] ) : '',
+				'back_fallback_url' => isset( $row['back_fallback_url'] ) ? esc_url_raw( $row['back_fallback_url'] ) : '',
+				'side_image'  => isset( $row['side_image'] ) ? esc_url_raw( $row['side_image'] ) : '',
+				'side_fallback_url' => isset( $row['side_fallback_url'] ) ? esc_url_raw( $row['side_fallback_url'] ) : '',
+				'side_label'  => ( isset( $row['side_label'] ) && 'right' === sanitize_key( (string) $row['side_label'] ) ) ? 'right' : 'left',
+			);
+		}
+
+		if ( empty( $sanitized_colors ) ) {
+			delete_post_meta( $post_id, 'tta_threaddesk_product_postbox' );
+			return;
+		}
+
+		update_post_meta(
+			$post_id,
+			'tta_threaddesk_product_postbox',
+			array(
+				'colors' => $sanitized_colors,
+			)
+		);
 	}
 
 	public function render_layout_status_admin_meta_box( $post ) {
