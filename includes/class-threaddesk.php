@@ -1870,13 +1870,13 @@ class TTA_ThreadDesk {
 		<div class="threaddesk-screenprint" id="<?php echo esc_attr( $instance_id ); ?>" data-threaddesk-screenprint-layouts="<?php echo esc_attr( wp_json_encode( $layout_items ) ); ?>" data-threaddesk-screenprint-images-by-color="<?php echo esc_attr( wp_json_encode( $screenprint_images_by_color ) ); ?>" data-threaddesk-screenprint-initial-color="<?php echo esc_attr( $initial_color_key ); ?>">
 			<div class="threaddesk-screenprint__color-picker" style="display:flex;flex-wrap:wrap;gap:10px;align-items:stretch;">
 				<?php foreach ( $screenprint_color_choices as $choice_index => $choice ) : ?>
-					<button type="button" class="threaddesk-screenprint__open-color" data-threaddesk-screenprint-open-color="<?php echo esc_attr( $choice['key'] ); ?>" style="display:flex;flex-direction:column;align-items:center;gap:6px;padding:8px 0;width:80px;border:1px solid #dcdcde;background:#fff;border-radius:4px;cursor:pointer;<?php echo 0 === (int) $choice_index ? 'box-shadow:0 0 0 1px #2271b1;' : ''; ?>">
+					<button type="button" class="threaddesk-screenprint__open-color" data-threaddesk-screenprint-open-color="<?php echo esc_attr( $choice['key'] ); ?>" aria-label="<?php echo esc_attr( $choice['label'] ); ?>" style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:8px 0;width:70px;border:1px solid #dcdcde;background:#fff;border-radius:4px;cursor:pointer;position:relative;overflow:visible;<?php echo 0 === (int) $choice_index ? 'box-shadow:0 0 0 1px #2271b1;' : ''; ?>">
+						<span class="threaddesk-screenprint__color-tag" aria-hidden="true"><?php echo esc_html( $choice['label'] ); ?></span>
 						<?php if ( ! empty( $choice['image'] ) ) : ?>
-							<img src="<?php echo esc_url( $choice['image'] ); ?>" alt="<?php echo esc_attr( $choice['label'] ); ?>" style="width:56px;height:56px;object-fit:cover;border-radius:3px;" />
+							<img src="<?php echo esc_url( $choice['image'] ); ?>" alt="" aria-hidden="true" style="width:56px;height:56px;object-fit:cover;border-radius:3px;" />
 						<?php else : ?>
-							<span style="display:inline-flex;width:56px;height:56px;align-items:center;justify-content:center;background:#f0f0f1;border-radius:3px;color:#666;">—</span>
+							<span style="display:inline-flex;width:56px;height:56px;align-items:center;justify-content:center;background:#f0f0f1;border-radius:3px;color:#666;" aria-hidden="true">—</span>
 						<?php endif; ?>
-						<span style="font-size:12px;font-weight:600;text-align:center;white-space:normal;word-break:break-word;line-height:1.25;"><?php echo esc_html( $choice['label'] ); ?></span>
 					</button>
 				<?php endforeach; ?>
 			</div>
