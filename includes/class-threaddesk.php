@@ -2083,11 +2083,31 @@ class TTA_ThreadDesk {
 				createBtn.appendChild(createTitle);
 				createBtn.appendChild(createMeta);
 				createBtn.addEventListener('click',()=>{
+					if(modal){modal.classList.remove('is-active');modal.setAttribute('aria-hidden','true');}
+					const layoutChooser=document.querySelector('.threaddesk-layout-modal [data-threaddesk-layout-step="chooser"]');
+					const layoutModalEl=layoutChooser?layoutChooser.closest('.threaddesk-layout-modal'):null;
+					if(layoutModalEl){
+						layoutModalEl.classList.add('is-active');
+						layoutModalEl.setAttribute('aria-hidden','false');
+						document.body.classList.add('threaddesk-modal-open');
+						const layoutViewer=layoutModalEl.querySelector('[data-threaddesk-layout-step="viewer"]');
+						layoutChooser.classList.add('is-active');
+						layoutChooser.hidden=false;
+						layoutChooser.setAttribute('aria-hidden','false');
+						if(layoutViewer){layoutViewer.classList.remove('is-active');layoutViewer.hidden=true;layoutViewer.setAttribute('aria-hidden','true');}
+						if(createLayoutCategory){
+							const categoryButtons=layoutModalEl.querySelectorAll('[data-threaddesk-layout-category]');
+							for(let i=0;i<categoryButtons.length;i+=1){
+								const button=categoryButtons[i];
+								if(String(button.getAttribute('data-threaddesk-layout-category')||'').trim()===createLayoutCategory){button.click();break;}
+							}
+						}
+						return;
+					}
 					const localScope=root.closest('.product')||document;
 					const layoutOpen=localScope.querySelector('[data-threaddesk-layout-open]')||document.querySelector('[data-threaddesk-layout-open]');
 					if(!layoutOpen){return;}
 					if(createLayoutCategory){layoutOpen.setAttribute('data-threaddesk-layout-category-open', createLayoutCategory);}
-					if(modal){modal.classList.remove('is-active');modal.setAttribute('aria-hidden','true');}
 					document.body.classList.remove('threaddesk-modal-open');
 					window.setTimeout(()=>{layoutOpen.click();},0);
 				});
