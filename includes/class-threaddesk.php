@@ -1693,6 +1693,12 @@ class TTA_ThreadDesk {
 			)
 		);
 
+		$layout_status_labels = array(
+			'pending'  => __( 'Pending', 'threaddesk' ),
+			'approved' => __( 'Approved', 'threaddesk' ),
+			'rejected' => __( 'Rejected', 'threaddesk' ),
+		);
+
 		$layout_items = array();
 		foreach ( $layout_posts as $layout_post ) {
 			$layout_category_id = (int) get_post_meta( $layout_post->ID, 'layout_category_id', true );
@@ -1715,12 +1721,66 @@ class TTA_ThreadDesk {
 				continue;
 			}
 
+			$layout_angles = isset( $payload['angles'] ) && is_array( $payload['angles'] ) ? $payload['angles'] : array();
+			$preview_angle = '';
+			$preview_entries = array();
+			$print_count = 0;
+			foreach ( $placements as $angle_key => $angle_placements ) {
+				if ( ! is_array( $angle_placements ) ) {
+					continue;
+				}
+				foreach ( $angle_placements as $entry ) {
+					if ( ! is_array( $entry ) ) {
+						continue;
+					}
+					$entry_url = isset( $entry['url'] ) ? (string) $entry['url'] : '';
+					if ( '' === $entry_url ) {
+						$entry_url = isset( $entry['sourceUrl'] ) ? (string) $entry['sourceUrl'] : '';
+					}
+					if ( '' === $entry_url ) {
+						$entry_url = isset( $entry['designUrl'] ) ? (string) $entry['designUrl'] : '';
+					}
+					if ( '' === $entry_url ) {
+						$entry_url = isset( $entry['previewUrl'] ) ? (string) $entry['previewUrl'] : '';
+					}
+					if ( '' === $entry_url ) {
+						$entry_url = isset( $entry['preview'] ) ? (string) $entry['preview'] : '';
+					}
+					if ( '' === $entry_url ) {
+						continue;
+					}
+					$print_count++;
+					if ( '' === $preview_angle ) {
+						$preview_angle = sanitize_key( (string) $angle_key );
+					}
+					if ( '' !== $preview_angle && sanitize_key( (string) $angle_key ) === $preview_angle ) {
+						$preview_entries[] = $entry;
+					}
+				}
+			}
+			if ( empty( $preview_entries ) && '' !== $preview_angle && isset( $placements[ $preview_angle ] ) && is_array( $placements[ $preview_angle ] ) ) {
+				$preview_entries = $placements[ $preview_angle ];
+			}
+			$preview_base_url = '';
+			if ( '' !== $preview_angle && isset( $layout_angles[ $preview_angle ] ) ) {
+				$preview_base_url = (string) $layout_angles[ $preview_angle ];
+			}
+			$layout_status = sanitize_key( (string) get_post_meta( $layout_post->ID, 'layout_status', true ) );
+			if ( ! isset( $layout_status_labels[ $layout_status ] ) ) {
+				$layout_status = 'pending';
+			}
+
 			$layout_items[] = array(
 				'id' => (int) $layout_post->ID,
 				'title' => (string) $layout_post->post_title,
 				'category_id' => $layout_category_id,
 				'category_slug' => $layout_category_slug,
 				'placementsByAngle' => $placements,
+				'previewBaseUrl' => $preview_base_url,
+				'previewEntries' => $preview_entries,
+				'printCount' => $print_count,
+				'statusKey' => $layout_status,
+				'statusLabel' => $layout_status_labels[ $layout_status ],
 			);
 		}
 
@@ -1733,7 +1793,7 @@ class TTA_ThreadDesk {
 		ob_start();
 		?>
 		<div class="threaddesk-screenprint" id="<?php echo esc_attr( $instance_id ); ?>" data-threaddesk-screenprint-layouts="<?php echo esc_attr( wp_json_encode( $layout_items ) ); ?>" data-threaddesk-screenprint-images="<?php echo esc_attr( wp_json_encode( $product_images ) ); ?>">
-			<button type="button" class="button threaddesk-screenprint__open"><?php echo esc_html__( 'Apply Saved Screenprint Layout', 'threaddesk' ); ?></button>
+			<button type="button" class="threaddesk-screenprint__open"><?php echo esc_html__( 'Screen Printing', 'threaddesk' ); ?></button>
 			<div class="threaddesk-layout-modal" aria-hidden="true">
 				<div class="threaddesk-auth-modal__overlay" data-threaddesk-screenprint-close></div>
 				<div class="threaddesk-auth-modal__panel" role="dialog" aria-modal="true" aria-label="<?php echo esc_attr__( 'Screenprint layout chooser', 'threaddesk' ); ?>">
@@ -1764,6 +1824,8 @@ class TTA_ThreadDesk {
 			const root=document.getElementById(<?php echo wp_json_encode( $instance_id ); ?>); if(!root){return;}
 			const layouts=JSON.parse(root.getAttribute('data-threaddesk-screenprint-layouts')||'[]');
 			const images=JSON.parse(root.getAttribute('data-threaddesk-screenprint-images')||'{}');
+			const i18nNoPreview=<?php echo wp_json_encode( __( 'No placement preview', 'threaddesk' ) ); ?>;
+			const i18nPrintCountLabel=<?php echo wp_json_encode( __( 'Print count', 'threaddesk' ) ); ?>;
 			const modal=root.querySelector('.threaddesk-layout-modal');
 			const options=root.querySelector('[data-threaddesk-screenprint-options]');
 			const viewer=root.querySelector('[data-threaddesk-screenprint-viewer]');
@@ -1780,7 +1842,7 @@ class TTA_ThreadDesk {
 				main.src=images[angle]||images.front||'';
 				overlayWrap.innerHTML='';
 				entries.forEach((entry)=>{
-					const src=String(entry.sourceUrl||entry.designUrl||entry.previewUrl||entry.preview||'').trim();
+					const src=String(entry.sourceUrl||entry.designUrl||entry.previewUrl||entry.preview||entry.url||'').trim();
 					if(!src){return;}
 					const img=document.createElement('img');
 					img.src=src; img.alt=''; img.setAttribute('aria-hidden','true');
@@ -1789,7 +1851,55 @@ class TTA_ThreadDesk {
 				});
 			};
 			(layouts||[]).forEach((layout)=>{
-				const btn=document.createElement('button'); btn.type='button'; btn.className='threaddesk-layout-modal__option'; btn.textContent=layout.title||('Layout #'+layout.id);
+				const btn=document.createElement('button');
+				btn.type='button';
+				btn.className='threaddesk-screenprint-option threaddesk__card threaddesk__card--design';
+				const title=(layout.title||'').trim()||('Layout #'+layout.id);
+				const entries=Array.isArray(layout.previewEntries)?layout.previewEntries:[];
+				const preview=document.createElement('div');
+				preview.className='threaddesk__card-design-preview';
+				const baseSrc=String(layout.previewBaseUrl||'').trim();
+				if(baseSrc){
+					const base=document.createElement('img');
+					base.className='threaddesk__card-layout-preview-base';
+					base.src=baseSrc;
+					base.alt='';
+					base.setAttribute('aria-hidden','true');
+					preview.appendChild(base);
+				}
+				entries.forEach((entry)=>{
+					const overlaySrc=String(entry.url||entry.sourceUrl||entry.designUrl||entry.previewUrl||entry.preview||'').trim();
+					if(!overlaySrc){return;}
+					const overlay=document.createElement('img');
+					overlay.className='threaddesk__card-layout-preview-overlay';
+					overlay.src=overlaySrc;
+					overlay.alt='';
+					overlay.style.top=(Number(entry.top||50)).toFixed(2)+'%';
+					overlay.style.left=(Number(entry.left||50)).toFixed(2)+'%';
+					overlay.style.width=(Number(entry.width||25)).toFixed(2)+'%';
+					preview.appendChild(overlay);
+				});
+				if(!preview.childElementCount){
+					const fallback=document.createElement('span');
+					fallback.className='threaddesk-layout-modal__image-fallback';
+					fallback.textContent=i18nNoPreview;
+					preview.appendChild(fallback);
+				}
+				const titleWrap=document.createElement('h5');
+				titleWrap.className='threaddesk-screenprint-option__title';
+				titleWrap.textContent=title;
+				const meta=document.createElement('p');
+				meta.className='threaddesk__card-design-color-count';
+				const count=document.createElement('span');
+				count.textContent=i18nPrintCountLabel+': '+String(Number(layout.printCount||0));
+				const status=document.createElement('span');
+				status.className='threaddesk__card-design-status threaddesk__card-design-status--'+String(layout.statusKey||'pending');
+				status.textContent=String(layout.statusLabel||'Pending').toUpperCase();
+				meta.appendChild(count);
+				meta.appendChild(status);
+				btn.appendChild(preview);
+				btn.appendChild(titleWrap);
+				btn.appendChild(meta);
 				btn.addEventListener('click',()=>{selected=layout; viewer.hidden=false; render();});
 				options.appendChild(btn);
 			});
