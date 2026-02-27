@@ -1903,6 +1903,12 @@ class TTA_ThreadDesk {
 									</div>
 									<span><?php echo esc_html__( 'Back', 'threaddesk' ); ?></span>
 								</button>
+								<button type="button" class="threaddesk-layout-viewer__angle" data-threaddesk-screenprint-angle="right">
+									<div class="threaddesk-layout-viewer__angle-image-wrap">
+										<img src="" alt="" data-threaddesk-screenprint-angle-image="right" />
+									</div>
+									<span><?php echo esc_html__( 'Right', 'threaddesk' ); ?></span>
+								</button>
 							</div>
 						</div>
 						<div class="threaddesk-layout-viewer__design-panel">
@@ -1930,6 +1936,7 @@ class TTA_ThreadDesk {
 			const selectedLabel=root.querySelector('[data-threaddesk-screenprint-selected]');
 			const main=root.querySelector('[data-threaddesk-screenprint-main]');
 			const overlayWrap=root.querySelector('[data-threaddesk-screenprint-overlay]');
+			const stage=root.querySelector('[data-threaddesk-screenprint-stage]');
 			const angleThumbs=root.querySelectorAll('[data-threaddesk-screenprint-angle-image]');
 			let selected=null; let angle='front'; let selectedColor=initialColorKey;
 			if(!selectedColor||!imageMap[selectedColor]){const keys=Object.keys(imageMap||{}); selectedColor=keys.length?keys[0]:'';}
@@ -1951,11 +1958,54 @@ class TTA_ThreadDesk {
 			}));
 			root.querySelectorAll('[data-threaddesk-screenprint-close]').forEach((el)=>el.addEventListener('click',()=>{modal.classList.remove('is-active');modal.setAttribute('aria-hidden','true');setStep('chooser');}));
 			root.querySelectorAll('[data-threaddesk-screenprint-back]').forEach((el)=>el.addEventListener('click',()=>setStep('chooser')));
+			const lockStageRatio=(src)=>{
+				if(stageRatioLocked||!stage||!src){return;}
+				const probe=new Image();
+				probe.addEventListener('load',()=>{
+					if(stageRatioLocked||!probe.naturalWidth||!probe.naturalHeight){return;}
+					stage.style.aspectRatio=probe.naturalWidth+' / '+probe.naturalHeight;
+					stageRatioLocked=true;
+				});
+				probe.src=src;
+			};
+			const getAngleEntries=(map,targetAngle)=>{
+				const candidates=[targetAngle];
+				if(targetAngle==='left'){candidates.push('side');}
+				if(targetAngle==='side'){candidates.push('left');}
+				for(let i=0;i<candidates.length;i++){
+					const key=candidates[i];
+					const raw=map&&Object.prototype.hasOwnProperty.call(map,key)?map[key]:null;
+					if(Array.isArray(raw)){return raw;}
+					if(raw&&typeof raw==='object'){return Object.values(raw);}
+				}
+				return [];
+			};
+			const renderAngleOverlays=(map)=>{
+				root.querySelectorAll('.threaddesk-layout-viewer__angle-overlay').forEach((el)=>el.remove());
+				root.querySelectorAll('[data-threaddesk-screenprint-angle]').forEach((btn)=>{
+					const targetAngle=btn.getAttribute('data-threaddesk-screenprint-angle')||'front';
+					const imageWrap=btn.querySelector('.threaddesk-layout-viewer__angle-image-wrap');
+					if(!imageWrap){return;}
+					const entries=getAngleEntries(map,targetAngle);
+					entries.forEach((entry)=>{
+						const src=String(entry.sourceUrl||entry.designUrl||entry.previewUrl||entry.preview||entry.url||'').trim();
+						if(!src){return;}
+						const img=document.createElement('img');
+						img.className='threaddesk-layout-viewer__angle-overlay';
+						img.src=src; img.alt=''; img.setAttribute('aria-hidden','true');
+						img.style.top=(Number(entry.top||0)).toFixed(2)+'%';
+						img.style.left=(Number(entry.left||0)).toFixed(2)+'%';
+						img.style.width=(Number(entry.width||0)).toFixed(2)+'%';
+						imageWrap.appendChild(img);
+					});
+				});
+			};
 			const render=()=>{
 				if(!selected){return;}
 				const map=selected.placementsByAngle||{};
-				const entries=Array.isArray(map[angle])?map[angle]:[];
+				const entries=getAngleEntries(map,angle);
 				main.src=images[angle]||images.front||'';
+				lockStageRatio(main.src);
 				main.style.display=main.src?'block':'none';
 				overlayWrap.innerHTML='';
 				entries.forEach((entry)=>{
@@ -1963,9 +2013,14 @@ class TTA_ThreadDesk {
 					if(!src){return;}
 					const img=document.createElement('img');
 					img.src=src; img.alt=''; img.setAttribute('aria-hidden','true');
-					img.style.position='absolute'; img.style.top=(Number(entry.top||0)).toFixed(2)+'%'; img.style.left=(Number(entry.left||0)).toFixed(2)+'%'; img.style.width=(Number(entry.width||0)).toFixed(2)+'%';
+					img.style.position='absolute';
+					img.style.top=(Number(entry.top||0)).toFixed(2)+'%';
+					img.style.left=(Number(entry.left||0)).toFixed(2)+'%';
+					img.style.width=(Number(entry.width||0)).toFixed(2)+'%';
+					img.style.transform='translate(-50%, -50%)';
 					overlayWrap.appendChild(img);
 				});
+				renderAngleOverlays(map);
 			};
 			(layouts||[]).forEach((layout)=>{
 				const btn=document.createElement('button');
@@ -2039,6 +2094,7 @@ class TTA_ThreadDesk {
 		$gallery_ids = $product && is_callable( array( $product, 'get_gallery_image_ids' ) ) ? (array) $product->get_gallery_image_ids() : array();
 		$side_url   = ! empty( $gallery_ids[0] ) ? wp_get_attachment_image_url( (int) $gallery_ids[0], 'large' ) : '';
 		$back_url   = ! empty( $gallery_ids[1] ) ? wp_get_attachment_image_url( (int) $gallery_ids[1], 'large' ) : '';
+		$right_url  = ! empty( $gallery_ids[2] ) ? wp_get_attachment_image_url( (int) $gallery_ids[2], 'large' ) : '';
 		if ( '' === $front_url ) {
 			$front_url = $side_url ? $side_url : $back_url;
 		}
@@ -2048,11 +2104,15 @@ class TTA_ThreadDesk {
 		if ( '' === $back_url ) {
 			$back_url = $side_url ? $side_url : $front_url;
 		}
+		if ( '' === $right_url ) {
+			$right_url = $side_url ? $side_url : $front_url;
+		}
 
 		return array(
 			'front' => (string) $front_url,
 			'left'  => (string) $side_url,
 			'back'  => (string) $back_url,
+			'right' => (string) $right_url,
 		);
 	}
 
