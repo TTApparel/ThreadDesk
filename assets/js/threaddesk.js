@@ -109,12 +109,19 @@ jQuery(function ($) {
 	}
 
 
-	const layoutModal = $('.threaddesk-layout-modal[data-threaddesk-layout-builder]');
+	const layoutBuilderModalSelector = '.threaddesk-layout-modal[data-threaddesk-layout-builder]';
+	const layoutBuilderStepSelector = '[data-threaddesk-layout-step="chooser"], [data-threaddesk-layout-step="viewer"]';
+	const findLayoutBuilderModals = function (scopeEl) {
+		const scope = scopeEl && scopeEl.length ? scopeEl : $(document);
+		return scope.find(layoutBuilderModalSelector).filter(function () {
+			const modal = $(this);
+			return modal.find('[data-threaddesk-layout-step="chooser"]').length && modal.find('[data-threaddesk-layout-step="viewer"]').length;
+		});
+	};
+	const layoutModal = findLayoutBuilderModals().first();
 
 	if (layoutModal.length) {
 		let lastLayoutTrigger = null;
-		const chooserStep = layoutModal.find('[data-threaddesk-layout-step="chooser"]');
-		const viewerStep = layoutModal.find('[data-threaddesk-layout-step="viewer"]');
 		const stage = layoutModal.find('.threaddesk-layout-viewer__stage');
 		const mainImage = layoutModal.find('[data-threaddesk-layout-main-image]');
 		const layoutViewer = layoutModal.find('.threaddesk-layout-viewer');
@@ -213,6 +220,22 @@ jQuery(function ($) {
 			const targetAngle = getPlacementAngleTarget(selectedPlacementKey);
 			const savedEntry = targetAngle && selectedPlacementKey ? ((savedPlacementsByAngle[targetAngle] || {})[selectedPlacementKey] || null) : null;
 			removePlacementButton.prop('hidden', !(isAdjustMode && savedEntry && savedEntry.url));
+
+			if (isAdjustMode && savedEntry && savedEntry.url) {
+				const activeSrc = String(selectedDesignSourceUrl || designOverlay.attr('src') || '').trim();
+				const fallbackSrc = String(savedEntry.url || '').trim();
+				const resolvedSrc = activeSrc || fallbackSrc;
+				if (resolvedSrc) {
+					selectedDesignSourceUrl = resolvedSrc;
+					if (designOverlay.prop('hidden') || !String(designOverlay.attr('src') || '').trim()) {
+						applySelectedDesign(resolvedSrc, {
+							top: Number(savedEntry.top || 0),
+							left: Number(savedEntry.left || 0),
+							width: Number(savedEntry.width || 0),
+						});
+					}
+				}
+			}
 		};
 
 		const getPlacementAbbreviation = function (placementLabel, placementKey) {
@@ -433,9 +456,18 @@ jQuery(function ($) {
 			}
 		};
 
-		const showChooserStep = function () {
-			chooserStep.addClass('is-active').prop('hidden', false).attr('aria-hidden', 'false');
-			viewerStep.removeClass('is-active').prop('hidden', true).attr('aria-hidden', 'true');
+		const setLayoutStep = function (modalEl, stepName) {
+			const scopedModal = modalEl && modalEl.length ? modalEl : layoutModal;
+			const scopedChooserStep = scopedModal.find('[data-threaddesk-layout-step="chooser"]');
+			const scopedViewerStep = scopedModal.find('[data-threaddesk-layout-step="viewer"]');
+			const chooserIsActive = stepName === 'chooser';
+
+			scopedChooserStep.toggleClass('is-active', chooserIsActive).prop('hidden', !chooserIsActive).attr('aria-hidden', chooserIsActive ? 'false' : 'true');
+			scopedViewerStep.toggleClass('is-active', !chooserIsActive).prop('hidden', chooserIsActive).attr('aria-hidden', chooserIsActive ? 'true' : 'false');
+		};
+
+		const showChooserStep = function (modalEl) {
+			setLayoutStep(modalEl, 'chooser');
 			placementList.empty();
 			placementEmpty.hide();
 			saveLayoutForm.prop('hidden', true);
@@ -458,9 +490,8 @@ jQuery(function ($) {
 			updateSizeReading();
 		};
 
-		const showViewerStep = function () {
-			chooserStep.removeClass('is-active').prop('hidden', true).attr('aria-hidden', 'true');
-			viewerStep.addClass('is-active').prop('hidden', false).attr('aria-hidden', 'false');
+		const showViewerStep = function (modalEl) {
+			setLayoutStep(modalEl, 'viewer');
 		};
 
 		const renderPlacementOptions = function (placements) {
@@ -804,7 +835,7 @@ jQuery(function ($) {
 				Object.keys(entries).forEach(function (placementKey) {
 					const entry = entries[placementKey];
 					if (!entry || typeof entry !== 'object') { return; }
-					const url = String(entry.url || '').trim();
+					const url = String(entry.url || entry.sourceUrl || entry.designUrl || entry.previewUrl || entry.preview || '').trim();
 					if (!url) { return; }
 					const key = String(placementKey || entry.placementKey || '').trim();
 					if (!key) { return; }
@@ -841,11 +872,12 @@ jQuery(function ($) {
 			updateSaveLayoutVisibility();
 		};
 
-		const openLayoutModal = function (triggerEl) {
+		const openLayoutModal = function (triggerEl, modalEl) {
+			const scopedModal = modalEl && modalEl.length ? modalEl : layoutModal;
 			lastLayoutTrigger = triggerEl || document.activeElement || lastLayoutTrigger;
-			layoutModal.addClass('is-active').attr('aria-hidden', 'false');
+			scopedModal.addClass('is-active').attr('aria-hidden', 'false');
 			$('body').addClass('threaddesk-modal-open');
-			showChooserStep();
+			showChooserStep(scopedModal);
 			setPanelStep('placements');
 			saveLayoutIdField.val('0');
 		};
@@ -941,6 +973,13 @@ jQuery(function ($) {
 				setMainImage(String(savedPayload.currentAngle || 'front').trim() || 'front');
 			}
 
+			if (!categoryButton.length && !savedPayload) {
+				const firstCategoryButton = layoutModal.find('[data-threaddesk-layout-category]').first();
+				if (firstCategoryButton.length) {
+					firstCategoryButton.trigger('click');
+				}
+			}
+
 			if (savedPayload) {
 				const savedAngles = savedPayload.angles && typeof savedPayload.angles === 'object' ? savedPayload.angles : {};
 				if (savedAngles && Object.keys(savedAngles).length) {
@@ -965,11 +1004,17 @@ jQuery(function ($) {
 		});
 
 		$(document).on('threaddesk:open-layout-modal', function (event, externalData) {
+			const builderModal = findLayoutBuilderModals().first();
+			if (!builderModal.length) {
+				console.warn('[ThreadDesk] Builder layout modal not found for threaddesk:open-layout-modal. Selector:', layoutBuilderModalSelector + ' + ' + layoutBuilderStepSelector);
+				return;
+			}
+
 			const request = externalData && typeof externalData === 'object' ? externalData : {};
 			const requestedCategory = String(request.category || '').trim();
 			const requestedCategoryId = Number(request.categoryId || 0);
 			const forceViewer = !!request.forceViewer;
-			openLayoutModal(document.activeElement);
+			openLayoutModal(document.activeElement, layoutModal);
 
 			let categoryButton = requestedCategory ? layoutModal.find('[data-threaddesk-layout-category]').filter(function () {
 				return String($(this).attr('data-threaddesk-layout-category') || '').trim() === requestedCategory;
@@ -983,10 +1028,15 @@ jQuery(function ($) {
 
 			if (categoryButton.length) {
 				categoryButton.trigger('click');
+			} else {
+				const firstCategoryButton = layoutModal.find('[data-threaddesk-layout-category]').first();
+				if (firstCategoryButton.length) {
+					firstCategoryButton.trigger('click');
+				}
 			}
 
 			if (forceViewer) {
-				showViewerStep();
+				showViewerStep(layoutModal);
 				setPanelStep('placements');
 				if (visibleAngles.length) { setMainImage('front'); }
 			}
@@ -1202,7 +1252,9 @@ jQuery(function ($) {
 
 		const startDrag = function (event) {
 			if (!isAdjustMode) { return; }
-			if (!selectedDesignSourceUrl) { return; }
+			const activeSource = String(selectedDesignSourceUrl || designOverlay.attr('src') || '').trim();
+			if (!activeSource) { return; }
+			selectedDesignSourceUrl = activeSource;
 			dragState = { active: true };
 			designOverlay.addClass('is-dragging');
 			event.preventDefault();
