@@ -998,7 +998,7 @@ jQuery(function ($) {
 			const requestedCategory = String(request.category || '').trim();
 			const requestedCategoryId = Number(request.categoryId || 0);
 			const forceViewer = !!request.forceViewer;
-			openLayoutModal(document.activeElement, builderModal);
+			openLayoutModal(document.activeElement, layoutModal);
 
 			let categoryButton = requestedCategory ? builderModal.find('[data-threaddesk-layout-category]').filter(function () {
 				return String($(this).attr('data-threaddesk-layout-category') || '').trim() === requestedCategory;
@@ -1013,14 +1013,14 @@ jQuery(function ($) {
 			if (categoryButton.length) {
 				categoryButton.trigger('click');
 			} else {
-				const firstCategoryButton = builderModal.find('[data-threaddesk-layout-category]').first();
+				const firstCategoryButton = layoutModal.find('[data-threaddesk-layout-category]').first();
 				if (firstCategoryButton.length) {
 					firstCategoryButton.trigger('click');
 				}
 			}
 
 			if (forceViewer) {
-				showViewerStep(builderModal);
+				showViewerStep(layoutModal);
 				setPanelStep('placements');
 				if (visibleAngles.length) { setMainImage('front'); }
 			}
