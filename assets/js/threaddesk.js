@@ -109,7 +109,7 @@ jQuery(function ($) {
 	}
 
 
-	const layoutModal = $('.threaddesk-layout-modal');
+	const layoutModal = $('.threaddesk-layout-modal[data-threaddesk-layout-builder]');
 
 	if (layoutModal.length) {
 		let lastLayoutTrigger = null;
