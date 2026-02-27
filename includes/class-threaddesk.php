@@ -1798,23 +1798,45 @@ class TTA_ThreadDesk {
 				<div class="threaddesk-auth-modal__overlay" data-threaddesk-screenprint-close></div>
 				<div class="threaddesk-auth-modal__panel" role="dialog" aria-modal="true" aria-label="<?php echo esc_attr__( 'Screenprint layout chooser', 'threaddesk' ); ?>">
 					<div class="threaddesk-auth-modal__actions"><button type="button" class="threaddesk-auth-modal__close" data-threaddesk-screenprint-close>&times;</button></div>
-					<div class="threaddesk-layout-modal__content is-active">
+					<div class="threaddesk-layout-modal__content is-active" data-threaddesk-screenprint-step="chooser" aria-hidden="false">
 						<h3><?php echo esc_html__( 'Choose one of your saved layouts', 'threaddesk' ); ?></h3>
 						<div class="threaddesk-layout-modal__options" data-threaddesk-screenprint-options></div>
-						<div class="threaddesk-screenprint__viewer" data-threaddesk-screenprint-viewer hidden>
-							<div class="threaddesk-screenprint__angles">
-								<button type="button" class="button" data-threaddesk-screenprint-angle="front"><?php echo esc_html__( 'Front', 'threaddesk' ); ?></button>
-								<button type="button" class="button" data-threaddesk-screenprint-angle="left"><?php echo esc_html__( 'Side', 'threaddesk' ); ?></button>
-								<button type="button" class="button" data-threaddesk-screenprint-angle="back"><?php echo esc_html__( 'Back', 'threaddesk' ); ?></button>
-							</div>
-							<div class="threaddesk-screenprint__stage" data-threaddesk-screenprint-stage>
-								<img src="" alt="" data-threaddesk-screenprint-main />
-								<div class="threaddesk-screenprint__overlay" data-threaddesk-screenprint-overlay></div>
-							</div>
-						</div>
 						<?php if ( empty( $layout_items ) ) : ?>
 							<p class="threaddesk-layout-modal__empty"><?php echo esc_html__( 'No saved layouts match this product categories yet.', 'threaddesk' ); ?></p>
 						<?php endif; ?>
+					</div>
+					<div class="threaddesk-layout-modal__content threaddesk-layout-viewer" data-threaddesk-screenprint-step="viewer" aria-hidden="true" hidden>
+						<div class="threaddesk-layout-viewer__left-column">
+							<div class="threaddesk-layout-viewer__stage threaddesk-screenprint__stage" data-threaddesk-screenprint-stage>
+								<img src="" alt="" class="threaddesk-layout-viewer__main-image" data-threaddesk-screenprint-main />
+								<div class="threaddesk-screenprint__overlay" data-threaddesk-screenprint-overlay></div>
+							</div>
+							<div class="threaddesk-layout-viewer__angles">
+								<button type="button" class="threaddesk-layout-viewer__angle is-active" data-threaddesk-screenprint-angle="front">
+									<div class="threaddesk-layout-viewer__angle-image-wrap">
+										<img src="" alt="" data-threaddesk-screenprint-angle-image="front" />
+									</div>
+									<span><?php echo esc_html__( 'Front', 'threaddesk' ); ?></span>
+								</button>
+								<button type="button" class="threaddesk-layout-viewer__angle" data-threaddesk-screenprint-angle="left">
+									<div class="threaddesk-layout-viewer__angle-image-wrap">
+										<img src="" alt="" data-threaddesk-screenprint-angle-image="left" />
+									</div>
+									<span><?php echo esc_html__( 'Side', 'threaddesk' ); ?></span>
+								</button>
+								<button type="button" class="threaddesk-layout-viewer__angle" data-threaddesk-screenprint-angle="back">
+									<div class="threaddesk-layout-viewer__angle-image-wrap">
+										<img src="" alt="" data-threaddesk-screenprint-angle-image="back" />
+									</div>
+									<span><?php echo esc_html__( 'Back', 'threaddesk' ); ?></span>
+								</button>
+							</div>
+						</div>
+						<div class="threaddesk-layout-viewer__design-panel">
+							<button type="button" class="threaddesk-layout-viewer__back-button" data-threaddesk-screenprint-back><?php echo esc_html__( 'Back to Saved Layouts', 'threaddesk' ); ?></button>
+							<h4><?php echo esc_html__( 'Applied Layout', 'threaddesk' ); ?></h4>
+							<p data-threaddesk-screenprint-selected><?php echo esc_html__( 'No layout selected yet.', 'threaddesk' ); ?></p>
+						</div>
 					</div>
 				</div>
 			</div>
@@ -1826,20 +1848,32 @@ class TTA_ThreadDesk {
 			const images=JSON.parse(root.getAttribute('data-threaddesk-screenprint-images')||'{}');
 			const i18nNoPreview=<?php echo wp_json_encode( __( 'No placement preview', 'threaddesk' ) ); ?>;
 			const i18nPrintCountLabel=<?php echo wp_json_encode( __( 'Print count', 'threaddesk' ) ); ?>;
+			const i18nSelectedPrefix=<?php echo wp_json_encode( __( 'Selected layout', 'threaddesk' ) ); ?>;
 			const modal=root.querySelector('.threaddesk-layout-modal');
 			const options=root.querySelector('[data-threaddesk-screenprint-options]');
-			const viewer=root.querySelector('[data-threaddesk-screenprint-viewer]');
+			const chooserStep=root.querySelector('[data-threaddesk-screenprint-step="chooser"]');
+			const viewerStep=root.querySelector('[data-threaddesk-screenprint-step="viewer"]');
+			const selectedLabel=root.querySelector('[data-threaddesk-screenprint-selected]');
 			const main=root.querySelector('[data-threaddesk-screenprint-main]');
 			const overlayWrap=root.querySelector('[data-threaddesk-screenprint-overlay]');
+			const angleThumbs=root.querySelectorAll('[data-threaddesk-screenprint-angle-image]');
 			let selected=null; let angle='front';
 			const openBtn=root.querySelector('.threaddesk-screenprint__open');
-			openBtn&&openBtn.addEventListener('click',()=>{modal.classList.add('is-active');modal.setAttribute('aria-hidden','false');});
-			root.querySelectorAll('[data-threaddesk-screenprint-close]').forEach((el)=>el.addEventListener('click',()=>{modal.classList.remove('is-active');modal.setAttribute('aria-hidden','true');}));
+			const setStep=(step)=>{
+				const showChooser=step==='chooser';
+				if(chooserStep){chooserStep.hidden=!showChooser;chooserStep.classList.toggle('is-active',showChooser);chooserStep.setAttribute('aria-hidden',showChooser?'false':'true');}
+				if(viewerStep){viewerStep.hidden=showChooser;viewerStep.classList.toggle('is-active',!showChooser);viewerStep.setAttribute('aria-hidden',showChooser?'true':'false');}
+			};
+			angleThumbs.forEach((img)=>{const key=img.getAttribute('data-threaddesk-screenprint-angle-image')||'front';img.src=images[key]||images.front||'';});
+			openBtn&&openBtn.addEventListener('click',()=>{modal.classList.add('is-active');modal.setAttribute('aria-hidden','false');setStep('chooser');});
+			root.querySelectorAll('[data-threaddesk-screenprint-close]').forEach((el)=>el.addEventListener('click',()=>{modal.classList.remove('is-active');modal.setAttribute('aria-hidden','true');setStep('chooser');}));
+			root.querySelectorAll('[data-threaddesk-screenprint-back]').forEach((el)=>el.addEventListener('click',()=>setStep('chooser')));
 			const render=()=>{
 				if(!selected){return;}
 				const map=selected.placementsByAngle||{};
 				const entries=Array.isArray(map[angle])?map[angle]:[];
 				main.src=images[angle]||images.front||'';
+				main.style.display=main.src?'block':'none';
 				overlayWrap.innerHTML='';
 				entries.forEach((entry)=>{
 					const src=String(entry.sourceUrl||entry.designUrl||entry.previewUrl||entry.preview||entry.url||'').trim();
@@ -1900,10 +1934,15 @@ class TTA_ThreadDesk {
 				btn.appendChild(preview);
 				btn.appendChild(titleWrap);
 				btn.appendChild(meta);
-				btn.addEventListener('click',()=>{selected=layout; viewer.hidden=false; render();});
+				btn.addEventListener('click',()=>{selected=layout; if(selectedLabel){selectedLabel.textContent=i18nSelectedPrefix+': '+title;} setStep('viewer'); render();});
 				options.appendChild(btn);
 			});
-			root.querySelectorAll('[data-threaddesk-screenprint-angle]').forEach((btn)=>btn.addEventListener('click',()=>{angle=btn.getAttribute('data-threaddesk-screenprint-angle')||'front'; render();}));
+			root.querySelectorAll('[data-threaddesk-screenprint-angle]').forEach((btn)=>btn.addEventListener('click',()=>{
+				angle=btn.getAttribute('data-threaddesk-screenprint-angle')||'front';
+				root.querySelectorAll('[data-threaddesk-screenprint-angle]').forEach((item)=>item.classList.remove('is-active'));
+				btn.classList.add('is-active');
+				render();
+			}));
 		})();
 		</script>
 		<?php
