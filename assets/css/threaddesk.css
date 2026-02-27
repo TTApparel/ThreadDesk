@@ -1905,7 +1905,27 @@ body.threaddesk-modal-open {
 	}
 
 	.threaddesk-layout-viewer__angles {
-		flex-wrap: wrap;
+		flex-wrap: nowrap;
+		gap: 8px;
+		width: 100%;
+		justify-content: space-between;
+	}
+
+	.threaddesk-layout-viewer__angle {
+		flex: 1 1 0;
+		min-width: 0;
+		width: auto;
+		padding: 6px 4px;
+		gap: 6px;
+	}
+
+	.threaddesk-layout-viewer__angle-image-wrap {
+		width: 42px;
+		height: 58px;
+	}
+
+	.threaddesk-layout-viewer__angle span {
+		font-size: 10px;
 	}
 }
 
@@ -1917,10 +1937,20 @@ body.threaddesk-modal-open {
 }
 
 .threaddesk-screenprint .threaddesk-layout-modal__options {
-	display: flex;
-	flex-wrap: wrap;
-	align-items: flex-start;
+	display: grid;
+	grid-template-columns: minmax(0, 260px);
+	justify-content: center;
+	justify-items: center;
 	gap: 14px;
+	margin: 0 auto 14px;
+	width: 100%;
+}
+
+@media (min-width: 980px) {
+	.threaddesk-screenprint .threaddesk-layout-modal__options {
+		grid-template-columns: repeat(3, minmax(0, 260px));
+		max-width: 808px;
+	}
 }
 
 .threaddesk-screenprint-option {
@@ -1928,10 +1958,13 @@ body.threaddesk-modal-open {
 	border: 1px solid transparent;
 	cursor: pointer;
 	text-align: left;
-	width: fit-content;
-	max-width: 100%;
+	width: 100%;
+	max-width: 260px;
 	margin: 0;
 	transition: border-color .15s ease;
+	display: flex;
+	flex-direction: column;
+	height: 100%;
 }
 
 .threaddesk-screenprint-option:hover,
@@ -1947,6 +1980,22 @@ body.threaddesk-modal-open {
 
 .threaddesk-screenprint-option .threaddesk__card-design-color-count {
 	margin: 8px 0 0 !important;
+	margin-top: auto !important;
+}
+
+.threaddesk-screenprint-option--create .threaddesk__card-design-preview {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	border: 1px dashed #c3c4c7;
+	border-radius: 8px;
+	min-height: 180px;
+}
+
+.threaddesk-screenprint-option--create .threaddesk-layout-modal__image-fallback {
+	font-size: 48px;
+	line-height: 1;
+	color: #6b7280;
 }
 
 .threaddesk-screenprint-option__title {
@@ -1974,6 +2023,34 @@ body.threaddesk-modal-open {
 	font-weight: 700;
 	line-height: 1.1;
 	padding: 14px 24px;
+}
+
+
+.threaddesk-screenprint__open-color {
+	transition: box-shadow .15s ease, border-color .15s ease;
+}
+
+.threaddesk-screenprint__color-tag {
+	position: absolute;
+	top: -9px;
+	left: 50%;
+	transform: translate(-50%, -100%);
+	background: #111;
+	color: #fff;
+	font-size: 11px;
+	font-weight: 600;
+	line-height: 1;
+	padding: 4px 7px;
+	border-radius: 999px;
+	white-space: nowrap;
+	opacity: 0;
+	pointer-events: none;
+	transition: opacity .15s ease;
+}
+
+.threaddesk-screenprint__open-color:hover .threaddesk-screenprint__color-tag,
+.threaddesk-screenprint__open-color:focus-visible .threaddesk-screenprint__color-tag {
+	opacity: 1;
 }
 
 .threaddesk-screenprint__open:hover,
@@ -2020,9 +2097,17 @@ body.threaddesk-modal-open {
 	position: absolute;
 	inset: 0;
 	pointer-events: none;
+	z-index: 2;
 }
 
 .threaddesk-screenprint__overlay img {
 	position: absolute;
 	height: auto;
+}
+
+.threaddesk-layout-viewer__angle-image-wrap > img[data-threaddesk-screenprint-angle-image] {
+	width: 100%;
+	height: 100%;
+	object-fit: contain;
+	display: block;
 }
