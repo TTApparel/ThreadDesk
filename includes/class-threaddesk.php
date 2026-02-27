@@ -1843,6 +1843,12 @@ class TTA_ThreadDesk {
 									</div>
 									<span><?php echo esc_html__( 'Back', 'threaddesk' ); ?></span>
 								</button>
+								<button type="button" class="threaddesk-layout-viewer__angle" data-threaddesk-screenprint-angle="right">
+									<div class="threaddesk-layout-viewer__angle-image-wrap">
+										<img src="" alt="" data-threaddesk-screenprint-angle-image="right" />
+									</div>
+									<span><?php echo esc_html__( 'Right', 'threaddesk' ); ?></span>
+								</button>
 							</div>
 						</div>
 						<div class="threaddesk-layout-viewer__design-panel">
@@ -1969,6 +1975,7 @@ class TTA_ThreadDesk {
 		$gallery_ids = $product && is_callable( array( $product, 'get_gallery_image_ids' ) ) ? (array) $product->get_gallery_image_ids() : array();
 		$side_url   = ! empty( $gallery_ids[0] ) ? wp_get_attachment_image_url( (int) $gallery_ids[0], 'large' ) : '';
 		$back_url   = ! empty( $gallery_ids[1] ) ? wp_get_attachment_image_url( (int) $gallery_ids[1], 'large' ) : '';
+		$right_url  = ! empty( $gallery_ids[2] ) ? wp_get_attachment_image_url( (int) $gallery_ids[2], 'large' ) : '';
 		if ( '' === $front_url ) {
 			$front_url = $side_url ? $side_url : $back_url;
 		}
@@ -1978,11 +1985,15 @@ class TTA_ThreadDesk {
 		if ( '' === $back_url ) {
 			$back_url = $side_url ? $side_url : $front_url;
 		}
+		if ( '' === $right_url ) {
+			$right_url = $side_url ? $side_url : $front_url;
+		}
 
 		return array(
 			'front' => (string) $front_url,
 			'left'  => (string) $side_url,
 			'back'  => (string) $back_url,
+			'right' => (string) $right_url,
 		);
 	}
 
