@@ -131,6 +131,13 @@ jQuery(function ($) {
 			back: layoutModal.find('[data-threaddesk-layout-angle-image="back"]'),
 			right: layoutModal.find('[data-threaddesk-layout-angle-image="right"]'),
 		};
+
+		const syncAnglePreviewThumbs = function () {
+			angleImages.front.attr('src', currentAngles.front || '').css('transform', 'none');
+			angleImages.back.attr('src', currentAngles.back || '').css('transform', 'none');
+			angleImages.left.attr('src', currentAngles.left || '').css('transform', sideConfiguredAsRight ? 'scaleX(-1)' : 'none');
+			angleImages.right.attr('src', currentAngles.right || '').css('transform', sideConfiguredAsRight ? 'none' : 'scaleX(-1)');
+		};
 		const placementList = layoutModal.find('[data-threaddesk-layout-placement-list]');
 		const placementEmpty = layoutModal.find('[data-threaddesk-layout-placement-empty]');
 		const saveLayoutForm = layoutModal.find('[data-threaddesk-layout-save-layout-form]');
@@ -919,6 +926,20 @@ jQuery(function ($) {
 			}
 
 			if (savedPayload) {
+				const savedAngles = savedPayload.angles && typeof savedPayload.angles === 'object' ? savedPayload.angles : {};
+				if (savedAngles && Object.keys(savedAngles).length) {
+					currentAngles = {
+						front: String(savedAngles.front || '').trim(),
+						left: String(savedAngles.left || '').trim(),
+						back: String(savedAngles.back || '').trim(),
+						right: String(savedAngles.right || '').trim(),
+					};
+					const payloadSideLabel = String(savedPayload.sideLabel || '').toLowerCase();
+					if (payloadSideLabel === 'left' || payloadSideLabel === 'right') {
+						sideConfiguredAsRight = payloadSideLabel === 'right';
+					}
+					syncAnglePreviewThumbs();
+				}
 				applySavedLayoutPayload(savedPayload);
 				const preferredAngle = String(savedPayload.currentAngle || '').trim();
 				if (preferredAngle) {
@@ -961,10 +982,7 @@ jQuery(function ($) {
 			if (hasSide) { visibleAngles.push('left'); }
 			if (hasBack) { visibleAngles.push('back'); }
 			if (hasSide) { visibleAngles.push('right'); }
-			angleImages.front.attr('src', currentAngles.front).css('transform', 'none');
-			angleImages.back.attr('src', currentAngles.back).css('transform', 'none');
-			angleImages.left.attr('src', currentAngles.left).css('transform', sideIsRight ? 'scaleX(-1)' : 'none');
-			angleImages.right.attr('src', currentAngles.right).css('transform', sideIsRight ? 'none' : 'scaleX(-1)');
+			syncAnglePreviewThumbs();
 			renderPlacementOptions(placements);
 			setPanelStep('placements');
 			showViewerStep();
