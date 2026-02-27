@@ -1871,13 +1871,20 @@ class TTA_ThreadDesk {
 
 		$initial_color_key = (string) $screenprint_color_choices[0]['key'];
 		$instance_id = 'threaddesk-screenprint-' . wp_rand( 1000, 99999 );
+		$default_category_slug = ! empty( $product_term_slugs ) ? (string) reset( $product_term_slugs ) : '';
+		$create_layout_url = $this->get_layouts_redirect_url(
+			array(
+				'td_layout_return' => '1',
+				'td_layout_category' => $default_category_slug,
+			)
+		);
 
 		wp_enqueue_style( 'threaddesk', THREDDESK_URL . 'assets/css/threaddesk.css', array(), THREDDESK_VERSION );
 		wp_enqueue_script( 'threaddesk', THREDDESK_URL . 'assets/js/threaddesk.js', array( 'jquery' ), THREDDESK_VERSION, true );
 
 		ob_start();
 		?>
-		<div class="threaddesk-screenprint" id="<?php echo esc_attr( $instance_id ); ?>" data-threaddesk-screenprint-layouts="<?php echo esc_attr( wp_json_encode( $layout_items ) ); ?>" data-threaddesk-screenprint-images-by-color="<?php echo esc_attr( wp_json_encode( $screenprint_images_by_color ) ); ?>" data-threaddesk-screenprint-initial-color="<?php echo esc_attr( $initial_color_key ); ?>">
+		<div class="threaddesk-screenprint" id="<?php echo esc_attr( $instance_id ); ?>" data-threaddesk-screenprint-layouts="<?php echo esc_attr( wp_json_encode( $layout_items ) ); ?>" data-threaddesk-screenprint-images-by-color="<?php echo esc_attr( wp_json_encode( $screenprint_images_by_color ) ); ?>" data-threaddesk-screenprint-initial-color="<?php echo esc_attr( $initial_color_key ); ?>" data-threaddesk-screenprint-create-layout-url="<?php echo esc_url( $create_layout_url ); ?>">
 			<div class="threaddesk-screenprint__color-picker" style="display:flex;flex-wrap:wrap;gap:10px;align-items:stretch;">
 				<?php foreach ( $screenprint_color_choices as $choice_index => $choice ) : ?>
 					<button type="button" class="threaddesk-screenprint__open-color" data-threaddesk-screenprint-open-color="<?php echo esc_attr( $choice['key'] ); ?>" aria-label="<?php echo esc_attr( $choice['label'] ); ?>" style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:8px 0;width:70px;border:1px solid #dcdcde;background:#fff;border-radius:4px;cursor:pointer;position:relative;overflow:visible;<?php echo 0 === (int) $choice_index ? 'box-shadow:0 0 0 1px #2271b1;' : ''; ?>">
@@ -1952,6 +1959,9 @@ class TTA_ThreadDesk {
 			const i18nNoPreview=<?php echo wp_json_encode( __( 'No placement preview', 'threaddesk' ) ); ?>;
 			const i18nPrintCountLabel=<?php echo wp_json_encode( __( 'Print count', 'threaddesk' ) ); ?>;
 			const i18nSelectedPrefix=<?php echo wp_json_encode( __( 'Selected layout', 'threaddesk' ) ); ?>;
+			const i18nCreateLayout=<?php echo wp_json_encode( __( 'CREATE A LAYOUT', 'threaddesk' ) ); ?>;
+			const i18nCreateLayoutHint=<?php echo wp_json_encode( __( 'Need a new layout? Start in the placements builder.', 'threaddesk' ) ); ?>;
+			const createLayoutUrl=String(root.getAttribute('data-threaddesk-screenprint-create-layout-url')||'').trim();
 			const modal=root.querySelector('.threaddesk-layout-modal');
 			const options=root.querySelector('[data-threaddesk-screenprint-options]');
 			const chooserStep=root.querySelector('[data-threaddesk-screenprint-step="chooser"]');
@@ -2059,6 +2069,28 @@ class TTA_ThreadDesk {
 				});
 				renderAngleOverlays(map);
 			};
+			if(createLayoutUrl){
+				const createBtn=document.createElement('button');
+				createBtn.type='button';
+				createBtn.className='threaddesk-screenprint-option threaddesk-screenprint-option--create threaddesk__card threaddesk__card--design';
+				const createPreview=document.createElement('div');
+				createPreview.className='threaddesk__card-design-preview';
+				const createPlaceholder=document.createElement('span');
+				createPlaceholder.className='threaddesk-layout-modal__image-fallback';
+				createPlaceholder.textContent='+';
+				createPreview.appendChild(createPlaceholder);
+				const createTitle=document.createElement('h5');
+				createTitle.className='threaddesk-screenprint-option__title';
+				createTitle.textContent=i18nCreateLayout;
+				const createMeta=document.createElement('p');
+				createMeta.className='threaddesk__card-design-color-count';
+				createMeta.textContent=i18nCreateLayoutHint;
+				createBtn.appendChild(createPreview);
+				createBtn.appendChild(createTitle);
+				createBtn.appendChild(createMeta);
+				createBtn.addEventListener('click',()=>{window.location.href=createLayoutUrl;});
+				options.appendChild(createBtn);
+			}
 			(layouts||[]).forEach((layout)=>{
 				const btn=document.createElement('button');
 				btn.type='button';

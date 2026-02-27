@@ -1942,6 +1942,9 @@ body.threaddesk-modal-open {
 	max-width: 260px;
 	margin: 0;
 	transition: border-color .15s ease;
+	display: flex;
+	flex-direction: column;
+	height: 100%;
 }
 
 .threaddesk-screenprint-option:hover,
@@ -1957,6 +1960,22 @@ body.threaddesk-modal-open {
 
 .threaddesk-screenprint-option .threaddesk__card-design-color-count {
 	margin: 8px 0 0 !important;
+	margin-top: auto !important;
+}
+
+.threaddesk-screenprint-option--create .threaddesk__card-design-preview {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	border: 1px dashed #c3c4c7;
+	border-radius: 8px;
+	min-height: 180px;
+}
+
+.threaddesk-screenprint-option--create .threaddesk-layout-modal__image-fallback {
+	font-size: 48px;
+	line-height: 1;
+	color: #6b7280;
 }
 
 .threaddesk-screenprint-option__title {
