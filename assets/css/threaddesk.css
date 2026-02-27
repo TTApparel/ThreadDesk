@@ -2003,6 +2003,10 @@ body.threaddesk-modal-open {
 	aspect-ratio: 4 / 5;
 }
 
+.threaddesk-layout-viewer__stage.threaddesk-screenprint__stage {
+	padding: 0;
+}
+
 .threaddesk-screenprint__stage > img {
 	width: 100%;
 	height: 100%;
