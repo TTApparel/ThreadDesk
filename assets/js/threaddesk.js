@@ -1000,12 +1000,12 @@ jQuery(function ($) {
 			const forceViewer = !!request.forceViewer;
 			openLayoutModal(document.activeElement, layoutModal);
 
-			let categoryButton = requestedCategory ? layoutModal.find('[data-threaddesk-layout-category]').filter(function () {
+			let categoryButton = requestedCategory ? builderModal.find('[data-threaddesk-layout-category]').filter(function () {
 				return String($(this).attr('data-threaddesk-layout-category') || '').trim() === requestedCategory;
 			}).first() : $();
 
 			if (!categoryButton.length && requestedCategoryId > 0) {
-				categoryButton = layoutModal.find('[data-threaddesk-layout-category]').filter(function () {
+				categoryButton = builderModal.find('[data-threaddesk-layout-category]').filter(function () {
 					return Number($(this).attr('data-threaddesk-layout-category-id') || 0) === requestedCategoryId;
 				}).first();
 			}
