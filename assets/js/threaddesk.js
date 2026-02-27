@@ -109,8 +109,16 @@ jQuery(function ($) {
 	}
 
 
-	const layoutBuilderModalSelector = '.threaddesk-layout-modal[data-threaddesk-layout-builder]:has([data-threaddesk-layout-step="chooser"]):has([data-threaddesk-layout-step="viewer"])';
-	const layoutModal = $(layoutBuilderModalSelector).first();
+	const layoutBuilderModalSelector = '.threaddesk-layout-modal[data-threaddesk-layout-builder]';
+	const layoutBuilderStepSelector = '[data-threaddesk-layout-step="chooser"], [data-threaddesk-layout-step="viewer"]';
+	const findLayoutBuilderModals = function (scopeEl) {
+		const scope = scopeEl && scopeEl.length ? scopeEl : $(document);
+		return scope.find(layoutBuilderModalSelector).filter(function () {
+			const modal = $(this);
+			return modal.find('[data-threaddesk-layout-step="chooser"]').length && modal.find('[data-threaddesk-layout-step="viewer"]').length;
+		});
+	};
+	const layoutModal = findLayoutBuilderModals().first();
 
 	if (layoutModal.length) {
 		let lastLayoutTrigger = null;
@@ -973,9 +981,9 @@ jQuery(function ($) {
 		});
 
 		$(document).on('threaddesk:open-layout-modal', function (event, externalData) {
-			const builderModal = $(layoutBuilderModalSelector).first();
+			const builderModal = findLayoutBuilderModals().first();
 			if (!builderModal.length) {
-				console.warn('[ThreadDesk] Builder layout modal not found for threaddesk:open-layout-modal. Selector:', layoutBuilderModalSelector);
+				console.warn('[ThreadDesk] Builder layout modal not found for threaddesk:open-layout-modal. Selector:', layoutBuilderModalSelector + ' + ' + layoutBuilderStepSelector);
 				return;
 			}
 
