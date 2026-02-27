@@ -1904,22 +1904,36 @@ body.threaddesk-modal-open {
 }
 
 .threaddesk-screenprint .threaddesk-layout-modal__options {
-	grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+	display: flex;
+	flex-wrap: wrap;
+	align-items: flex-start;
 	gap: 14px;
 }
 
 .threaddesk-screenprint-option {
 	appearance: none;
-	border: 0;
+	border: 1px solid transparent;
 	cursor: pointer;
 	text-align: left;
-	width: 100%;
+	width: fit-content;
+	max-width: 100%;
 	margin: 0;
+	transition: border-color .15s ease;
 }
 
+.threaddesk-screenprint-option:hover,
 .threaddesk-screenprint-option:focus-visible {
-	outline: 2px solid #2a5bd7;
-	outline-offset: 2px;
+	border-color: #000;
+	outline: none;
+}
+
+.threaddesk-screenprint-option .threaddesk__card-design-preview {
+	width: 260px;
+	max-width: 100%;
+}
+
+.threaddesk-screenprint-option .threaddesk__card-design-color-count {
+	margin: 8px 0 0 !important;
 }
 
 .threaddesk-screenprint-option__title {
