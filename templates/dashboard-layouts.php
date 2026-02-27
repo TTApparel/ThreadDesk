@@ -443,7 +443,7 @@ if ( taxonomy_exists( 'product_cat' ) && is_array( $layout_category_settings ) )
 			</div>
 		</div>
 	</div>
-<div class="<?php echo esc_attr( $layout_modal_classes ); ?>" aria-hidden="<?php echo esc_attr( $layout_modal_aria_hidden ); ?>" data-threaddesk-layout-designs="<?php echo esc_attr( wp_json_encode( $saved_designs ) ); ?>">
+<div class="<?php echo esc_attr( $layout_modal_classes ); ?>" aria-hidden="<?php echo esc_attr( $layout_modal_aria_hidden ); ?>" data-threaddesk-layout-builder data-threaddesk-layout-designs="<?php echo esc_attr( wp_json_encode( $saved_designs ) ); ?>">
 	<div class="threaddesk-auth-modal__overlay" data-threaddesk-layout-close></div>
 	<div class="threaddesk-auth-modal__panel" role="dialog" aria-label="<?php echo esc_attr__( 'Choose a placement category', 'threaddesk' ); ?>" aria-modal="true">
 		<div class="threaddesk-auth-modal__actions">
