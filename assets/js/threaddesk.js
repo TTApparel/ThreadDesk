@@ -963,6 +963,35 @@ jQuery(function ($) {
 				}
 			}
 		});
+
+		$(document).on('threaddesk:open-layout-modal', function (event, externalData) {
+			const request = externalData && typeof externalData === 'object' ? externalData : {};
+			const requestedCategory = String(request.category || '').trim();
+			const requestedCategoryId = Number(request.categoryId || 0);
+			const forceViewer = !!request.forceViewer;
+			openLayoutModal(document.activeElement);
+
+			let categoryButton = requestedCategory ? layoutModal.find('[data-threaddesk-layout-category]').filter(function () {
+				return String($(this).attr('data-threaddesk-layout-category') || '').trim() === requestedCategory;
+			}).first() : $();
+
+			if (!categoryButton.length && requestedCategoryId > 0) {
+				categoryButton = layoutModal.find('[data-threaddesk-layout-category]').filter(function () {
+					return Number($(this).attr('data-threaddesk-layout-category-id') || 0) === requestedCategoryId;
+				}).first();
+			}
+
+			if (categoryButton.length) {
+				categoryButton.trigger('click');
+			}
+
+			if (forceViewer) {
+				showViewerStep();
+				setPanelStep('placements');
+				if (visibleAngles.length) { setMainImage('front'); }
+			}
+		});
+
 		$(document).on('click', '[data-threaddesk-layout-close]', function () { closeLayoutModal(); });
 		$(document).on('click', '[data-threaddesk-layout-angle]', function (event) {
 			if (isAdjustMode) {
