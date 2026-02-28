@@ -159,6 +159,15 @@ jQuery(function ($) {
 		const designList = layoutModal.find('[data-threaddesk-layout-design-list]');
 		const designEmpty = layoutModal.find('[data-threaddesk-layout-design-empty]');
 		const designHeading = layoutModal.find('[data-threaddesk-layout-design-heading]');
+		layoutModal.find('[data-threaddesk-layout-design-overlay]').each(function () {
+			const overlay = $(this);
+			if (String(this.tagName || '').toLowerCase() === 'img') {
+				return;
+			}
+			const replacement = $('<img src="" alt="" class="threaddesk-layout-viewer__design-overlay" data-threaddesk-layout-design-overlay hidden />');
+			replacement.attr('style', overlay.attr('style') || '');
+			overlay.replaceWith(replacement);
+		});
 		const designOverlay = layoutModal.find('[data-threaddesk-layout-design-overlay]');
 		const sizeSlider = layoutModal.find('[data-threaddesk-layout-size-slider]');
 		const sizeReading = layoutModal.find('[data-threaddesk-layout-size-reading]');
