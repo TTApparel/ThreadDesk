@@ -2089,7 +2089,7 @@ class TTA_ThreadDesk {
 							</div>
 							<div class="threaddesk-layout-viewer__design-panel">
 								<div class="threaddesk-layout-viewer__panel-step" data-threaddesk-layout-panel-step="placements">
-									<h4><?php echo esc_html__( 'Add your design to a placement area', 'threaddesk' ); ?></h4>
+									<h4><?php echo esc_html__( 'Choose Placement', 'threaddesk' ); ?></h4>
 									<div class="threaddesk-layout-viewer__placement-list" data-threaddesk-layout-placement-list></div>
 									<p class="threaddesk-layout-viewer__placement-empty" data-threaddesk-layout-placement-empty><?php echo esc_html__( 'No placements available for this category.', 'threaddesk' ); ?></p>
 									<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" class="threaddesk-layout-viewer__save-layout-form" data-threaddesk-layout-save-layout-form hidden>
