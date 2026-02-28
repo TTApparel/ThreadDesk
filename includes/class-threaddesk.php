@@ -2078,7 +2078,7 @@ class TTA_ThreadDesk {
 							<div class="threaddesk-layout-viewer__left-column">
 								<div class="threaddesk-layout-viewer__stage">
 									<img src="" alt="" class="threaddesk-layout-viewer__main-image" data-threaddesk-layout-main-image />
-									<div class="threaddesk-layout-viewer__design-overlay" data-threaddesk-layout-design-overlay></div>
+									<img src="" alt="" class="threaddesk-layout-viewer__design-overlay" data-threaddesk-layout-design-overlay hidden />
 								</div>
 								<div class="threaddesk-layout-viewer__angles">
 									<button type="button" class="threaddesk-layout-viewer__angle is-active" data-threaddesk-layout-angle="front"><div class="threaddesk-layout-viewer__angle-image-wrap"><img src="" alt="" data-threaddesk-layout-angle-image="front" /></div><span><?php echo esc_html__( 'FRONT', 'threaddesk' ); ?></span></button>
@@ -2089,7 +2089,7 @@ class TTA_ThreadDesk {
 							</div>
 							<div class="threaddesk-layout-viewer__design-panel">
 								<div class="threaddesk-layout-viewer__panel-step" data-threaddesk-layout-panel-step="placements">
-									<h4><?php echo esc_html__( 'Add your design to a placement area', 'threaddesk' ); ?></h4>
+									<h4><?php echo esc_html__( 'Choose Placement', 'threaddesk' ); ?></h4>
 									<div class="threaddesk-layout-viewer__placement-list" data-threaddesk-layout-placement-list></div>
 									<p class="threaddesk-layout-viewer__placement-empty" data-threaddesk-layout-placement-empty><?php echo esc_html__( 'No placements available for this category.', 'threaddesk' ); ?></p>
 									<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" class="threaddesk-layout-viewer__save-layout-form" data-threaddesk-layout-save-layout-form hidden>
