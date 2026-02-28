@@ -2078,7 +2078,7 @@ class TTA_ThreadDesk {
 							<div class="threaddesk-layout-viewer__left-column">
 								<div class="threaddesk-layout-viewer__stage">
 									<img src="" alt="" class="threaddesk-layout-viewer__main-image" data-threaddesk-layout-main-image />
-									<div class="threaddesk-layout-viewer__design-overlay" data-threaddesk-layout-design-overlay></div>
+									<img src="" alt="" class="threaddesk-layout-viewer__design-overlay" data-threaddesk-layout-design-overlay hidden />
 								</div>
 								<div class="threaddesk-layout-viewer__angles">
 									<button type="button" class="threaddesk-layout-viewer__angle is-active" data-threaddesk-layout-angle="front"><div class="threaddesk-layout-viewer__angle-image-wrap"><img src="" alt="" data-threaddesk-layout-angle-image="front" /></div><span><?php echo esc_html__( 'FRONT', 'threaddesk' ); ?></span></button>
