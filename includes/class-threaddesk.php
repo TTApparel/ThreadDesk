@@ -605,7 +605,7 @@ class TTA_ThreadDesk {
 														<td><strong><?php echo esc_html( $placement_term->name ); ?></strong></td>
 														<?php foreach ( $placement_terms as $product_term ) : ?>
 															<td style="text-align:center;">
-																<input type="checkbox" name="tta_threaddesk_layout_categories[<?php echo esc_attr( $placement_term_id ); ?>][product_categories][<?php echo esc_attr( $product_term->term_id ); ?>]" value="1" <?php checked( in_array( (int) $product_term->term_id, $configured_product_categories, true ) || empty( $configured_product_categories ) ); ?> />
+																<input type="checkbox" name="tta_threaddesk_layout_categories[<?php echo esc_attr( $placement_term_id ); ?>][product_categories][<?php echo esc_attr( $product_term->term_id ); ?>]" value="1" <?php checked( in_array( (int) $product_term->term_id, $configured_product_categories, true ) ); ?> />
 															</td>
 														<?php endforeach; ?>
 													</tr>
@@ -1783,9 +1783,10 @@ class TTA_ThreadDesk {
 			$matches_category = false;
 			if ( $layout_category_id > 0 ) {
 				$settings = isset( $layout_category_settings[ $layout_category_id ] ) && is_array( $layout_category_settings[ $layout_category_id ] ) ? $layout_category_settings[ $layout_category_id ] : array();
-				$configured_product_categories = isset( $settings['product_categories'] ) && is_array( $settings['product_categories'] ) ? array_map( 'absint', $settings['product_categories'] ) : array();
-				if ( ! empty( $configured_product_categories ) ) {
-					$matches_category = (bool) array_intersect( $configured_product_categories, $product_term_ids );
+				$has_product_category_mapping = isset( $settings['product_categories'] );
+				$configured_product_categories = $has_product_category_mapping && is_array( $settings['product_categories'] ) ? array_map( 'absint', $settings['product_categories'] ) : array();
+				if ( $has_product_category_mapping ) {
+					$matches_category = ! empty( $configured_product_categories ) && (bool) array_intersect( $configured_product_categories, $product_term_ids );
 				} elseif ( in_array( $layout_category_id, $product_term_ids, true ) ) {
 					$matches_category = true;
 				}
@@ -1979,11 +1980,13 @@ class TTA_ThreadDesk {
 				$back_image   = ! empty( $settings['back_image'] ) ? esc_url_raw( $settings['back_image'] ) : '';
 				$side_image   = ! empty( $settings['side_image'] ) ? esc_url_raw( $settings['side_image'] ) : '';
 				$side_label   = isset( $settings['side_label'] ) && 'right' === $settings['side_label'] ? 'right' : 'left';
-				$configured_product_categories = isset( $settings['product_categories'] ) && is_array( $settings['product_categories'] ) ? array_map( 'absint', $settings['product_categories'] ) : array();
-				if ( ! empty( $configured_product_categories ) && empty( array_intersect( $configured_product_categories, $product_term_ids ) ) ) {
-					continue;
-				}
-				if ( empty( $configured_product_categories ) && ! in_array( $term_id, $product_term_ids, true ) && ! in_array( sanitize_key( $term->slug ), $product_term_slugs, true ) ) {
+				$has_product_category_mapping = isset( $settings['product_categories'] );
+				$configured_product_categories = $has_product_category_mapping && is_array( $settings['product_categories'] ) ? array_map( 'absint', $settings['product_categories'] ) : array();
+				if ( $has_product_category_mapping ) {
+					if ( empty( $configured_product_categories ) || empty( array_intersect( $configured_product_categories, $product_term_ids ) ) ) {
+						continue;
+					}
+				} elseif ( ! in_array( $term_id, $product_term_ids, true ) && ! in_array( sanitize_key( $term->slug ), $product_term_slugs, true ) ) {
 					continue;
 				}
 				$configured_placements = isset( $settings['placements'] ) && is_array( $settings['placements'] ) ? $settings['placements'] : array_keys( $placement_slot_labels );
