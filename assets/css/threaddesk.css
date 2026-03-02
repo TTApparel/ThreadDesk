@@ -2030,6 +2030,65 @@ body.threaddesk-modal-open {
 	transition: box-shadow .15s ease, border-color .15s ease;
 }
 
+.threaddesk-screenprint__open-color--collapsed {
+	display: none !important;
+}
+
+.threaddesk-screenprint__open-color--revealed {
+	animation: threaddesk-color-fade-down .3s ease;
+}
+
+.threaddesk-screenprint__show-all-wrap {
+	margin-top: 12px;
+	animation: threaddesk-color-fade-down .3s ease;
+}
+
+.threaddesk-screenprint__show-all-wrap.is-hiding {
+	animation: threaddesk-color-fade-up-out .3s ease forwards;
+}
+
+.threaddesk-screenprint__show-all {
+	appearance: none;
+	background: transparent;
+	border: 1px solid #2271b1;
+	color: #2271b1;
+	border-radius: 4px;
+	cursor: pointer;
+	font-size: 13px;
+	font-weight: 600;
+	line-height: 1.3;
+	padding: 7px 12px;
+	transition: background-color .15s ease, color .15s ease;
+}
+
+.threaddesk-screenprint__show-all:hover,
+.threaddesk-screenprint__show-all:focus-visible {
+	background: #2271b1;
+	color: #fff;
+}
+
+@keyframes threaddesk-color-fade-down {
+	from {
+		opacity: 0;
+		transform: translateY(-8px);
+	}
+	to {
+		opacity: 1;
+		transform: translateY(0);
+	}
+}
+
+@keyframes threaddesk-color-fade-up-out {
+	from {
+		opacity: 1;
+		transform: translateY(0);
+	}
+	to {
+		opacity: 0;
+		transform: translateY(-8px);
+	}
+}
+
 .threaddesk-screenprint__color-tag {
 	position: absolute;
 	top: -9px;
