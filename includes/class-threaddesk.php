@@ -2274,7 +2274,6 @@ class TTA_ThreadDesk {
 				if(!colorButtons.length){if(showAllWrap){showAllWrap.hidden=true;}return;}
 				colorButtons.forEach((button)=>{
 					button.classList.remove('threaddesk-screenprint__open-color--collapsed','threaddesk-screenprint__open-color--revealed');
-					button.hidden=false;
 				});
 				if(showAllWrap){showAllWrap.classList.remove('is-hiding');showAllWrap.hidden=true;}
 				let secondRowTop=null;
@@ -2286,14 +2285,13 @@ class TTA_ThreadDesk {
 				}
 				if(thirdRowTop===null){return;}
 				colorButtons.forEach((button)=>{
-					if(button.offsetTop>=thirdRowTop){button.classList.add('threaddesk-screenprint__open-color--collapsed');button.hidden=true;}
+					if(button.offsetTop>=thirdRowTop){button.classList.add('threaddesk-screenprint__open-color--collapsed');}
 				});
 				if(showAllWrap){showAllWrap.hidden=false;}
 			};
 			const expandColors=()=>{
 				if(!colorPicker){return;}
 				colorPicker.querySelectorAll('.threaddesk-screenprint__open-color--collapsed').forEach((button)=>{
-					button.hidden=false;
 					button.classList.remove('threaddesk-screenprint__open-color--collapsed');
 					button.classList.add('threaddesk-screenprint__open-color--revealed');
 					window.setTimeout(()=>button.classList.remove('threaddesk-screenprint__open-color--revealed'),350);
@@ -2304,9 +2302,9 @@ class TTA_ThreadDesk {
 				}
 			};
 			syncAngleThumbs();
-			setupCollapsedColors();
+			window.requestAnimationFrame(setupCollapsedColors);
 			window.addEventListener('resize',()=>{if(showAllWrap&&!showAllWrap.hidden){setupCollapsedColors();}});
-			if(showAllBtn){showAllBtn.addEventListener('click',expandColors);}
+			if(showAllBtn){showAllBtn.addEventListener('click',(event)=>{event.preventDefault();expandColors();});}
 			if(shouldOpenChooser&&modal){modal.classList.add('is-active');modal.setAttribute('aria-hidden','false');setStep('chooser');}
 			root.querySelectorAll('[data-threaddesk-screenprint-open-color]').forEach((btn)=>btn.addEventListener('click',()=>{
 				selectedColor=String(btn.getAttribute('data-threaddesk-screenprint-open-color')||'').trim();

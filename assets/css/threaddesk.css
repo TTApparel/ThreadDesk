@@ -2030,6 +2030,10 @@ body.threaddesk-modal-open {
 	transition: box-shadow .15s ease, border-color .15s ease;
 }
 
+.threaddesk-screenprint__open-color--collapsed {
+	display: none !important;
+}
+
 .threaddesk-screenprint__open-color--revealed {
 	animation: threaddesk-color-fade-down .3s ease;
 }
