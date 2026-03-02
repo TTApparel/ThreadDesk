@@ -2069,7 +2069,7 @@ class TTA_ThreadDesk {
 					</button>
 				<?php endforeach; ?>
 			</div>
-			<div id="hide-colors" class="threaddesk-screenprint__show-all-wrap" hidden>
+			<div class="threaddesk-screenprint__show-all-wrap" data-threaddesk-screenprint-hide-colors hidden>
 				<button type="button" class="threaddesk-screenprint__show-all" data-threaddesk-screenprint-show-all-colors><?php echo esc_html__( 'View all colors', 'threaddesk' ); ?></button>
 			</div>
 			<div class="threaddesk-layout-modal" aria-hidden="true">
@@ -2236,7 +2236,7 @@ class TTA_ThreadDesk {
 			const shouldOpenChooser=String(root.getAttribute('data-threaddesk-screenprint-open-chooser')||'0').trim()==='1';
 			const modal=root.querySelector('.threaddesk-layout-modal');
 			const colorPicker=root.querySelector('[data-threaddesk-screenprint-color-picker]');
-			const showAllWrap=root.querySelector('#hide-colors');
+			const showAllWrap=root.querySelector('[data-threaddesk-screenprint-hide-colors]');
 			const showAllBtn=root.querySelector('[data-threaddesk-screenprint-show-all-colors]');
 			const options=root.querySelector('[data-threaddesk-screenprint-options]');
 			const chooserStep=root.querySelector('[data-threaddesk-screenprint-step="chooser"]');
@@ -2246,7 +2246,7 @@ class TTA_ThreadDesk {
 			const overlayWrap=root.querySelector('[data-threaddesk-screenprint-overlay]');
 			const stage=root.querySelector('[data-threaddesk-screenprint-stage]');
 			const angleThumbs=root.querySelectorAll('[data-threaddesk-screenprint-angle-image]');
-			let selected=null; let angle='front'; let selectedColor=initialColorKey; let stageRatioLocked=false;
+			let selected=null; let angle='front'; let selectedColor=initialColorKey; let stageRatioLocked=false; let colorsExpanded=false;
 			if(!selectedColor||!imageMap[selectedColor]){const keys=Object.keys(imageMap||{}); selectedColor=keys.length?keys[0]:'';}
 			let images=(imageMap&&imageMap[selectedColor])?imageMap[selectedColor]:{};
 			const setStep=(step)=>{
@@ -2272,6 +2272,10 @@ class TTA_ThreadDesk {
 				if(!colorPicker){return;}
 				const colorButtons=Array.from(colorPicker.querySelectorAll('[data-threaddesk-screenprint-open-color]'));
 				if(!colorButtons.length){if(showAllWrap){showAllWrap.hidden=true;}return;}
+				if(colorsExpanded){
+					if(showAllWrap){showAllWrap.hidden=true;showAllWrap.style.display='none';showAllWrap.style.pointerEvents='none';showAllWrap.setAttribute('aria-hidden','true');if(showAllBtn){showAllBtn.disabled=true;}}
+					return;
+				}
 				colorButtons.forEach((button)=>{
 					button.classList.remove('threaddesk-screenprint__open-color--collapsed','threaddesk-screenprint__open-color--revealed');
 				});
@@ -2291,6 +2295,7 @@ class TTA_ThreadDesk {
 			};
 			const expandColors=()=>{
 				if(!colorPicker){return;}
+				colorsExpanded=true;
 				colorPicker.querySelectorAll('.threaddesk-screenprint__open-color--collapsed').forEach((button)=>{
 					button.classList.remove('threaddesk-screenprint__open-color--collapsed');
 					button.classList.add('threaddesk-screenprint__open-color--revealed');
