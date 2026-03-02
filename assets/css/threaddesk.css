@@ -2038,6 +2038,10 @@ body.threaddesk-modal-open {
 	animation: threaddesk-color-fade-down .3s ease;
 }
 
+.hide-colors.hide-colors--hidden {
+	display: none !important;
+}
+
 .threaddesk-screenprint__show-all-wrap {
 	margin-top: 12px;
 	animation: threaddesk-color-fade-down .3s ease;

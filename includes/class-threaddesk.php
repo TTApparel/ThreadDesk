@@ -2271,15 +2271,15 @@ class TTA_ThreadDesk {
 			const setupCollapsedColors=()=>{
 				if(!colorPicker){return;}
 				const colorButtons=Array.from(colorPicker.querySelectorAll('[data-threaddesk-screenprint-open-color]'));
-				if(!colorButtons.length){if(showAllWrap){showAllWrap.hidden=true;}return;}
+				if(!colorButtons.length){if(showAllWrap){showAllWrap.classList.add('hide-colors--hidden');showAllWrap.hidden=true;}return;}
 				if(colorsExpanded){
-					if(showAllWrap){showAllWrap.hidden=true;showAllWrap.style.display='none';showAllWrap.style.pointerEvents='none';showAllWrap.setAttribute('aria-hidden','true');if(showAllBtn){showAllBtn.disabled=true;}}
+					if(showAllWrap){showAllWrap.classList.add('hide-colors--hidden');showAllWrap.hidden=true;showAllWrap.style.display='none';showAllWrap.style.pointerEvents='none';showAllWrap.setAttribute('aria-hidden','true');if(showAllBtn){showAllBtn.disabled=true;}}
 					return;
 				}
 				colorButtons.forEach((button)=>{
 					button.classList.remove('threaddesk-screenprint__open-color--collapsed','threaddesk-screenprint__open-color--revealed');
 				});
-				if(showAllWrap){showAllWrap.classList.remove('is-hiding');showAllWrap.hidden=true;showAllWrap.style.display='';showAllWrap.style.pointerEvents='';showAllWrap.setAttribute('aria-hidden','false');if(showAllBtn){showAllBtn.disabled=false;}}
+				if(showAllWrap){showAllWrap.classList.remove('is-hiding','hide-colors--hidden');showAllWrap.hidden=true;showAllWrap.style.display='';showAllWrap.style.pointerEvents='';showAllWrap.setAttribute('aria-hidden','false');if(showAllBtn){showAllBtn.disabled=false;}}
 				let secondRowTop=null;
 				let thirdRowTop=null;
 				for(let i=0;i<colorButtons.length;i++){
@@ -2291,7 +2291,7 @@ class TTA_ThreadDesk {
 				colorButtons.forEach((button)=>{
 					if(button.offsetTop>=thirdRowTop){button.classList.add('threaddesk-screenprint__open-color--collapsed');}
 				});
-				if(showAllWrap){showAllWrap.style.display='';showAllWrap.style.pointerEvents='';showAllWrap.hidden=false;showAllWrap.setAttribute('aria-hidden','false');if(showAllBtn){showAllBtn.disabled=false;}}
+				if(showAllWrap){showAllWrap.classList.remove('hide-colors--hidden');showAllWrap.style.display='';showAllWrap.style.pointerEvents='';showAllWrap.hidden=false;showAllWrap.setAttribute('aria-hidden','false');if(showAllBtn){showAllBtn.disabled=false;}}
 			};
 			const expandColors=()=>{
 				if(!colorPicker){return;}
@@ -2306,7 +2306,7 @@ class TTA_ThreadDesk {
 					showAllWrap.setAttribute('aria-hidden','true');
 					showAllWrap.style.pointerEvents='none';
 					if(showAllBtn){showAllBtn.disabled=true;}
-					window.setTimeout(()=>{showAllWrap.hidden=true;showAllWrap.style.display='none';showAllWrap.classList.remove('is-hiding');},300);
+					window.setTimeout(()=>{showAllWrap.hidden=true;showAllWrap.style.display='none';showAllWrap.classList.remove('is-hiding');showAllWrap.classList.add('hide-colors--hidden');},300);
 				}
 			};
 			syncAngleThumbs();
