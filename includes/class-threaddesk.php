@@ -2069,7 +2069,7 @@ class TTA_ThreadDesk {
 					</button>
 				<?php endforeach; ?>
 			</div>
-			<div class="threaddesk-screenprint__show-all-wrap" data-threaddesk-screenprint-hide-colors hidden>
+			<div class="threaddesk-screenprint__show-all-wrap hide-colors" hidden>
 				<button type="button" class="threaddesk-screenprint__show-all" data-threaddesk-screenprint-show-all-colors><?php echo esc_html__( 'View all colors', 'threaddesk' ); ?></button>
 			</div>
 			<div class="threaddesk-layout-modal" aria-hidden="true">
@@ -2236,7 +2236,7 @@ class TTA_ThreadDesk {
 			const shouldOpenChooser=String(root.getAttribute('data-threaddesk-screenprint-open-chooser')||'0').trim()==='1';
 			const modal=root.querySelector('.threaddesk-layout-modal');
 			const colorPicker=root.querySelector('[data-threaddesk-screenprint-color-picker]');
-			const showAllWrap=root.querySelector('[data-threaddesk-screenprint-hide-colors]');
+			const showAllWrap=root.querySelector('.hide-colors');
 			const showAllBtn=root.querySelector('[data-threaddesk-screenprint-show-all-colors]');
 			const options=root.querySelector('[data-threaddesk-screenprint-options]');
 			const chooserStep=root.querySelector('[data-threaddesk-screenprint-step="chooser"]');
