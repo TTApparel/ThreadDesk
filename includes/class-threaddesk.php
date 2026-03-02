@@ -2275,7 +2275,7 @@ class TTA_ThreadDesk {
 				colorButtons.forEach((button)=>{
 					button.classList.remove('threaddesk-screenprint__open-color--collapsed','threaddesk-screenprint__open-color--revealed');
 				});
-				if(showAllWrap){showAllWrap.classList.remove('is-hiding');showAllWrap.hidden=true;}
+				if(showAllWrap){showAllWrap.classList.remove('is-hiding');showAllWrap.hidden=true;showAllWrap.style.display='';showAllWrap.style.pointerEvents='';showAllWrap.setAttribute('aria-hidden','false');if(showAllBtn){showAllBtn.disabled=false;}}
 				let secondRowTop=null;
 				let thirdRowTop=null;
 				for(let i=0;i<colorButtons.length;i++){
@@ -2287,7 +2287,7 @@ class TTA_ThreadDesk {
 				colorButtons.forEach((button)=>{
 					if(button.offsetTop>=thirdRowTop){button.classList.add('threaddesk-screenprint__open-color--collapsed');}
 				});
-				if(showAllWrap){showAllWrap.hidden=false;}
+				if(showAllWrap){showAllWrap.style.display='';showAllWrap.style.pointerEvents='';showAllWrap.hidden=false;showAllWrap.setAttribute('aria-hidden','false');if(showAllBtn){showAllBtn.disabled=false;}}
 			};
 			const expandColors=()=>{
 				if(!colorPicker){return;}
@@ -2298,7 +2298,10 @@ class TTA_ThreadDesk {
 				});
 				if(showAllWrap){
 					showAllWrap.classList.add('is-hiding');
-					window.setTimeout(()=>{showAllWrap.hidden=true;showAllWrap.classList.remove('is-hiding');},300);
+					showAllWrap.setAttribute('aria-hidden','true');
+					showAllWrap.style.pointerEvents='none';
+					if(showAllBtn){showAllBtn.disabled=true;}
+					window.setTimeout(()=>{showAllWrap.hidden=true;showAllWrap.style.display='none';showAllWrap.classList.remove('is-hiding');},300);
 				}
 			};
 			syncAngleThumbs();
