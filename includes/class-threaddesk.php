@@ -413,6 +413,18 @@ class TTA_ThreadDesk {
 				$placements = array_keys( $placement_slots );
 			}
 
+			$product_categories = array();
+			if ( ! empty( $row['product_categories'] ) && is_array( $row['product_categories'] ) ) {
+				foreach ( $row['product_categories'] as $product_category_id => $enabled ) {
+					$product_category_id = absint( $product_category_id );
+					if ( $product_category_id > 0 && $enabled ) {
+						$product_categories[] = $product_category_id;
+					}
+				}
+			}
+
+			$product_categories = array_values( array_unique( $product_categories ) );
+
 			$sortable[] = array(
 				'term_id' => $term_id,
 				'order'   => $order,
@@ -424,6 +436,7 @@ class TTA_ThreadDesk {
 					'side_image'  => isset( $row['side_image'] ) ? esc_url_raw( $row['side_image'] ) : '',
 					'side_label'  => isset( $row['side_label'] ) && 'right' === sanitize_key( $row['side_label'] ) ? 'right' : 'left',
 					'placements'  => $placements,
+					'product_categories' => $product_categories,
 				),
 			);
 		}
@@ -560,6 +573,49 @@ class TTA_ThreadDesk {
 										</tbody>
 </table>
 								<p class="description"><?php echo esc_html__( 'Drag rows by the move icon to control display order in Placements.', 'threaddesk' ); ?></p>
+								<?php
+								$enabled_placement_terms = array();
+								foreach ( $placement_terms as $placement_term ) {
+									$placement_term_id = (int) $placement_term->term_id;
+									if ( isset( $layout_categories[ $placement_term_id ]['enabled'] ) && ! empty( $layout_categories[ $placement_term_id ]['enabled'] ) ) {
+										$enabled_placement_terms[] = $placement_term;
+									}
+								}
+								?>
+								<h3 style="margin-top:18px;"><?php echo esc_html__( 'Placement Availability by Product Category', 'threaddesk' ); ?></h3>
+								<p class="description"><?php echo esc_html__( 'For each enabled placement category, choose which product categories can use it in Placements.', 'threaddesk' ); ?></p>
+								<?php if ( ! empty( $enabled_placement_terms ) ) : ?>
+									<div style="overflow:auto; margin-top:10px;">
+										<table class="widefat striped">
+											<thead>
+												<tr>
+													<th><?php echo esc_html__( 'Placement Category', 'threaddesk' ); ?></th>
+													<?php foreach ( $placement_terms as $product_term ) : ?>
+														<th><?php echo esc_html( $product_term->name ); ?></th>
+													<?php endforeach; ?>
+												</tr>
+											</thead>
+											<tbody>
+												<?php foreach ( $enabled_placement_terms as $placement_term ) : ?>
+													<?php
+													$placement_term_id = (int) $placement_term->term_id;
+													$configured_product_categories = isset( $layout_categories[ $placement_term_id ]['product_categories'] ) && is_array( $layout_categories[ $placement_term_id ]['product_categories'] ) ? array_map( 'absint', $layout_categories[ $placement_term_id ]['product_categories'] ) : array();
+													?>
+													<tr>
+														<td><strong><?php echo esc_html( $placement_term->name ); ?></strong></td>
+														<?php foreach ( $placement_terms as $product_term ) : ?>
+															<td style="text-align:center;">
+																<input type="checkbox" name="tta_threaddesk_layout_categories[<?php echo esc_attr( $placement_term_id ); ?>][product_categories][<?php echo esc_attr( $product_term->term_id ); ?>]" value="1" <?php checked( in_array( (int) $product_term->term_id, $configured_product_categories, true ) || empty( $configured_product_categories ) ); ?> />
+															</td>
+														<?php endforeach; ?>
+													</tr>
+												<?php endforeach; ?>
+											</tbody>
+										</table>
+									</div>
+								<?php else : ?>
+									<p><?php echo esc_html__( 'Enable at least one placement category above to map product category availability.', 'threaddesk' ); ?></p>
+								<?php endif; ?>
 							<?php else : ?>
 								<p><?php echo esc_html__( 'No product categories found. Create WooCommerce product categories first.', 'threaddesk' ); ?></p>
 							<?php endif; ?>
@@ -1703,6 +1759,7 @@ class TTA_ThreadDesk {
 		$product_term_slugs = wp_get_post_terms( $product_id, 'product_cat', array( 'fields' => 'slugs' ) );
 		$product_term_ids = is_array( $product_term_ids ) ? array_map( 'absint', $product_term_ids ) : array();
 		$product_term_slugs = is_array( $product_term_slugs ) ? array_map( 'sanitize_key', $product_term_slugs ) : array();
+		$layout_category_settings = get_option( 'tta_threaddesk_layout_categories', array() );
 
 		$layout_posts = get_posts(
 			array(
@@ -1724,8 +1781,14 @@ class TTA_ThreadDesk {
 			$layout_category_id = (int) get_post_meta( $layout_post->ID, 'layout_category_id', true );
 			$layout_category_slug = sanitize_key( (string) get_post_meta( $layout_post->ID, 'layout_category', true ) );
 			$matches_category = false;
-			if ( $layout_category_id > 0 && in_array( $layout_category_id, $product_term_ids, true ) ) {
-				$matches_category = true;
+			if ( $layout_category_id > 0 ) {
+				$settings = isset( $layout_category_settings[ $layout_category_id ] ) && is_array( $layout_category_settings[ $layout_category_id ] ) ? $layout_category_settings[ $layout_category_id ] : array();
+				$configured_product_categories = isset( $settings['product_categories'] ) && is_array( $settings['product_categories'] ) ? array_map( 'absint', $settings['product_categories'] ) : array();
+				if ( ! empty( $configured_product_categories ) ) {
+					$matches_category = (bool) array_intersect( $configured_product_categories, $product_term_ids );
+				} elseif ( in_array( $layout_category_id, $product_term_ids, true ) ) {
+					$matches_category = true;
+				}
 			}
 			if ( ! $matches_category && '' !== $layout_category_slug && in_array( $layout_category_slug, $product_term_slugs, true ) ) {
 				$matches_category = true;
@@ -1886,7 +1949,6 @@ class TTA_ThreadDesk {
 		$screenprint_return_url  = remove_query_arg( 'td_screenprint_return', get_permalink( $product_id ) );
 
 		$placement_slot_labels = $this->get_available_placement_slots();
-		$layout_category_settings = get_option( 'tta_threaddesk_layout_categories', array() );
 		$placement_categories = array();
 		if ( taxonomy_exists( 'product_cat' ) && is_array( $layout_category_settings ) ) {
 			uasort(
@@ -1917,6 +1979,13 @@ class TTA_ThreadDesk {
 				$back_image   = ! empty( $settings['back_image'] ) ? esc_url_raw( $settings['back_image'] ) : '';
 				$side_image   = ! empty( $settings['side_image'] ) ? esc_url_raw( $settings['side_image'] ) : '';
 				$side_label   = isset( $settings['side_label'] ) && 'right' === $settings['side_label'] ? 'right' : 'left';
+				$configured_product_categories = isset( $settings['product_categories'] ) && is_array( $settings['product_categories'] ) ? array_map( 'absint', $settings['product_categories'] ) : array();
+				if ( ! empty( $configured_product_categories ) && empty( array_intersect( $configured_product_categories, $product_term_ids ) ) ) {
+					continue;
+				}
+				if ( empty( $configured_product_categories ) && ! in_array( $term_id, $product_term_ids, true ) && ! in_array( sanitize_key( $term->slug ), $product_term_slugs, true ) ) {
+					continue;
+				}
 				$configured_placements = isset( $settings['placements'] ) && is_array( $settings['placements'] ) ? $settings['placements'] : array_keys( $placement_slot_labels );
 				$placements = array();
 				foreach ( $configured_placements as $placement_key ) {
