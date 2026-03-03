@@ -2044,6 +2044,8 @@ body.threaddesk-modal-open {
 
 .threaddesk-screenprint__show-all-wrap {
 	margin-top: 12px;
+	display: flex;
+	justify-content: center;
 	animation: threaddesk-color-fade-down .3s ease;
 }
 
