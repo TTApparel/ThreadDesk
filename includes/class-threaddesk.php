@@ -2311,7 +2311,7 @@ class TTA_ThreadDesk {
 			};
 			syncAngleThumbs();
 			window.requestAnimationFrame(setupCollapsedColors);
-			window.addEventListener('resize',()=>{if(showAllWrap&&!showAllWrap.hidden){setupCollapsedColors();}});
+			window.addEventListener('resize',()=>{if(showAllWrap&&!showAllWrap.hidden&&!colorsExpanded){setupCollapsedColors();}});
 			if(showAllBtn){showAllBtn.addEventListener('click',(event)=>{event.preventDefault();expandColors();});}
 			if(shouldOpenChooser&&modal){modal.classList.add('is-active');modal.setAttribute('aria-hidden','false');setStep('chooser');}
 			root.querySelectorAll('[data-threaddesk-screenprint-open-color]').forEach((btn)=>btn.addEventListener('click',()=>{
