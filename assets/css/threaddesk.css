@@ -2038,7 +2038,7 @@ body.threaddesk-modal-open {
 	animation: threaddesk-color-fade-down .3s ease;
 }
 
-.hide-colors.hide-colors--hidden {
+.threaddesk-screenprint .hide-colors.hide-colors--hidden {
 	display: none !important;
 }
 
