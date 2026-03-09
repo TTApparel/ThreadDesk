@@ -2017,7 +2017,20 @@ class TTA_ThreadDesk {
 		}
 
 		if ( ! empty( $placement_categories ) ) {
-			$primary_category = reset( $placement_categories );
+			$primary_category = null;
+			foreach ( $placement_categories as $placement_category ) {
+				$placement_term_id   = isset( $placement_category['term_id'] ) ? absint( $placement_category['term_id'] ) : 0;
+				$placement_term_slug = isset( $placement_category['term_slug'] ) ? sanitize_key( (string) $placement_category['term_slug'] ) : '';
+				if ( ( $default_category_id > 0 && $placement_term_id === $default_category_id ) || ( '' !== $default_category_slug && '' !== $placement_term_slug && $placement_term_slug === $default_category_slug ) ) {
+					$primary_category = $placement_category;
+					break;
+				}
+			}
+
+			if ( ! is_array( $primary_category ) ) {
+				$primary_category = reset( $placement_categories );
+			}
+
 			if ( is_array( $primary_category ) ) {
 				if ( ! empty( $primary_category['term_slug'] ) ) {
 					$default_category_slug = sanitize_key( (string) $primary_category['term_slug'] );
