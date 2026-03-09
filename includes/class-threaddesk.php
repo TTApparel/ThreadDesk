@@ -324,7 +324,7 @@ class TTA_ThreadDesk {
 
 	private function render_settings_page_inline_script() {
 		?>
-		<script>
+		<script data-cfasync="false">
 		jQuery(function ($) {
 			const tbody = $('[data-threaddesk-placement-sortable]');
 			const refreshOrders = function () {
@@ -2308,7 +2308,7 @@ class TTA_ThreadDesk {
 				</div>
 			</div>
 		</div>
-		<script>
+		<script data-cfasync="false">
 		(function(){
 			const root=document.getElementById(<?php echo wp_json_encode( $instance_id ); ?>); if(!root){return;}
 			const layouts=JSON.parse(root.getAttribute('data-threaddesk-screenprint-layouts')||'[]');
