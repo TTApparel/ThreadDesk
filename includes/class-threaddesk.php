@@ -2536,9 +2536,16 @@ class TTA_ThreadDesk {
 			renderSelectedColorLabel();
 			window.requestAnimationFrame(setupCollapsedColors);
 			window.addEventListener('resize',()=>{if(showAllWrap&&!showAllWrap.hidden&&!colorsExpanded){setupCollapsedColors();}});
-			if(showAllBtn){showAllBtn.addEventListener('click',(event)=>{event.preventDefault();expandColors();});}
-			if(shouldOpenChooser&&modal){window.setTimeout(()=>{openScreenprintChooserModal();},1000);}
-			root.querySelectorAll('[data-threaddesk-screenprint-open-color]').forEach((btn)=>btn.addEventListener('click',()=>{
+			if(showAllBtn){
+				showAllBtn.addEventListener('click',(event)=>{
+					event.preventDefault();
+					expandColors();
+				});
+			}
+			if(shouldOpenChooser&&modal){
+				window.setTimeout(()=>{openScreenprintChooserModal();},1000);
+			}
+			const onScreenprintColorClick=(btn)=>{
 				selectedColor=String(btn.getAttribute('data-threaddesk-screenprint-open-color')||'').trim();
 				images=(imageMap&&imageMap[selectedColor])?imageMap[selectedColor]:{};
 				syncAngleThumbs();
@@ -2546,9 +2553,16 @@ class TTA_ThreadDesk {
 				root.querySelectorAll('[data-threaddesk-screenprint-open-color]').forEach((item)=>{item.style.boxShadow='none';});
 				btn.style.boxShadow='0 0 0 1px #2271b1';
 				openScreenprintChooserModal();
-			}));
-			root.querySelectorAll('[data-threaddesk-screenprint-close]').forEach((el)=>el.addEventListener('click',()=>{closeScreenprintModal();}));
-			root.querySelectorAll('[data-threaddesk-screenprint-back]').forEach((el)=>el.addEventListener('click',()=>setStep('chooser')));
+			};
+			root.querySelectorAll('[data-threaddesk-screenprint-open-color]').forEach((btn)=>{
+				btn.addEventListener('click',()=>{onScreenprintColorClick(btn);});
+			});
+			root.querySelectorAll('[data-threaddesk-screenprint-close]').forEach((el)=>{
+				el.addEventListener('click',()=>{closeScreenprintModal();});
+			});
+			root.querySelectorAll('[data-threaddesk-screenprint-back]').forEach((el)=>{
+				el.addEventListener('click',()=>{setStep('chooser');});
+			});
 			const lockStageRatio=(src)=>{
 				if(stageRatioLocked||!stage||!src){return;}
 				const probe=new Image();
