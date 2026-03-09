@@ -1885,17 +1885,7 @@ body.threaddesk-modal-open {
 
 .threaddesk-layout-modal [data-threaddesk-screenprint-step].is-active {
 	display: grid;
-	align-items: stretch;
-}
-
-
-.threaddesk-layout-modal [data-threaddesk-screenprint-step="viewer"] .threaddesk-layout-viewer__left-column {
-	height: var(--threaddesk-layout-stage-height, auto);
-}
-
-.threaddesk-layout-modal [data-threaddesk-screenprint-step="viewer"] .threaddesk-layout-viewer__design-panel {
-	height: var(--threaddesk-layout-stage-height, auto);
-	max-height: var(--threaddesk-layout-stage-height, none);
+	align-items: start;
 }
 
 
