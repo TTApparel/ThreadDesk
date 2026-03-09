@@ -2387,6 +2387,7 @@ class TTA_ThreadDesk {
 			const setActivePlacement=(placementKey)=>{
 				activePlacementKey=String(placementKey||'').trim();
 				if(!selectedDesignList){return;}
+				selectedDesignList.classList.toggle('has-active-placement',!!activePlacementKey);
 				selectedDesignList.querySelectorAll('.threaddesk-screenprint__selected-design-option').forEach((btn)=>{
 					const key=String(btn.getAttribute('data-threaddesk-screenprint-placement-key')||'').trim();
 					btn.classList.toggle('is-active',!!activePlacementKey&&key===activePlacementKey);
@@ -2429,7 +2430,8 @@ class TTA_ThreadDesk {
 						if(!entry||typeof entry!=='object'){return;}
 						const key=String(entry.placementKey||'').trim();
 						if(!key){return;}
-					if(!grouped[key]){grouped[key]=Object.assign({__angleKey:angleKey},entry);order.push(key);} 
+						if(!grouped[key]){grouped[key]=Object.assign({__angleKey:angleKey},entry);order.push(key);}
+					});
 				});
 			});
 				let count=0;
@@ -2438,6 +2440,7 @@ class TTA_ThreadDesk {
 					const src=String(entry.sourceUrl||entry.designUrl||entry.previewUrl||entry.preview||entry.url||'').trim();
 					if(!src){return;}
 					const title=String(entry.designName||entry.placementLabel||i18nDesignFallback).trim()||i18nDesignFallback;
+					const placementLabel=String(entry.placementLabel||entry.placementKey||'').trim()||'Placement';
 					const item=document.createElement('button');
 					item.type='button';
 					item.className='threaddesk-layout-viewer__design-option threaddesk-screenprint__selected-design-option';
@@ -2452,15 +2455,20 @@ class TTA_ThreadDesk {
 					const name=document.createElement('span');
 					name.className='threaddesk-layout-viewer__design-option-title';
 					name.textContent=title;
+					const placement=document.createElement('span');
+					placement.className='threaddesk-layout-viewer__placement-option threaddesk-screenprint__active-placement-option';
+					placement.setAttribute('aria-hidden','true');
+					placement.textContent=placementLabel;
 					item.appendChild(img);
 					item.appendChild(name);
+					item.appendChild(placement);
 					item.addEventListener('click',()=>{
 						if(!selected){return;}
-						const placementKey=String(entry.placementKey||'').trim();
-						if(!placementKey){return;}
+						const currentPlacementKey=String(entry.placementKey||'').trim();
+						if(!currentPlacementKey){return;}
 						const placementAngle=String(entry.__angleKey||angle||'front').toLowerCase();
 						if(placementAngle==='front'||placementAngle==='back'||placementAngle==='left'||placementAngle==='right'||placementAngle==='side'){angle=placementAngle;}
-						setActivePlacement(placementKey);
+						setActivePlacement(currentPlacementKey);
 						render();
 					});
 					selectedDesignList.appendChild(item);

@@ -2264,3 +2264,20 @@ body.threaddesk-modal-open {
 	grid-template-columns: 1fr;
 	gap: 8px;
 }
+
+
+.threaddesk-screenprint__selected-design-list.has-active-placement .threaddesk-screenprint__selected-design-option:not(.is-active) {
+	display: none;
+}
+
+.threaddesk-screenprint__active-placement-option {
+	display: none;
+	margin-top: 8px;
+	width: 100%;
+	justify-content: center;
+	pointer-events: none;
+}
+
+.threaddesk-screenprint__selected-design-option.is-active .threaddesk-screenprint__active-placement-option {
+	display: inline-flex;
+}
