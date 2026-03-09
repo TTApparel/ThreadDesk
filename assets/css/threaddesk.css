@@ -2128,6 +2128,23 @@ body.threaddesk-modal-open {
 	margin-top: 10px;
 }
 
+.threaddesk-screenprint__selected-color {
+	margin: 0 0 8px;
+	font-size: 12px;
+	text-transform: uppercase;
+	letter-spacing: .04em;
+	color: #2e2e2e;
+}
+
+.threaddesk-screenprint__selected-designs {
+	margin-top: 12px;
+}
+
+
+.threaddesk-screenprint__selected-design-option {
+	cursor: default;
+}
+
 .threaddesk-screenprint__angles {
 	display: flex;
 	gap: 8px;
@@ -2175,4 +2192,55 @@ body.threaddesk-modal-open {
 	height: 100%;
 	object-fit: contain;
 	display: block;
+}
+
+
+.threaddesk-screenprint__selected-design-option,
+.threaddesk-layout-viewer__placement-option.is-complete {
+	position: relative;
+}
+
+.threaddesk-screenprint__selected-design-option::after,
+.threaddesk-layout-viewer__placement-option.is-complete::after {
+	position: absolute;
+	top: -24px;
+	left: 50%;
+	transform: translateX(-50%);
+	background: #111;
+	color: #fff;
+	font-size: 10px;
+	line-height: 1;
+	padding: 4px 6px;
+	border-radius: 4px;
+	opacity: 0;
+	pointer-events: none;
+	transition: opacity .15s ease;
+	z-index: 20;
+	white-space: nowrap;
+}
+
+.threaddesk-screenprint__selected-design-option::after {
+	content: attr(data-threaddesk-tooltip);
+}
+
+.threaddesk-layout-viewer__placement-option.is-complete::after {
+	content: 'SWAP';
+}
+
+.threaddesk-screenprint__selected-design-option:hover::after,
+.threaddesk-screenprint__selected-design-option:focus-visible::after,
+.threaddesk-layout-viewer__placement-option.is-complete:hover::after,
+.threaddesk-layout-viewer__placement-option.is-complete:focus-visible::after {
+	opacity: 1;
+}
+
+.threaddesk-layout-modal--slider-locked [data-threaddesk-layout-size-slider] {
+	opacity: .5;
+	cursor: not-allowed;
+}
+
+.threaddesk-screenprint__selected-design-list {
+	display: grid;
+	grid-template-columns: 1fr;
+	gap: 8px;
 }
