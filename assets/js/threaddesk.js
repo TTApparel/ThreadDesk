@@ -926,6 +926,7 @@ jQuery(function ($) {
 			const trigger = $(this);
 			const savedPayload = parseLayoutPayloadFromAttribute(trigger.attr('data-threaddesk-layout-payload'));
 			const requestedCategory = String(trigger.attr('data-threaddesk-layout-category-open') || (savedPayload && savedPayload.category) || '').trim();
+			const requestedCategoryIdFromTrigger = Number(trigger.attr('data-threaddesk-layout-category-id-open') || 0);
 			const existingLayoutId = Number(trigger.attr('data-threaddesk-layout-id') || 0);
 			if (existingLayoutId > 0) {
 				saveLayoutIdField.val(String(existingLayoutId));
@@ -934,8 +935,8 @@ jQuery(function ($) {
 			let categoryButton = requestedCategory ? layoutModal.find('[data-threaddesk-layout-category]').filter(function () {
 				return String($(this).attr('data-threaddesk-layout-category') || '').trim() === requestedCategory;
 			}).first() : $();
-			if (!categoryButton.length && savedPayload && Number(savedPayload.categoryId || 0) > 0) {
-				const requestedCategoryId = Number(savedPayload.categoryId || 0);
+			if (!categoryButton.length && (requestedCategoryIdFromTrigger > 0 || (savedPayload && Number(savedPayload.categoryId || 0) > 0))) {
+				const requestedCategoryId = requestedCategoryIdFromTrigger > 0 ? requestedCategoryIdFromTrigger : Number(savedPayload.categoryId || 0);
 				categoryButton = layoutModal.find('[data-threaddesk-layout-category]').filter(function () {
 					return Number($(this).attr('data-threaddesk-layout-category-id') || 0) === requestedCategoryId;
 				}).first();
