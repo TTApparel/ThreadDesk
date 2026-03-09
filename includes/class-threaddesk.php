@@ -2342,13 +2342,32 @@ class TTA_ThreadDesk {
 			const overlayWrap=root.querySelector('[data-threaddesk-screenprint-overlay]');
 			const stage=root.querySelector('[data-threaddesk-screenprint-stage]');
 			const angleThumbs=root.querySelectorAll('[data-threaddesk-screenprint-angle-image]');
-			let selected=null; let angle='front'; let selectedColor=initialColorKey; let stageRatioLocked=false; let colorsExpanded=false;
+			let selected=null; let angle='front'; let selectedColor=initialColorKey; let stageRatioLocked=false; let colorsExpanded=false; let activePlacementKey=''; let dragState=null;
 			if(!selectedColor||!imageMap[selectedColor]){const keys=Object.keys(imageMap||{}); selectedColor=keys.length?keys[0]:'';}
 			let images=(imageMap&&imageMap[selectedColor])?imageMap[selectedColor]:{};
 			const setStep=(step)=>{
 				const showChooser=step==='chooser';
 				if(chooserStep){chooserStep.hidden=!showChooser;chooserStep.classList.toggle('is-active',showChooser);chooserStep.setAttribute('aria-hidden',showChooser?'false':'true');}
 				if(viewerStep){viewerStep.hidden=showChooser;viewerStep.classList.toggle('is-active',!showChooser);viewerStep.setAttribute('aria-hidden',showChooser?'true':'false');}
+			};
+			const openScreenprintChooserModal=()=>{
+				if(!modal){return;}
+				modal.classList.add('is-active');
+				modal.setAttribute('aria-hidden','false');
+				document.body.classList.add('threaddesk-modal-open');
+				setStep('chooser');
+			};
+			const closeScreenprintModal=()=>{
+				if(!modal){return;}
+				modal.classList.remove('is-active');
+				modal.setAttribute('aria-hidden','true');
+				document.body.classList.remove('threaddesk-modal-open');
+				setStep('chooser');
+			};
+			const syncScreenprintPanelHeight=()=>{
+				if(!viewerStep||viewerStep.hidden||!stage){return;}
+				const stageHeight=Math.round(stage.getBoundingClientRect().height||0);
+				if(stageHeight>0){viewerStep.style.setProperty('--threaddesk-screenprint-stage-rendered-height',stageHeight+'px');}
 			};
 			const getSideLabel=()=>String((images&&images.sideLabel)||'left').toLowerCase()==='right'?'right':'left';
 			const getAngleTransform=(targetAngle)=>{
@@ -2379,6 +2398,39 @@ class TTA_ThreadDesk {
 				const label=getSelectedColorLabel();
 				selectedColorLabel.textContent=(i18nSelectedColorPrefix||'Color')+': '+(label||'--');
 			};
+			const setActivePlacement=(placementKey)=>{
+				activePlacementKey=String(placementKey||'').trim();
+				if(!selectedDesignList){return;}
+				selectedDesignList.classList.toggle('has-active-placement',!!activePlacementKey);
+				selectedDesignList.querySelectorAll('.threaddesk-screenprint__selected-design-option').forEach((btn)=>{
+					const key=String(btn.getAttribute('data-threaddesk-screenprint-placement-key')||'').trim();
+					btn.classList.toggle('is-active',!!activePlacementKey&&key===activePlacementKey);
+				});
+			};
+			const getPlacementEntry=(map,targetAngle,placementKey)=>{
+				const key=String(placementKey||'').trim();
+				if(!key){return null;}
+				const candidates=[targetAngle];
+				if(targetAngle==='left'){candidates.push('side');}
+				if(targetAngle==='side'){candidates.push('left');}
+				for(let i=0;i<candidates.length;i++){
+					const candidate=candidates[i];
+					const raw=map&&Object.prototype.hasOwnProperty.call(map,candidate)?map[candidate]:null;
+					if(Array.isArray(raw)){
+						for(let j=0;j<raw.length;j++){
+							if(String(raw[j]&&raw[j].placementKey||'').trim()===key){return raw[j];}
+						}
+						continue;
+					}
+					if(raw&&typeof raw==='object'){
+						const values=Object.values(raw);
+						for(let j=0;j<values.length;j++){
+							if(String(values[j]&&values[j].placementKey||'').trim()===key){return values[j];}
+						}
+					}
+				}
+				return null;
+			};
 			const renderSelectedDesignPreview=(map)=>{
 				if(!selectedDesignList||!selectedDesignEmpty){return;}
 				selectedDesignList.innerHTML='';
@@ -2392,7 +2444,7 @@ class TTA_ThreadDesk {
 						if(!entry||typeof entry!=='object'){return;}
 						const key=String(entry.placementKey||'').trim();
 						if(!key){return;}
-						if(!grouped[key]){grouped[key]=entry;order.push(key);} 
+						if(!grouped[key]){grouped[key]=Object.assign({__angleKey:angleKey},entry);order.push(key);}
 					});
 				});
 				let count=0;
@@ -2401,9 +2453,11 @@ class TTA_ThreadDesk {
 					const src=String(entry.sourceUrl||entry.designUrl||entry.previewUrl||entry.preview||entry.url||'').trim();
 					if(!src){return;}
 					const title=String(entry.designName||entry.placementLabel||i18nDesignFallback).trim()||i18nDesignFallback;
+					const placementLabel=String(entry.placementLabel||entry.placementKey||'').trim()||'Placement';
 					const item=document.createElement('button');
 					item.type='button';
 					item.className='threaddesk-layout-viewer__design-option threaddesk-screenprint__selected-design-option';
+					item.setAttribute('data-threaddesk-screenprint-placement-key',String(entry.placementKey||'').trim());
 					item.setAttribute('data-threaddesk-tooltip',i18nAdjust);
 					item.setAttribute('aria-label',i18nAdjust+' '+title);
 					const img=document.createElement('img');
@@ -2414,25 +2468,26 @@ class TTA_ThreadDesk {
 					const name=document.createElement('span');
 					name.className='threaddesk-layout-viewer__design-option-title';
 					name.textContent=title;
+					const placement=document.createElement('span');
+					placement.className='threaddesk-layout-viewer__placement-option threaddesk-screenprint__active-placement-option';
+					placement.setAttribute('aria-hidden','true');
+					placement.textContent=placementLabel;
 					item.appendChild(img);
 					item.appendChild(name);
+					item.appendChild(placement);
 					item.addEventListener('click',()=>{
 						if(!selected){return;}
-						const placementKey=String(entry.placementKey||'').trim();
-						if(!placementKey){return;}
-						const payload={
-							category:String(selected.category_slug||createLayoutCategory||'').trim(),
-							categoryId:Number(selected.category_id||createLayoutCategoryId||0),
-							placementsByAngle:selected.placementsByAngle||{},
-							currentAngle:angle,
-						};
-						if(window.jQuery&&typeof window.jQuery.fn==='object'){
-							window.jQuery(document).trigger('threaddesk:open-layout-modal',[{category:payload.category,categoryId:payload.categoryId,forceViewer:true,layoutId:Number(selected.id||0),payload:payload,adjustPlacementKey:placementKey,lockPlacementSize:true,currentAngle:angle,quickAdjust:true}]);
-						}
+						const currentPlacementKey=String(entry.placementKey||'').trim();
+						if(!currentPlacementKey){return;}
+						const placementAngle=String(entry.__angleKey||angle||'front').toLowerCase();
+						if(placementAngle==='front'||placementAngle==='back'||placementAngle==='left'||placementAngle==='right'||placementAngle==='side'){angle=placementAngle;}
+						setActivePlacement(currentPlacementKey);
+						render();
 					});
 					selectedDesignList.appendChild(item);
 					count++;
 				});
+				setActivePlacement(activePlacementKey);
 				selectedDesignEmpty.style.display=count?'none':'block';
 			};
 			const setupCollapsedColors=()=>{
@@ -2481,7 +2536,7 @@ class TTA_ThreadDesk {
 			window.requestAnimationFrame(setupCollapsedColors);
 			window.addEventListener('resize',()=>{if(showAllWrap&&!showAllWrap.hidden&&!colorsExpanded){setupCollapsedColors();}});
 			if(showAllBtn){showAllBtn.addEventListener('click',(event)=>{event.preventDefault();expandColors();});}
-			if(shouldOpenChooser&&modal){window.setTimeout(()=>{modal.classList.add('is-active');modal.setAttribute('aria-hidden','false');setStep('chooser');},1000);}
+			if(shouldOpenChooser&&modal){window.setTimeout(()=>{openScreenprintChooserModal();},1000);}
 			root.querySelectorAll('[data-threaddesk-screenprint-open-color]').forEach((btn)=>btn.addEventListener('click',()=>{
 				selectedColor=String(btn.getAttribute('data-threaddesk-screenprint-open-color')||'').trim();
 				images=(imageMap&&imageMap[selectedColor])?imageMap[selectedColor]:{};
@@ -2489,9 +2544,9 @@ class TTA_ThreadDesk {
 				renderSelectedColorLabel();
 				root.querySelectorAll('[data-threaddesk-screenprint-open-color]').forEach((item)=>{item.style.boxShadow='none';});
 				btn.style.boxShadow='0 0 0 1px #2271b1';
-				modal.classList.add('is-active');modal.setAttribute('aria-hidden','false');setStep('chooser');
+				openScreenprintChooserModal();
 			}));
-			root.querySelectorAll('[data-threaddesk-screenprint-close]').forEach((el)=>el.addEventListener('click',()=>{modal.classList.remove('is-active');modal.setAttribute('aria-hidden','true');setStep('chooser');}));
+			root.querySelectorAll('[data-threaddesk-screenprint-close]').forEach((el)=>el.addEventListener('click',()=>{closeScreenprintModal();}));
 			root.querySelectorAll('[data-threaddesk-screenprint-back]').forEach((el)=>el.addEventListener('click',()=>setStep('chooser')));
 			const lockStageRatio=(src)=>{
 				if(stageRatioLocked||!stage||!src){return;}
@@ -2537,6 +2592,7 @@ class TTA_ThreadDesk {
 			};
 			const render=()=>{
 				if(!selected){return;}
+				syncScreenprintPanelHeight();
 				const map=selected.placementsByAngle||{};
 				const entries=getAngleEntries(map,angle);
 				main.src=getAngleImage(angle);
@@ -2547,18 +2603,54 @@ class TTA_ThreadDesk {
 				entries.forEach((entry)=>{
 					const src=String(entry.sourceUrl||entry.designUrl||entry.previewUrl||entry.preview||entry.url||'').trim();
 					if(!src){return;}
+					const placementKey=String(entry.placementKey||'').trim();
 					const img=document.createElement('img');
+					img.className='threaddesk-screenprint__overlay-design';
+					img.setAttribute('data-threaddesk-screenprint-placement-key',placementKey);
 					img.src=src; img.alt=''; img.setAttribute('aria-hidden','true');
 					img.style.position='absolute';
 					img.style.top=(Number(entry.top||0)).toFixed(2)+'%';
 					img.style.left=(Number(entry.left||0)).toFixed(2)+'%';
 					img.style.width=(Number(entry.width||0)).toFixed(2)+'%';
 					img.style.transform='translate(-50%, -50%)';
+					img.classList.toggle('is-active',!!activePlacementKey&&placementKey===activePlacementKey);
+					img.addEventListener('mousedown',(event)=>{
+						event.preventDefault();
+						setActivePlacement(placementKey);
+						dragState={placementKey:placementKey};
+					});
+					img.addEventListener('touchstart',(event)=>{
+						const touch=event.touches&&event.touches[0];
+						if(!touch){return;}
+						event.preventDefault();
+						setActivePlacement(placementKey);
+						dragState={placementKey:placementKey};
+					});
+					img.addEventListener('click',()=>setActivePlacement(placementKey));
 					overlayWrap.appendChild(img);
 				});
 				renderAngleOverlays(map);
 				renderSelectedDesignPreview(map);
 			};
+			const updateDragPosition=(clientX,clientY)=>{
+				if(!selected||!dragState||!stage){return;}
+				const map=selected.placementsByAngle||{};
+				const entry=getPlacementEntry(map,angle,dragState.placementKey);
+				if(!entry){return;}
+				const rect=stage.getBoundingClientRect();
+				if(!rect.width||!rect.height){return;}
+				const x=Math.min(Math.max(clientX-rect.left,0),rect.width);
+				const y=Math.min(Math.max(clientY-rect.top,0),rect.height);
+				entry.left=(x/rect.width)*100;
+				entry.top=(y/rect.height)*100;
+				render();
+			};
+			document.addEventListener('mousemove',(event)=>{if(dragState){updateDragPosition(event.clientX,event.clientY);}});
+			document.addEventListener('touchmove',(event)=>{if(!dragState){return;} const touch=event.touches&&event.touches[0]; if(!touch){return;} event.preventDefault(); updateDragPosition(touch.clientX,touch.clientY);},{passive:false});
+			document.addEventListener('mouseup',()=>{dragState=null;});
+			document.addEventListener('touchend',()=>{dragState=null;});
+			document.addEventListener('touchcancel',()=>{dragState=null;});
+			window.addEventListener('resize',syncScreenprintPanelHeight);
 			{
 				const createBtn=document.createElement('button');
 				createBtn.type='button';
@@ -2645,7 +2737,7 @@ class TTA_ThreadDesk {
 				btn.appendChild(preview);
 				btn.appendChild(titleWrap);
 				btn.appendChild(meta);
-				btn.addEventListener('click',()=>{selected=layout; if(selectedLabel){selectedLabel.textContent=i18nSelectedPrefix+': '+title;} setStep('viewer'); render();});
+				btn.addEventListener('click',()=>{selected=layout; if(selectedLabel){selectedLabel.textContent=i18nSelectedPrefix+': '+title;} setStep('viewer'); render(); window.requestAnimationFrame(syncScreenprintPanelHeight);});
 				options.appendChild(btn);
 			});
 			root.querySelectorAll('[data-threaddesk-screenprint-angle]').forEach((btn)=>btn.addEventListener('click',()=>{
