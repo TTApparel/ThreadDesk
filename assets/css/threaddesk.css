@@ -1452,6 +1452,11 @@ body.threaddesk-modal-open {
 	min-height: 100%;
 }
 
+
+.threaddesk-layout-modal [data-threaddesk-screenprint-step="viewer"].is-active .threaddesk-layout-viewer__design-panel {
+	max-height: var(--threaddesk-screenprint-stage-rendered-height, var(--threaddesk-layout-stage-height));
+}
+
 .threaddesk-layout-viewer__design-panel h4 {
 	margin: 0;
 	text-transform: uppercase;

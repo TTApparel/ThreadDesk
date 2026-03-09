@@ -2350,6 +2350,11 @@ class TTA_ThreadDesk {
 				if(chooserStep){chooserStep.hidden=!showChooser;chooserStep.classList.toggle('is-active',showChooser);chooserStep.setAttribute('aria-hidden',showChooser?'false':'true');}
 				if(viewerStep){viewerStep.hidden=showChooser;viewerStep.classList.toggle('is-active',!showChooser);viewerStep.setAttribute('aria-hidden',showChooser?'true':'false');}
 			};
+			const syncScreenprintPanelHeight=()=>{
+				if(!viewerStep||viewerStep.hidden||!stage){return;}
+				const stageHeight=Math.round(stage.getBoundingClientRect().height||0);
+				if(stageHeight>0){viewerStep.style.setProperty('--threaddesk-screenprint-stage-rendered-height',stageHeight+'px');}
+			};
 			const getSideLabel=()=>String((images&&images.sideLabel)||'left').toLowerCase()==='right'?'right':'left';
 			const getAngleTransform=(targetAngle)=>{
 				if(targetAngle!=='left'&&targetAngle!=='right'){return 'none';}
@@ -2566,6 +2571,7 @@ class TTA_ThreadDesk {
 			};
 			const render=()=>{
 				if(!selected){return;}
+				syncScreenprintPanelHeight();
 				const map=selected.placementsByAngle||{};
 				const entries=getAngleEntries(map,angle);
 				main.src=getAngleImage(angle);
@@ -2623,6 +2629,7 @@ class TTA_ThreadDesk {
 			document.addEventListener('mouseup',()=>{dragState=null;});
 			document.addEventListener('touchend',()=>{dragState=null;});
 			document.addEventListener('touchcancel',()=>{dragState=null;});
+			window.addEventListener('resize',syncScreenprintPanelHeight);
 			{
 				const createBtn=document.createElement('button');
 				createBtn.type='button';
@@ -2709,7 +2716,7 @@ class TTA_ThreadDesk {
 				btn.appendChild(preview);
 				btn.appendChild(titleWrap);
 				btn.appendChild(meta);
-				btn.addEventListener('click',()=>{selected=layout; if(selectedLabel){selectedLabel.textContent=i18nSelectedPrefix+': '+title;} setStep('viewer'); render();});
+				btn.addEventListener('click',()=>{selected=layout; if(selectedLabel){selectedLabel.textContent=i18nSelectedPrefix+': '+title;} setStep('viewer'); render(); window.requestAnimationFrame(syncScreenprintPanelHeight);});
 				options.appendChild(btn);
 			});
 			root.querySelectorAll('[data-threaddesk-screenprint-angle]').forEach((btn)=>btn.addEventListener('click',()=>{
