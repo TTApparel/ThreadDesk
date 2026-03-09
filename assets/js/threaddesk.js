@@ -178,6 +178,9 @@ jQuery(function ($) {
 		const adjustPaletteOptionsLabel = layoutModal.find('[data-threaddesk-layout-adjust-palette-options-label]');
 		const adjustPaletteOptions = layoutModal.find('[data-threaddesk-layout-adjust-palette-options]');
 		const removePlacementButton = layoutModal.find('[data-threaddesk-layout-remove-placement]');
+		const saveLayoutSubmitButton = saveLayoutForm.find('[data-threaddesk-layout-save-layout]');
+		const quickRemoveButton = $('<button type="button" class="threaddesk-layout-viewer__save-layout-button threaddesk-layout-viewer__remove-button" data-threaddesk-layout-quick-remove>Remove Design</button>').hide();
+		if (saveLayoutForm.length) { saveLayoutForm.append(quickRemoveButton); }
 		const layoutDesignsRaw = layoutModal.attr('data-threaddesk-layout-designs') || '[]';
 		let layoutDesigns = [];
 		try { layoutDesigns = JSON.parse(layoutDesignsRaw); } catch (e) { layoutDesigns = []; }
@@ -199,6 +202,8 @@ jQuery(function ($) {
 		let dragState = null;
 		let currentOverlayConfig = null;
 		let isAdjustMode = false;
+		let quickAdjustPlacementKey = '';
+		let quickAdjustLockSize = false;
 		const savedPlacementsByAngle = { front: {}, left: {}, back: {}, right: {} };
 		const overlayRenderScale = 0.7;
 		const designRatioCache = {};
@@ -229,6 +234,22 @@ jQuery(function ($) {
 			const targetAngle = getPlacementAngleTarget(selectedPlacementKey);
 			const savedEntry = targetAngle && selectedPlacementKey ? ((savedPlacementsByAngle[targetAngle] || {})[selectedPlacementKey] || null) : null;
 			removePlacementButton.prop('hidden', !(isAdjustMode && savedEntry && savedEntry.url));
+		};
+
+		const configureQuickAdjustMode = function (opts) {
+			const settings = opts && typeof opts === 'object' ? opts : {};
+			quickAdjustPlacementKey = String(settings.placementKey || '').trim();
+			quickAdjustLockSize = !!settings.lockSize;
+			if (quickAdjustLockSize) {
+				sizeSlider.prop('disabled', true).attr('aria-disabled', 'true');
+				layoutModal.addClass('threaddesk-layout-modal--slider-locked');
+			} else {
+				sizeSlider.prop('disabled', false).attr('aria-disabled', 'false');
+				layoutModal.removeClass('threaddesk-layout-modal--slider-locked');
+			}
+			const hasQuick = !!quickAdjustPlacementKey;
+			if (saveLayoutSubmitButton.length) { saveLayoutSubmitButton.toggle(!hasQuick); }
+			quickRemoveButton.toggle(hasQuick);
 		};
 
 		const getPlacementAbbreviation = function (placementLabel, placementKey) {
@@ -460,6 +481,7 @@ jQuery(function ($) {
 		};
 
 		const showChooserStep = function (modalEl) {
+			configureQuickAdjustMode({});
 			setLayoutStep(modalEl, 'chooser');
 			placementList.empty();
 			placementEmpty.hide();
@@ -1001,7 +1023,13 @@ jQuery(function ($) {
 			const requestedCategory = String(request.category || '').trim();
 			const requestedCategoryId = Number(request.categoryId || 0);
 			const forceViewer = !!request.forceViewer;
+			const quickAdjustKey = String(request.adjustPlacementKey || '').trim();
+			const quickAdjustLock = !!request.lockPlacementSize;
+			const requestPayload = request.payload && typeof request.payload === 'object' ? request.payload : null;
+			const requestLayoutId = Number(request.layoutId || 0);
 			openLayoutModal(document.activeElement, layoutModal);
+			if (requestLayoutId > 0) { saveLayoutIdField.val(String(requestLayoutId)); }
+			configureQuickAdjustMode({ placementKey: quickAdjustKey, lockSize: quickAdjustLock });
 
 			let categoryButton = requestedCategory ? builderModal.find('[data-threaddesk-layout-category]').filter(function () {
 				return String($(this).attr('data-threaddesk-layout-category') || '').trim() === requestedCategory;
@@ -1022,10 +1050,20 @@ jQuery(function ($) {
 				}
 			}
 
+			if (requestPayload) {
+				applySavedLayoutPayload(requestPayload);
+				const desiredAngle = String(request.currentAngle || requestPayload.currentAngle || 'front').trim();
+				if (desiredAngle) { setMainImage(desiredAngle); }
+			}
+
 			if (forceViewer) {
 				showViewerStep(layoutModal);
 				setPanelStep('placements');
-				if (visibleAngles.length) { setMainImage('front'); }
+				if (visibleAngles.length) { setMainImage(String(request.currentAngle || 'front')); }
+				if (quickAdjustKey) {
+					const targetPlacement = layoutModal.find('.threaddesk-layout-viewer__placement-option[data-threaddesk-layout-placement-key="' + quickAdjustKey + '"]').first();
+					if (targetPlacement.length) { targetPlacement.trigger('click'); }
+				}
 			}
 		});
 
@@ -1186,6 +1224,7 @@ jQuery(function ($) {
 
 		$(document).on('input change', '[data-threaddesk-layout-size-slider]', function () {
 			if (!isAdjustMode) { return; }
+			if (quickAdjustLockSize) { updateSizeReading(); return; }
 			if (!selectedDesignSourceUrl) { updateSizeReading(); return; }
 			const overlayCfg = getOverlayConfig();
 			if (overlayCfg) {
@@ -1239,6 +1278,7 @@ jQuery(function ($) {
 
 		const startDrag = function (event) {
 			if (!isAdjustMode) { return; }
+			if (quickAdjustLockSize) { updateSizeReading(); return; }
 			if (!selectedDesignSourceUrl) { return; }
 			dragState = { active: true };
 			designOverlay.addClass('is-dragging');
@@ -1303,6 +1343,19 @@ jQuery(function ($) {
 			const button = $(this);
 			button.text('Placement Saved');
 			setTimeout(function () { button.text('Save Placement'); }, 1400);
+		});
+
+
+		$(document).on('click', '[data-threaddesk-layout-quick-remove]', function () {
+			const placementKey = String(quickAdjustPlacementKey || '').trim();
+			if (!placementKey) { return; }
+			const targetPlacement = layoutModal.find('.threaddesk-layout-viewer__placement-option[data-threaddesk-layout-placement-key="' + placementKey + '"]').first();
+			if (!targetPlacement.length) { return; }
+			targetPlacement.trigger('click');
+			window.setTimeout(function () {
+				removePlacementButton.trigger('click');
+				setPanelStep('placements');
+			}, 0);
 		});
 
 		$(document).on('click', '[data-threaddesk-layout-remove-placement]', function () {

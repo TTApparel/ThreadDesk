@@ -2202,6 +2202,7 @@ class TTA_ThreadDesk {
 							<p class="threaddesk-screenprint__selected-color" data-threaddesk-screenprint-selected-color><?php echo esc_html__( 'Color: --', 'threaddesk' ); ?></p>
 							<h4><?php echo esc_html__( 'Applied Layout', 'threaddesk' ); ?></h4>
 							<p data-threaddesk-screenprint-selected><?php echo esc_html__( 'No layout selected yet.', 'threaddesk' ); ?></p>
+							<p class="threaddesk-screenprint__selected-color" data-threaddesk-screenprint-selected-color><?php echo esc_html__( 'Color: --', 'threaddesk' ); ?></p>
 							<div class="threaddesk-screenprint__selected-designs">
 								<h5 class="threaddesk-screenprint__selected-designs-heading"><?php echo esc_html__( 'Designs on this view', 'threaddesk' ); ?></h5>
 								<div class="threaddesk-layout-viewer__design-list threaddesk-screenprint__selected-design-list" data-threaddesk-screenprint-selected-design-list></div>
@@ -2319,6 +2320,7 @@ class TTA_ThreadDesk {
 			const i18nSelectedPrefix=<?php echo wp_json_encode( __( 'Selected layout', 'threaddesk' ) ); ?>;
 			const i18nSelectedColorPrefix=<?php echo wp_json_encode( __( 'Color', 'threaddesk' ) ); ?>;
 			const i18nDesignFallback=<?php echo wp_json_encode( __( 'Design', 'threaddesk' ) ); ?>;
+			const i18nAdjust=<?php echo wp_json_encode( __( 'ADJUST', 'threaddesk' ) ); ?>;
 			const i18nCreateLayout=<?php echo wp_json_encode( __( 'CREATE A LAYOUT', 'threaddesk' ) ); ?>;
 			const i18nCreateLayoutHint=<?php echo wp_json_encode( __( 'Need a new layout? Start in the placements builder.', 'threaddesk' ) ); ?>;
 			const createLayoutCategory=String(root.getAttribute('data-threaddesk-screenprint-create-layout-category')||'').trim();
@@ -2374,7 +2376,7 @@ class TTA_ThreadDesk {
 			const renderSelectedColorLabel=()=>{
 				if(!selectedColorLabel){return;}
 				const label=getSelectedColorLabel();
-				selectedColorLabel.textContent=i18nSelectedColorPrefix+': '+(label||'--');
+				selectedColorLabel.textContent=(i18nSelectedColorPrefix||'Color')+': '+(label||'--');
 			};
 			const renderSelectedDesignPreview=(entries)=>{
 				if(!selectedDesignList||!selectedDesignEmpty){return;}
@@ -2385,8 +2387,11 @@ class TTA_ThreadDesk {
 					const src=String(entry.sourceUrl||entry.designUrl||entry.previewUrl||entry.preview||entry.url||'').trim();
 					if(!src){return;}
 					const title=String(entry.designName||entry.placementLabel||i18nDesignFallback).trim()||i18nDesignFallback;
-					const item=document.createElement('div');
+					const item=document.createElement('button');
+					item.type='button';
 					item.className='threaddesk-layout-viewer__design-option threaddesk-screenprint__selected-design-option';
+					item.setAttribute('data-threaddesk-tooltip',i18nAdjust);
+					item.setAttribute('aria-label',i18nAdjust+' '+title);
 					const img=document.createElement('img');
 					img.className='threaddesk-layout-viewer__design-option-image';
 					img.src=src;
@@ -2397,6 +2402,20 @@ class TTA_ThreadDesk {
 					name.textContent=title;
 					item.appendChild(img);
 					item.appendChild(name);
+					item.addEventListener('click',()=>{
+						if(!selected){return;}
+						const placementKey=String(entry.placementKey||'').trim();
+						if(!placementKey){return;}
+						const payload={
+							category:String(selected.category_slug||createLayoutCategory||'').trim(),
+							categoryId:Number(selected.category_id||createLayoutCategoryId||0),
+							placementsByAngle:selected.placementsByAngle||{},
+							currentAngle:angle,
+						};
+						if(window.jQuery&&typeof window.jQuery.fn==='object'){
+							window.jQuery(document).trigger('threaddesk:open-layout-modal',[{category:payload.category,categoryId:payload.categoryId,forceViewer:true,layoutId:Number(selected.id||0),payload:payload,adjustPlacementKey:placementKey,lockPlacementSize:true,currentAngle:angle,quickAdjust:true}]);
+						}
+					});
 					selectedDesignList.appendChild(item);
 					count++;
 				});
