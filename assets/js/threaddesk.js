@@ -1,4 +1,9 @@
 jQuery(function ($) {
+	const syncBodyModalState = function () {
+		const hasActiveModal = $('.threaddesk-auth-modal.is-active, .threaddesk-address-modal.is-active, .threaddesk-layout-modal.is-active, .threaddesk-design-modal.is-active').length > 0;
+		$('body').toggleClass('threaddesk-modal-open', hasActiveModal);
+	};
+
 	$('.threaddesk__nav-item').on('click', function () {
 		$('.threaddesk__nav-item').removeClass('is-active');
 		$(this).addClass('is-active');
@@ -14,8 +19,9 @@ jQuery(function ($) {
 		};
 
 		const closeModal = function () {
+			if (!modal.hasClass('is-active')) { return; }
 			modal.removeClass('is-active').attr('aria-hidden', 'true');
-			$('body').removeClass('threaddesk-modal-open');
+			syncBodyModalState();
 		};
 
 		const switchAuthPanel = function (target) {
@@ -70,8 +76,9 @@ jQuery(function ($) {
 		};
 
 		const closeAddressModal = function () {
+			if (!addressModal.hasClass('is-active')) { return; }
 			addressModal.removeClass('is-active').attr('aria-hidden', 'true');
-			$('body').removeClass('threaddesk-modal-open');
+			syncBodyModalState();
 		};
 
 		const switchAddressPanel = function (target) {
@@ -897,10 +904,12 @@ jQuery(function ($) {
 			saveLayoutIdField.val('0');
 		};
 
-		const closeLayoutModal = function () {
-			layoutModal.removeClass('is-active').attr('aria-hidden', 'true');
-			$('body').removeClass('threaddesk-modal-open');
-			showChooserStep();
+		const closeLayoutModal = function (modalEl) {
+			const scopedModal = modalEl && modalEl.length ? modalEl : layoutModal;
+			if (!scopedModal.hasClass('is-active')) { return; }
+			scopedModal.removeClass('is-active').attr('aria-hidden', 'true');
+			syncBodyModalState();
+			showChooserStep(scopedModal);
 			setPanelStep('placements');
 			if (lastLayoutTrigger && typeof lastLayoutTrigger.focus === 'function') {
 				try { lastLayoutTrigger.focus(); } catch (e) {}
@@ -1067,7 +1076,9 @@ jQuery(function ($) {
 			}
 		});
 
-		$(document).on('click', '[data-threaddesk-layout-close]', function () { closeLayoutModal(); });
+		$(document).on('click', '[data-threaddesk-layout-close]', function () {
+			closeLayoutModal($(this).closest('.threaddesk-layout-modal'));
+		});
 		$(document).on('click', '[data-threaddesk-layout-angle]', function (event) {
 			if (isAdjustMode) {
 				event.preventDefault();
@@ -1414,8 +1425,9 @@ jQuery(function ($) {
 		});
 
 		$(document).on('keyup', function (event) {
-			if (event.key === 'Escape' && layoutModal.hasClass('is-active')) {
-				closeLayoutModal();
+			if (event.key === 'Escape') {
+				const activeLayoutModal = findLayoutBuilderModals().filter('.is-active').last();
+				if (activeLayoutModal.length) { closeLayoutModal(activeLayoutModal); }
 			}
 		});
 	}
@@ -1432,12 +1444,13 @@ jQuery(function ($) {
 		};
 
 		const closeDesignModal = function () {
+			if (!designModal.hasClass('is-active')) { return; }
 			const focused = document.activeElement;
 			if (focused && designModal.get(0) && designModal.get(0).contains(focused)) {
 				try { focused.blur(); } catch (e) {}
 			}
 			designModal.removeClass('is-active').attr('aria-hidden', 'true');
-			$('body').removeClass('threaddesk-modal-open');
+			syncBodyModalState();
 			if (lastDesignTrigger && typeof lastDesignTrigger.focus === 'function') {
 				try { lastDesignTrigger.focus(); } catch (e) {}
 			}
