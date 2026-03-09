@@ -2041,13 +2041,45 @@ class TTA_ThreadDesk {
 
 		if ( ! empty( $placement_categories ) ) {
 			$primary_category = null;
+
+			$placement_category_map_by_id   = array();
+			$placement_category_map_by_slug = array();
 			foreach ( $placement_categories as $placement_category ) {
 				$placement_term_id   = isset( $placement_category['term_id'] ) ? absint( $placement_category['term_id'] ) : 0;
 				$placement_term_slug = isset( $placement_category['term_slug'] ) ? sanitize_key( (string) $placement_category['term_slug'] ) : '';
-				if ( ( $default_category_id > 0 && $placement_term_id === $default_category_id ) || ( '' !== $default_category_slug && '' !== $placement_term_slug && $placement_term_slug === $default_category_slug ) ) {
-					$primary_category = $placement_category;
+				if ( $placement_term_id > 0 ) {
+					$placement_category_map_by_id[ $placement_term_id ] = $placement_category;
+				}
+				if ( '' !== $placement_term_slug ) {
+					$placement_category_map_by_slug[ $placement_term_slug ] = $placement_category;
+				}
+			}
+
+			// Prefer the first product category that is actually available in placement mappings.
+			foreach ( $product_term_ids as $product_term_id ) {
+				$product_term_id = absint( $product_term_id );
+				if ( $product_term_id > 0 && isset( $placement_category_map_by_id[ $product_term_id ] ) ) {
+					$primary_category = $placement_category_map_by_id[ $product_term_id ];
 					break;
 				}
+			}
+
+			if ( ! is_array( $primary_category ) ) {
+				foreach ( $product_term_slugs as $product_term_slug ) {
+					$product_term_slug = sanitize_key( (string) $product_term_slug );
+					if ( '' !== $product_term_slug && isset( $placement_category_map_by_slug[ $product_term_slug ] ) ) {
+						$primary_category = $placement_category_map_by_slug[ $product_term_slug ];
+						break;
+					}
+				}
+			}
+
+			if ( ! is_array( $primary_category ) && $default_category_id > 0 && isset( $placement_category_map_by_id[ $default_category_id ] ) ) {
+				$primary_category = $placement_category_map_by_id[ $default_category_id ];
+			}
+
+			if ( ! is_array( $primary_category ) && '' !== $default_category_slug && isset( $placement_category_map_by_slug[ $default_category_slug ] ) ) {
+				$primary_category = $placement_category_map_by_slug[ $default_category_slug ];
 			}
 
 			if ( ! is_array( $primary_category ) ) {
