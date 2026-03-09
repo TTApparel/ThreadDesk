@@ -2204,7 +2204,6 @@ class TTA_ThreadDesk {
 							<p data-threaddesk-screenprint-selected><?php echo esc_html__( 'No layout selected yet.', 'threaddesk' ); ?></p>
 							<p class="threaddesk-screenprint__selected-color" data-threaddesk-screenprint-selected-color><?php echo esc_html__( 'Color: --', 'threaddesk' ); ?></p>
 							<div class="threaddesk-screenprint__selected-designs">
-								<h5 class="threaddesk-screenprint__selected-designs-heading"><?php echo esc_html__( 'Designs on this view', 'threaddesk' ); ?></h5>
 								<div class="threaddesk-layout-viewer__design-list threaddesk-screenprint__selected-design-list" data-threaddesk-screenprint-selected-design-list></div>
 								<p class="threaddesk-layout-viewer__placement-empty" data-threaddesk-screenprint-selected-design-empty><?php echo esc_html__( 'No designs on this view yet.', 'threaddesk' ); ?></p>
 							</div>
@@ -2334,7 +2333,9 @@ class TTA_ThreadDesk {
 			const chooserStep=root.querySelector('[data-threaddesk-screenprint-step="chooser"]');
 			const viewerStep=root.querySelector('[data-threaddesk-screenprint-step="viewer"]');
 			const selectedLabel=root.querySelector('[data-threaddesk-screenprint-selected]');
-			const selectedColorLabel=root.querySelector('[data-threaddesk-screenprint-selected-color]');
+			const selectedColorLabels=root.querySelectorAll('[data-threaddesk-screenprint-selected-color]');
+			const selectedColorLabel=selectedColorLabels.length?selectedColorLabels[0]:null;
+			if(selectedColorLabels.length>1){for(let i=1;i<selectedColorLabels.length;i++){selectedColorLabels[i].remove();}}
 			const selectedDesignList=root.querySelector('[data-threaddesk-screenprint-selected-design-list]');
 			const selectedDesignEmpty=root.querySelector('[data-threaddesk-screenprint-selected-design-empty]');
 			const main=root.querySelector('[data-threaddesk-screenprint-main]');
@@ -2378,12 +2379,25 @@ class TTA_ThreadDesk {
 				const label=getSelectedColorLabel();
 				selectedColorLabel.textContent=(i18nSelectedColorPrefix||'Color')+': '+(label||'--');
 			};
-			const renderSelectedDesignPreview=(entries)=>{
+			const renderSelectedDesignPreview=(map)=>{
 				if(!selectedDesignList||!selectedDesignEmpty){return;}
 				selectedDesignList.innerHTML='';
-				const items=Array.isArray(entries)?entries:[];
+				const grouped={};
+				const order=[];
+				const byAngle=(map&&typeof map==='object')?map:{};
+				Object.keys(byAngle).forEach((angleKey)=>{
+					const raw=byAngle[angleKey];
+					const items=Array.isArray(raw)?raw:(raw&&typeof raw==='object'?Object.values(raw):[]);
+					items.forEach((entry)=>{
+						if(!entry||typeof entry!=='object'){return;}
+						const key=String(entry.placementKey||'').trim();
+						if(!key){return;}
+						if(!grouped[key]){grouped[key]=entry;order.push(key);} 
+					});
+				});
 				let count=0;
-				items.forEach((entry)=>{
+				order.forEach((placementKey)=>{
+					const entry=grouped[placementKey];
 					const src=String(entry.sourceUrl||entry.designUrl||entry.previewUrl||entry.preview||entry.url||'').trim();
 					if(!src){return;}
 					const title=String(entry.designName||entry.placementLabel||i18nDesignFallback).trim()||i18nDesignFallback;
@@ -2543,7 +2557,7 @@ class TTA_ThreadDesk {
 					overlayWrap.appendChild(img);
 				});
 				renderAngleOverlays(map);
-				renderSelectedDesignPreview(entries);
+				renderSelectedDesignPreview(map);
 			};
 			{
 				const createBtn=document.createElement('button');

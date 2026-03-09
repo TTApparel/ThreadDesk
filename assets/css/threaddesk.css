@@ -2140,13 +2140,6 @@ body.threaddesk-modal-open {
 	margin-top: 12px;
 }
 
-.threaddesk-screenprint__selected-designs-heading {
-	margin: 0 0 8px;
-	font-size: 12px;
-	text-transform: uppercase;
-	letter-spacing: .04em;
-	color: #2e2e2e;
-}
 
 .threaddesk-screenprint__selected-design-option {
 	cursor: default;
@@ -2244,4 +2237,10 @@ body.threaddesk-modal-open {
 .threaddesk-layout-modal--slider-locked [data-threaddesk-layout-size-slider] {
 	opacity: .5;
 	cursor: not-allowed;
+}
+
+.threaddesk-screenprint__selected-design-list {
+	display: grid;
+	grid-template-columns: 1fr;
+	gap: 8px;
 }
