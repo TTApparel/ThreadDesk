@@ -2342,6 +2342,7 @@ class TTA_ThreadDesk {
 			const overlayWrap=root.querySelector('[data-threaddesk-screenprint-overlay]');
 			const stage=root.querySelector('[data-threaddesk-screenprint-stage]');
 			const angleThumbs=root.querySelectorAll('[data-threaddesk-screenprint-angle-image]');
+			if(!modal||!colorPicker||!options||!chooserStep||!viewerStep){return;}
 			let selected=null; let angle='front'; let selectedColor=initialColorKey; let stageRatioLocked=false; let colorsExpanded=false; let activePlacementKey=''; let dragState=null;
 			if(!selectedColor||!imageMap[selectedColor]){const keys=Object.keys(imageMap||{}); selectedColor=keys.length?keys[0]:'';}
 			let images=(imageMap&&imageMap[selectedColor])?imageMap[selectedColor]:{};
