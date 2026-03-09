@@ -1452,6 +1452,11 @@ body.threaddesk-modal-open {
 	min-height: 100%;
 }
 
+
+.threaddesk-layout-modal [data-threaddesk-screenprint-step="viewer"].is-active .threaddesk-layout-viewer__design-panel {
+	max-height: var(--threaddesk-screenprint-stage-rendered-height, var(--threaddesk-layout-stage-height));
+}
+
 .threaddesk-layout-viewer__design-panel h4 {
 	margin: 0;
 	text-transform: uppercase;
@@ -2145,6 +2150,11 @@ body.threaddesk-modal-open {
 	cursor: default;
 }
 
+.threaddesk-screenprint__selected-design-option.is-active {
+	border-color: #2271b1;
+	box-shadow: 0 0 0 2px rgba(34,113,177,.25);
+}
+
 .threaddesk-screenprint__angles {
 	display: flex;
 	gap: 8px;
@@ -2178,13 +2188,23 @@ body.threaddesk-modal-open {
 .threaddesk-screenprint__overlay {
 	position: absolute;
 	inset: 0;
-	pointer-events: none;
+	pointer-events: auto;
 	z-index: 2;
 }
 
 .threaddesk-screenprint__overlay img {
 	position: absolute;
 	height: auto;
+}
+
+.threaddesk-screenprint__overlay-design {
+	pointer-events: auto;
+	cursor: grab;
+}
+
+.threaddesk-screenprint__overlay-design.is-active {
+	outline: 2px solid #2271b1;
+	outline-offset: 2px;
 }
 
 .threaddesk-layout-viewer__angle-image-wrap > img[data-threaddesk-screenprint-angle-image] {
