@@ -1946,6 +1946,7 @@ class TTA_ThreadDesk {
 		$initial_color_key = (string) $screenprint_color_choices[0]['key'];
 		$instance_id = 'threaddesk-screenprint-' . wp_rand( 1000, 99999 );
 		$default_category_slug = ! empty( $product_term_slugs ) ? (string) reset( $product_term_slugs ) : '';
+		$default_category_id   = ! empty( $product_term_ids ) ? (int) reset( $product_term_ids ) : 0;
 		$screenprint_open_chooser = isset( $_GET['td_screenprint_return'] ) && '1' === sanitize_text_field( wp_unslash( $_GET['td_screenprint_return'] ) );
 		$screenprint_return_url  = remove_query_arg( 'td_screenprint_return', get_permalink( $product_id ) );
 
@@ -2015,6 +2016,31 @@ class TTA_ThreadDesk {
 			}
 		}
 
+		if ( ! empty( $placement_categories ) ) {
+			$primary_category = null;
+			foreach ( $placement_categories as $placement_category ) {
+				$placement_term_id   = isset( $placement_category['term_id'] ) ? absint( $placement_category['term_id'] ) : 0;
+				$placement_term_slug = isset( $placement_category['term_slug'] ) ? sanitize_key( (string) $placement_category['term_slug'] ) : '';
+				if ( ( $default_category_id > 0 && $placement_term_id === $default_category_id ) || ( '' !== $default_category_slug && '' !== $placement_term_slug && $placement_term_slug === $default_category_slug ) ) {
+					$primary_category = $placement_category;
+					break;
+				}
+			}
+
+			if ( ! is_array( $primary_category ) ) {
+				$primary_category = reset( $placement_categories );
+			}
+
+			if ( is_array( $primary_category ) ) {
+				if ( ! empty( $primary_category['term_slug'] ) ) {
+					$default_category_slug = sanitize_key( (string) $primary_category['term_slug'] );
+				}
+				if ( ! empty( $primary_category['term_id'] ) ) {
+					$default_category_id = absint( $primary_category['term_id'] );
+				}
+			}
+		}
+
 		$saved_designs = array();
 		$design_posts = get_posts(
 			array(
@@ -2056,7 +2082,7 @@ class TTA_ThreadDesk {
 
 		ob_start();
 		?>
-		<div class="threaddesk-screenprint" id="<?php echo esc_attr( $instance_id ); ?>" data-threaddesk-screenprint-layouts="<?php echo esc_attr( wp_json_encode( $layout_items ) ); ?>" data-threaddesk-screenprint-images-by-color="<?php echo esc_attr( wp_json_encode( $screenprint_images_by_color ) ); ?>" data-threaddesk-screenprint-initial-color="<?php echo esc_attr( $initial_color_key ); ?>" data-threaddesk-screenprint-create-layout-category="<?php echo esc_attr( $default_category_slug ); ?>" data-threaddesk-screenprint-open-chooser="<?php echo $screenprint_open_chooser ? '1' : '0'; ?>">
+		<div class="threaddesk-screenprint" id="<?php echo esc_attr( $instance_id ); ?>" data-threaddesk-screenprint-layouts="<?php echo esc_attr( wp_json_encode( $layout_items ) ); ?>" data-threaddesk-screenprint-images-by-color="<?php echo esc_attr( wp_json_encode( $screenprint_images_by_color ) ); ?>" data-threaddesk-screenprint-initial-color="<?php echo esc_attr( $initial_color_key ); ?>" data-threaddesk-screenprint-create-layout-category="<?php echo esc_attr( $default_category_slug ); ?>" data-threaddesk-screenprint-create-layout-category-id="<?php echo esc_attr( (string) $default_category_id ); ?>" data-threaddesk-screenprint-open-chooser="<?php echo $screenprint_open_chooser ? '1' : '0'; ?>">
 			<div class="threaddesk-screenprint__color-picker" data-threaddesk-screenprint-color-picker style="display:flex;flex-wrap:wrap;gap:10px;align-items:stretch;justify-content:center;">
 				<?php foreach ( $screenprint_color_choices as $choice_index => $choice ) : ?>
 					<button type="button" class="threaddesk-screenprint__open-color" data-threaddesk-screenprint-open-color="<?php echo esc_attr( $choice['key'] ); ?>" aria-label="<?php echo esc_attr( $choice['label'] ); ?>" style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:8px 0;width:70px;border:1px solid #dcdcde;background:#fff;border-radius:4px;cursor:pointer;position:relative;overflow:visible;<?php echo 0 === (int) $choice_index ? 'box-shadow:0 0 0 1px #2271b1;' : ''; ?>">
@@ -2124,7 +2150,7 @@ class TTA_ThreadDesk {
 					</div>
 				</div>
 			</div>
-			<button type="button" data-threaddesk-layout-open data-threaddesk-layout-category-open="<?php echo esc_attr( $default_category_slug ); ?>" hidden></button>
+			<button type="button" data-threaddesk-layout-open data-threaddesk-layout-category-open="<?php echo esc_attr( $default_category_slug ); ?>" data-threaddesk-layout-category-id-open="<?php echo esc_attr( (string) $default_category_id ); ?>" hidden></button>
 			<div class="threaddesk-layout-modal" aria-hidden="true" data-threaddesk-layout-builder data-threaddesk-layout-designs="<?php echo esc_attr( wp_json_encode( $saved_designs ) ); ?>">
 				<div class="threaddesk-auth-modal__overlay" data-threaddesk-layout-close></div>
 				<div class="threaddesk-auth-modal__panel" role="dialog" aria-label="<?php echo esc_attr__( 'Choose a placement category', 'threaddesk' ); ?>" aria-modal="true">
@@ -2233,6 +2259,7 @@ class TTA_ThreadDesk {
 			const i18nCreateLayout=<?php echo wp_json_encode( __( 'CREATE A LAYOUT', 'threaddesk' ) ); ?>;
 			const i18nCreateLayoutHint=<?php echo wp_json_encode( __( 'Need a new layout? Start in the placements builder.', 'threaddesk' ) ); ?>;
 			const createLayoutCategory=String(root.getAttribute('data-threaddesk-screenprint-create-layout-category')||'').trim();
+			const createLayoutCategoryId=Number(root.getAttribute('data-threaddesk-screenprint-create-layout-category-id')||0);
 			const shouldOpenChooser=String(root.getAttribute('data-threaddesk-screenprint-open-chooser')||'0').trim()==='1';
 			const modal=root.querySelector('.threaddesk-layout-modal');
 			const colorPicker=root.querySelector('[data-threaddesk-screenprint-color-picker]');
@@ -2412,13 +2439,14 @@ class TTA_ThreadDesk {
 					if(typeof createBtn.blur==='function'){createBtn.blur();}
 					if(modal){modal.classList.remove('is-active');modal.setAttribute('aria-hidden','true');}
 					if(window.jQuery&&typeof window.jQuery.fn==='object'){
-						window.jQuery(document).trigger('threaddesk:open-layout-modal',[{category:createLayoutCategory,forceViewer:true}]);
+						window.jQuery(document).trigger('threaddesk:open-layout-modal',[{category:createLayoutCategory,categoryId:createLayoutCategoryId,forceViewer:true}]);
 						return;
 					}
 					const localScope=root.closest('.product')||document;
 					const layoutOpen=localScope.querySelector('[data-threaddesk-layout-open]')||document.querySelector('[data-threaddesk-layout-open]');
 					if(!layoutOpen){return;}
 					if(createLayoutCategory){layoutOpen.setAttribute('data-threaddesk-layout-category-open', createLayoutCategory);}
+					if(createLayoutCategoryId>0){layoutOpen.setAttribute('data-threaddesk-layout-category-id-open', String(createLayoutCategoryId));}
 					document.body.classList.remove('threaddesk-modal-open');
 					window.setTimeout(()=>{layoutOpen.click();},0);
 				});
