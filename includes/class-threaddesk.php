@@ -2153,7 +2153,7 @@ class TTA_ThreadDesk {
 			<div class="threaddesk-screenprint__show-all-wrap hide-colors" hidden>
 				<button type="button" class="threaddesk-screenprint__show-all" data-threaddesk-screenprint-show-all-colors><?php echo esc_html__( 'View all colors', 'threaddesk' ); ?></button>
 			</div>
-			<div class="threaddesk-layout-modal" aria-hidden="true">
+			<div class="threaddesk-layout-modal" aria-hidden="true" data-threaddesk-screenprint-modal>
 				<div class="threaddesk-auth-modal__overlay" data-threaddesk-screenprint-close></div>
 				<div class="threaddesk-auth-modal__panel" role="dialog" aria-modal="true" aria-label="<?php echo esc_attr__( 'Screenprint layout chooser', 'threaddesk' ); ?>">
 					<div class="threaddesk-auth-modal__actions"><button type="button" class="threaddesk-auth-modal__close" data-threaddesk-screenprint-close>&times;</button></div>
@@ -2325,7 +2325,7 @@ class TTA_ThreadDesk {
 			const createLayoutCategory=String(root.getAttribute('data-threaddesk-screenprint-create-layout-category')||'').trim();
 			const createLayoutCategoryId=Number(root.getAttribute('data-threaddesk-screenprint-create-layout-category-id')||0);
 			const shouldOpenChooser=String(root.getAttribute('data-threaddesk-screenprint-open-chooser')||'0').trim()==='1';
-			const modal=root.querySelector('.threaddesk-layout-modal');
+			const modal=root.querySelector('[data-threaddesk-screenprint-modal]');
 			const colorPicker=root.querySelector('[data-threaddesk-screenprint-color-picker]');
 			const showAllWrap=root.querySelector('.hide-colors');
 			const showAllBtn=root.querySelector('[data-threaddesk-screenprint-show-all-colors]');
