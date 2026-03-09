@@ -1759,6 +1759,29 @@ class TTA_ThreadDesk {
 		$product_term_slugs = wp_get_post_terms( $product_id, 'product_cat', array( 'fields' => 'slugs' ) );
 		$product_term_ids = is_array( $product_term_ids ) ? array_map( 'absint', $product_term_ids ) : array();
 		$product_term_slugs = is_array( $product_term_slugs ) ? array_map( 'sanitize_key', $product_term_slugs ) : array();
+		$preferred_product_category_id = ! empty( $product_term_ids ) ? (int) reset( $product_term_ids ) : 0;
+		$preferred_product_category_slug = ! empty( $product_term_slugs ) ? (string) reset( $product_term_slugs ) : '';
+		if ( taxonomy_exists( 'product_cat' ) && ! empty( $product_term_ids ) ) {
+			$product_terms = wp_get_post_terms( $product_id, 'product_cat' );
+			if ( is_array( $product_terms ) && ! empty( $product_terms ) ) {
+				$deepest_term = null;
+				$deepest_depth = -1;
+				foreach ( $product_terms as $product_term ) {
+					if ( ! $product_term || is_wp_error( $product_term ) || ! isset( $product_term->term_id ) ) {
+						continue;
+					}
+					$depth = count( get_ancestors( (int) $product_term->term_id, 'product_cat', 'taxonomy' ) );
+					if ( $depth > $deepest_depth ) {
+						$deepest_depth = $depth;
+						$deepest_term = $product_term;
+					}
+				}
+				if ( $deepest_term && ! empty( $deepest_term->term_id ) ) {
+					$preferred_product_category_id = absint( $deepest_term->term_id );
+					$preferred_product_category_slug = sanitize_key( (string) $deepest_term->slug );
+				}
+			}
+		}
 		$layout_category_settings = get_option( 'tta_threaddesk_layout_categories', array() );
 
 		$layout_posts = get_posts(
@@ -1945,8 +1968,8 @@ class TTA_ThreadDesk {
 
 		$initial_color_key = (string) $screenprint_color_choices[0]['key'];
 		$instance_id = 'threaddesk-screenprint-' . wp_rand( 1000, 99999 );
-		$default_category_slug = ! empty( $product_term_slugs ) ? (string) reset( $product_term_slugs ) : '';
-		$default_category_id   = ! empty( $product_term_ids ) ? (int) reset( $product_term_ids ) : 0;
+		$default_category_slug = $preferred_product_category_slug;
+		$default_category_id   = $preferred_product_category_id;
 		$screenprint_open_chooser = isset( $_GET['td_screenprint_return'] ) && '1' === sanitize_text_field( wp_unslash( $_GET['td_screenprint_return'] ) );
 		$screenprint_return_url  = remove_query_arg( 'td_screenprint_return', get_permalink( $product_id ) );
 
