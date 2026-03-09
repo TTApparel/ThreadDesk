@@ -2128,6 +2128,30 @@ body.threaddesk-modal-open {
 	margin-top: 10px;
 }
 
+.threaddesk-screenprint__selected-color {
+	margin: 0 0 8px;
+	font-size: 12px;
+	text-transform: uppercase;
+	letter-spacing: .04em;
+	color: #2e2e2e;
+}
+
+.threaddesk-screenprint__selected-designs {
+	margin-top: 12px;
+}
+
+.threaddesk-screenprint__selected-designs-heading {
+	margin: 0 0 8px;
+	font-size: 12px;
+	text-transform: uppercase;
+	letter-spacing: .04em;
+	color: #2e2e2e;
+}
+
+.threaddesk-screenprint__selected-design-option {
+	cursor: default;
+}
+
 .threaddesk-screenprint__angles {
 	display: flex;
 	gap: 8px;

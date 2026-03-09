@@ -2199,8 +2199,14 @@ class TTA_ThreadDesk {
 						</div>
 						<div class="threaddesk-layout-viewer__design-panel">
 							<button type="button" class="threaddesk-layout-viewer__back-button" data-threaddesk-screenprint-back><?php echo esc_html__( 'Back to Saved Layouts', 'threaddesk' ); ?></button>
+							<p class="threaddesk-screenprint__selected-color" data-threaddesk-screenprint-selected-color><?php echo esc_html__( 'Color: --', 'threaddesk' ); ?></p>
 							<h4><?php echo esc_html__( 'Applied Layout', 'threaddesk' ); ?></h4>
 							<p data-threaddesk-screenprint-selected><?php echo esc_html__( 'No layout selected yet.', 'threaddesk' ); ?></p>
+							<div class="threaddesk-screenprint__selected-designs">
+								<h5 class="threaddesk-screenprint__selected-designs-heading"><?php echo esc_html__( 'Designs on this view', 'threaddesk' ); ?></h5>
+								<div class="threaddesk-layout-viewer__design-list threaddesk-screenprint__selected-design-list" data-threaddesk-screenprint-selected-design-list></div>
+								<p class="threaddesk-layout-viewer__placement-empty" data-threaddesk-screenprint-selected-design-empty><?php echo esc_html__( 'No designs on this view yet.', 'threaddesk' ); ?></p>
+							</div>
 						</div>
 					</div>
 				</div>
@@ -2311,6 +2317,8 @@ class TTA_ThreadDesk {
 			const i18nNoPreview=<?php echo wp_json_encode( __( 'No placement preview', 'threaddesk' ) ); ?>;
 			const i18nPrintCountLabel=<?php echo wp_json_encode( __( 'Print count', 'threaddesk' ) ); ?>;
 			const i18nSelectedPrefix=<?php echo wp_json_encode( __( 'Selected layout', 'threaddesk' ) ); ?>;
+			const i18nSelectedColorPrefix=<?php echo wp_json_encode( __( 'Color', 'threaddesk' ) ); ?>;
+			const i18nDesignFallback=<?php echo wp_json_encode( __( 'Design', 'threaddesk' ) ); ?>;
 			const i18nCreateLayout=<?php echo wp_json_encode( __( 'CREATE A LAYOUT', 'threaddesk' ) ); ?>;
 			const i18nCreateLayoutHint=<?php echo wp_json_encode( __( 'Need a new layout? Start in the placements builder.', 'threaddesk' ) ); ?>;
 			const createLayoutCategory=String(root.getAttribute('data-threaddesk-screenprint-create-layout-category')||'').trim();
@@ -2324,6 +2332,9 @@ class TTA_ThreadDesk {
 			const chooserStep=root.querySelector('[data-threaddesk-screenprint-step="chooser"]');
 			const viewerStep=root.querySelector('[data-threaddesk-screenprint-step="viewer"]');
 			const selectedLabel=root.querySelector('[data-threaddesk-screenprint-selected]');
+			const selectedColorLabel=root.querySelector('[data-threaddesk-screenprint-selected-color]');
+			const selectedDesignList=root.querySelector('[data-threaddesk-screenprint-selected-design-list]');
+			const selectedDesignEmpty=root.querySelector('[data-threaddesk-screenprint-selected-design-empty]');
 			const main=root.querySelector('[data-threaddesk-screenprint-main]');
 			const overlayWrap=root.querySelector('[data-threaddesk-screenprint-overlay]');
 			const stage=root.querySelector('[data-threaddesk-screenprint-stage]');
@@ -2350,6 +2361,47 @@ class TTA_ThreadDesk {
 				return String((images&&images[key])||images.front||'').trim();
 			};
 			const syncAngleThumbs=()=>{angleThumbs.forEach((img)=>{const key=img.getAttribute('data-threaddesk-screenprint-angle-image')||'front';img.src=getAngleImage(key);img.style.transform=getAngleTransform(key);});};
+			const getSelectedColorLabel=()=>{
+				if(!colorPicker){return '';}
+				const colorButtons=Array.from(colorPicker.querySelectorAll('[data-threaddesk-screenprint-open-color]'));
+				for(let i=0;i<colorButtons.length;i++){
+					const button=colorButtons[i];
+					if(String(button.getAttribute('data-threaddesk-screenprint-open-color')||'').trim()!==selectedColor){continue;}
+					return String(button.getAttribute('aria-label')||'').trim();
+				}
+				return '';
+			};
+			const renderSelectedColorLabel=()=>{
+				if(!selectedColorLabel){return;}
+				const label=getSelectedColorLabel();
+				selectedColorLabel.textContent=i18nSelectedColorPrefix+': '+(label||'--');
+			};
+			const renderSelectedDesignPreview=(entries)=>{
+				if(!selectedDesignList||!selectedDesignEmpty){return;}
+				selectedDesignList.innerHTML='';
+				const items=Array.isArray(entries)?entries:[];
+				let count=0;
+				items.forEach((entry)=>{
+					const src=String(entry.sourceUrl||entry.designUrl||entry.previewUrl||entry.preview||entry.url||'').trim();
+					if(!src){return;}
+					const title=String(entry.designName||entry.placementLabel||i18nDesignFallback).trim()||i18nDesignFallback;
+					const item=document.createElement('div');
+					item.className='threaddesk-layout-viewer__design-option threaddesk-screenprint__selected-design-option';
+					const img=document.createElement('img');
+					img.className='threaddesk-layout-viewer__design-option-image';
+					img.src=src;
+					img.alt='';
+					img.setAttribute('aria-hidden','true');
+					const name=document.createElement('span');
+					name.className='threaddesk-layout-viewer__design-option-title';
+					name.textContent=title;
+					item.appendChild(img);
+					item.appendChild(name);
+					selectedDesignList.appendChild(item);
+					count++;
+				});
+				selectedDesignEmpty.style.display=count?'none':'block';
+			};
 			const setupCollapsedColors=()=>{
 				if(!colorPicker){return;}
 				const colorButtons=Array.from(colorPicker.querySelectorAll('[data-threaddesk-screenprint-open-color]'));
@@ -2392,6 +2444,7 @@ class TTA_ThreadDesk {
 				}
 			};
 			syncAngleThumbs();
+			renderSelectedColorLabel();
 			window.requestAnimationFrame(setupCollapsedColors);
 			window.addEventListener('resize',()=>{if(showAllWrap&&!showAllWrap.hidden&&!colorsExpanded){setupCollapsedColors();}});
 			if(showAllBtn){showAllBtn.addEventListener('click',(event)=>{event.preventDefault();expandColors();});}
@@ -2400,6 +2453,7 @@ class TTA_ThreadDesk {
 				selectedColor=String(btn.getAttribute('data-threaddesk-screenprint-open-color')||'').trim();
 				images=(imageMap&&imageMap[selectedColor])?imageMap[selectedColor]:{};
 				syncAngleThumbs();
+				renderSelectedColorLabel();
 				root.querySelectorAll('[data-threaddesk-screenprint-open-color]').forEach((item)=>{item.style.boxShadow='none';});
 				btn.style.boxShadow='0 0 0 1px #2271b1';
 				modal.classList.add('is-active');modal.setAttribute('aria-hidden','false');setStep('chooser');
@@ -2470,6 +2524,7 @@ class TTA_ThreadDesk {
 					overlayWrap.appendChild(img);
 				});
 				renderAngleOverlays(map);
+				renderSelectedDesignPreview(entries);
 			};
 			{
 				const createBtn=document.createElement('button');
