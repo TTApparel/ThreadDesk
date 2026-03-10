@@ -31,6 +31,11 @@ ThreadDesk is a WooCommerce customer portal that adds a dedicated "ThreadDesk" s
 - Quotes are stored as `tta_quote` custom post types with metadata (`status`, `total`, `currency`, `items_json`, `created_at`).
 - Designs and Layouts are stored as `tta_design` and `tta_layout` placeholders.
 - Outstanding balance is calculated from unpaid WooCommerce orders with statuses `pending`, `on-hold`, and `failed`.
+- Guest sessions are tracked with a secure browser cookie (`tta_threaddesk_guest`) and can save draft `tta_design` / `tta_layout` posts without logging in.
+- Guest drafts use a 7-day absolute TTL and a 48-hour inactivity timeout (both filterable), intended to match short-lived design/cart workflows.
+- Guest ownership is browser-dependent: drafts are available only in the same browser profile while the cookie remains present.
+- Sensitive events rotate the guest token automatically (login/logout) and an explicit reset endpoint is available at `admin-post.php?action=tta_threaddesk_reset_guest_token`.
+- A daily cleanup job permanently deletes stale guest-owned `tta_design` and `tta_layout` posts older than the guest TTL.
 
 ## Product Postbox Reference (for integrations)
 
