@@ -2199,7 +2199,6 @@ class TTA_ThreadDesk {
 						</div>
 						<div class="threaddesk-layout-viewer__design-panel">
 							<button type="button" class="threaddesk-layout-viewer__back-button" data-threaddesk-screenprint-back><?php echo esc_html__( 'Back to Saved Layouts', 'threaddesk' ); ?></button>
-							<p class="threaddesk-screenprint__selected-color" data-threaddesk-screenprint-selected-color><?php echo esc_html__( 'Color: --', 'threaddesk' ); ?></p>
 							<h4><?php echo esc_html__( 'Applied Layout', 'threaddesk' ); ?></h4>
 							<p data-threaddesk-screenprint-selected><?php echo esc_html__( 'No layout selected yet.', 'threaddesk' ); ?></p>
 							<p class="threaddesk-screenprint__selected-color" data-threaddesk-screenprint-selected-color><?php echo esc_html__( 'Color: --', 'threaddesk' ); ?></p>
@@ -2322,10 +2321,11 @@ class TTA_ThreadDesk {
 			const initialColorKey=String(root.getAttribute('data-threaddesk-screenprint-initial-color')||'').trim();
 			const i18nNoPreview=<?php echo wp_json_encode( __( 'No placement preview', 'threaddesk' ) ); ?>;
 			const i18nPrintCountLabel=<?php echo wp_json_encode( __( 'Print count', 'threaddesk' ) ); ?>;
-			const i18nSelectedPrefix=<?php echo wp_json_encode( __( 'Selected layout', 'threaddesk' ) ); ?>;
+			const i18nSelectedPrefix=<?php echo wp_json_encode( __( 'LAYOUT', 'threaddesk' ) ); ?>;
 			const i18nSelectedColorPrefix=<?php echo wp_json_encode( __( 'Color', 'threaddesk' ) ); ?>;
 			const i18nDesignFallback=<?php echo wp_json_encode( __( 'Design', 'threaddesk' ) ); ?>;
 			const i18nAdjust=<?php echo wp_json_encode( __( 'ADJUST', 'threaddesk' ) ); ?>;
+			const i18nApproxSizePrefix=<?php echo wp_json_encode( __( 'Approx. size', 'threaddesk' ) ); ?>;
 			const i18nCreateLayout=<?php echo wp_json_encode( __( 'CREATE A LAYOUT', 'threaddesk' ) ); ?>;
 			const i18nCreateLayoutHint=<?php echo wp_json_encode( __( 'Need a new layout? Start in the placements builder.', 'threaddesk' ) ); ?>;
 			const createLayoutCategory=String(root.getAttribute('data-threaddesk-screenprint-create-layout-category')||'').trim();
@@ -2410,9 +2410,12 @@ class TTA_ThreadDesk {
 				activePlacementKey=String(placementKey||'').trim();
 				if(!selectedDesignList){return;}
 				selectedDesignList.classList.toggle('has-active-placement',!!activePlacementKey);
-				selectedDesignList.querySelectorAll('.threaddesk-screenprint__selected-design-option').forEach((btn)=>{
-					const key=String(btn.getAttribute('data-threaddesk-screenprint-placement-key')||'').trim();
-					btn.classList.toggle('is-active',!!activePlacementKey&&key===activePlacementKey);
+				selectedDesignList.querySelectorAll('.threaddesk-screenprint__selected-design-item').forEach((item)=>{
+					const key=String(item.getAttribute('data-threaddesk-screenprint-placement-key')||'').trim();
+					const isActive=!!activePlacementKey&&key===activePlacementKey;
+					item.classList.toggle('is-active',isActive);
+					const button=item.querySelector('.threaddesk-screenprint__selected-design-option');
+					if(button){button.classList.toggle('is-active',isActive);}
 				});
 			};
 			const getPlacementEntry=(map,targetAngle,placementKey)=>{
@@ -2462,10 +2465,12 @@ class TTA_ThreadDesk {
 					if(!src){return;}
 					const title=String(entry.designName||entry.placementLabel||i18nDesignFallback).trim()||i18nDesignFallback;
 					const placementLabel=String(entry.placementLabel||entry.placementKey||'').trim()||'Placement';
+					const itemWrap=document.createElement('div');
+					itemWrap.className='threaddesk-screenprint__selected-design-item';
+					itemWrap.setAttribute('data-threaddesk-screenprint-placement-key',String(entry.placementKey||'').trim());
 					const item=document.createElement('button');
 					item.type='button';
 					item.className='threaddesk-layout-viewer__design-option threaddesk-screenprint__selected-design-option';
-					item.setAttribute('data-threaddesk-screenprint-placement-key',String(entry.placementKey||'').trim());
 					item.setAttribute('data-threaddesk-tooltip',i18nAdjust);
 					item.setAttribute('aria-label',i18nAdjust+' '+title);
 					const img=document.createElement('img');
@@ -2480,9 +2485,30 @@ class TTA_ThreadDesk {
 					placement.className='threaddesk-layout-viewer__placement-option threaddesk-screenprint__active-placement-option';
 					placement.setAttribute('aria-hidden','true');
 					placement.textContent=placementLabel;
+					const adjustPalette=document.createElement('div');
+					adjustPalette.className='threaddesk-layout-viewer__adjust-palette threaddesk-screenprint__active-adjust-palette';
+					adjustPalette.setAttribute('aria-hidden','true');
+					const paletteCurrent=Array.isArray(entry.paletteCurrent)?entry.paletteCurrent:[];
+					paletteCurrent.forEach((rawColor)=>{
+						const color=String(rawColor||'').trim();
+						if(!color){return;}
+						const dot=document.createElement('span');
+						dot.className='threaddesk-layout-viewer__palette-dot';
+						dot.setAttribute('aria-hidden','true');
+						dot.style.setProperty('--threaddesk-layout-palette-color',color);
+						adjustPalette.appendChild(dot);
+					});
+					const sizeReading=document.createElement('p');
+					sizeReading.className='threaddesk-layout-viewer__size-reading threaddesk-screenprint__active-size-reading';
+					sizeReading.setAttribute('aria-hidden','true');
+					const sliderValue=Number(entry.sliderValue||100);
+					sizeReading.textContent=i18nApproxSizePrefix+': '+String(Math.round(Number.isFinite(sliderValue)?sliderValue:100))+'%';
 					item.appendChild(img);
 					item.appendChild(name);
-					item.appendChild(placement);
+					itemWrap.appendChild(item);
+					itemWrap.appendChild(placement);
+					itemWrap.appendChild(adjustPalette);
+					itemWrap.appendChild(sizeReading);
 					item.addEventListener('click',()=>{
 						if(!selected){return;}
 						const currentPlacementKey=String(entry.placementKey||'').trim();
@@ -2492,7 +2518,7 @@ class TTA_ThreadDesk {
 						setActivePlacement(currentPlacementKey);
 						render();
 					});
-					selectedDesignList.appendChild(item);
+					selectedDesignList.appendChild(itemWrap);
 					count++;
 				});
 				setActivePlacement(activePlacementKey);

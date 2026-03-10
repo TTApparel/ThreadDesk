@@ -2266,7 +2266,13 @@ body.threaddesk-modal-open {
 }
 
 
-.threaddesk-screenprint__selected-design-list.has-active-placement .threaddesk-screenprint__selected-design-option:not(.is-active) {
+.threaddesk-screenprint__selected-design-item {
+	display: flex;
+	flex-direction: column;
+}
+
+
+.threaddesk-screenprint__selected-design-list.has-active-placement .threaddesk-screenprint__selected-design-item:not(.is-active) {
 	display: none;
 }
 
@@ -2278,6 +2284,22 @@ body.threaddesk-modal-open {
 	pointer-events: none;
 }
 
-.threaddesk-screenprint__selected-design-option.is-active .threaddesk-screenprint__active-placement-option {
+.threaddesk-screenprint__active-adjust-palette,
+.threaddesk-screenprint__active-size-reading {
+	display: none;
+}
+
+.threaddesk-screenprint__selected-design-item.is-active .threaddesk-screenprint__active-placement-option {
 	display: inline-flex;
+}
+
+.threaddesk-screenprint__selected-design-item.is-active .threaddesk-screenprint__active-adjust-palette {
+	display: flex;
+	margin-top: 8px;
+	margin-bottom: 0;
+}
+
+.threaddesk-screenprint__selected-design-item.is-active .threaddesk-screenprint__active-size-reading {
+	display: block;
+	margin: 6px 0 0;
 }
