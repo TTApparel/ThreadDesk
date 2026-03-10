@@ -2455,7 +2455,6 @@ class TTA_ThreadDesk {
 						if(!grouped[key]){grouped[key]=Object.assign({__angleKey:angleKey},entry);order.push(key);}
 					});
 				});
-			});
 				let count=0;
 				order.forEach((placementKey)=>{
 					const entry=grouped[placementKey];
