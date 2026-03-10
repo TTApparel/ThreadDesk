@@ -2493,8 +2493,6 @@ class TTA_ThreadDesk {
 			const i18nApproxSizePrefix=<?php echo wp_json_encode( __( 'Approx. size', 'threaddesk' ) ); ?>;
 			const i18nCreateLayout=<?php echo wp_json_encode( __( 'CREATE A LAYOUT', 'threaddesk' ) ); ?>;
 			const i18nCreateLayoutHint=<?php echo wp_json_encode( __( 'Need a new layout? Start in the placements builder.', 'threaddesk' ) ); ?>;
-			const i18nSavedInBrowser=<?php echo wp_json_encode( __( 'Saved in this browser', 'threaddesk' ) ); ?>;
-			const i18nSavedInAccount=<?php echo wp_json_encode( __( 'Saved in your account', 'threaddesk' ) ); ?>;
 			const i18nGuestEmpty=<?php echo wp_json_encode( __( 'No saved layouts in this browser yet.', 'threaddesk' ) ); ?>;
 			const i18nUserEmpty=<?php echo wp_json_encode( __( 'No saved layouts match this product categories yet.', 'threaddesk' ) ); ?>;
 			const createLayoutCategory=String(root.getAttribute('data-threaddesk-screenprint-create-layout-category')||'').trim();
@@ -3058,12 +3056,8 @@ class TTA_ThreadDesk {
 					const status=document.createElement('span');
 					status.className='threaddesk__card-design-status threaddesk__card-design-status--'+String(layout.statusKey||'pending');
 					status.textContent=String(layout.statusLabel||'Pending').toUpperCase();
-					const source=document.createElement('span');
-					source.className='threaddesk-screenprint-option__source';
-					source.textContent=isAuthenticated?i18nSavedInAccount:i18nSavedInBrowser;
 					meta.appendChild(count);
 					meta.appendChild(status);
-					meta.appendChild(source);
 				btn.appendChild(preview);
 				btn.appendChild(titleWrap);
 				btn.appendChild(meta);
