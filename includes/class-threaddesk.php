@@ -1312,8 +1312,15 @@ class TTA_ThreadDesk {
 		$return_context   = isset( $_POST['threaddesk_design_return_context'] ) ? sanitize_key( wp_unslash( $_POST['threaddesk_design_return_context'] ) ) : '';
 		$return_category  = isset( $_POST['threaddesk_design_return_layout_category'] ) ? sanitize_key( wp_unslash( $_POST['threaddesk_design_return_layout_category'] ) ) : '';
 		$return_placement = isset( $_POST['threaddesk_design_return_layout_placement'] ) ? sanitize_key( wp_unslash( $_POST['threaddesk_design_return_layout_placement'] ) ) : '';
-		$redirect_url     = $this->get_designs_redirect_url();
-		if ( 'layout_viewer' === $return_context ) {
+		$return_url_raw   = isset( $_POST['threaddesk_design_return_url'] ) ? esc_url_raw( wp_unslash( $_POST['threaddesk_design_return_url'] ) ) : '';
+		$return_url       = '';
+		if ( '' !== $return_url_raw ) {
+			$return_url = wp_validate_redirect( $return_url_raw, '' );
+		}
+		$redirect_url = $this->get_designs_redirect_url();
+		if ( '' !== $return_url ) {
+			$redirect_url = $return_url;
+		} elseif ( 'layout_viewer' === $return_context ) {
 			$query_args = array(
 				'td_layout_return' => '1',
 			);
@@ -2420,6 +2427,7 @@ class TTA_ThreadDesk {
 							<input type="hidden" name="threaddesk_design_return_context" value="" data-threaddesk-design-return-context />
 							<input type="hidden" name="threaddesk_design_return_layout_category" value="" data-threaddesk-design-return-layout-category />
 							<input type="hidden" name="threaddesk_design_return_layout_placement" value="" data-threaddesk-design-return-layout-placement />
+							<input type="hidden" name="threaddesk_design_return_url" value="<?php echo esc_url( add_query_arg( 'td_screenprint_return', '1', $screenprint_return_url ) ); ?>" />
 							<label class="threaddesk-designer__title-field" for="threaddesk_design_title_screenprint"><?php echo esc_html__( 'Title', 'threaddesk' ); ?></label>
 							<input type="text" id="threaddesk_design_title_screenprint" name="threaddesk_design_title" data-threaddesk-design-title-input maxlength="120" value="" />
 							<div class="threaddesk-designer__design-image" data-threaddesk-design-preview>
