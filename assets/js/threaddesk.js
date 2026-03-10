@@ -12,6 +12,7 @@ jQuery(function ($) {
 	const modal = $('.threaddesk-auth-modal');
 
 	if (modal.length) {
+		const shouldRefreshLayoutsAfterAuth = String(modal.attr('data-threaddesk-auth-refresh-layouts') || '').trim() === '1';
 		const openModal = function (target) {
 			modal.addClass('is-active').attr('aria-hidden', 'false');
 			$('body').addClass('threaddesk-modal-open');
@@ -63,6 +64,10 @@ jQuery(function ($) {
 		const defaultPanel = modal.data('threaddesk-auth-default');
 		if (defaultPanel) {
 			openModal(defaultPanel);
+		}
+
+		if (shouldRefreshLayoutsAfterAuth) {
+			$(document).trigger('threaddesk:auth-success');
 		}
 	}
 
@@ -897,6 +902,7 @@ jQuery(function ($) {
 		const openLayoutModal = function (triggerEl, modalEl) {
 			const scopedModal = modalEl && modalEl.length ? modalEl : layoutModal;
 			lastLayoutTrigger = triggerEl || document.activeElement || lastLayoutTrigger;
+			$('.threaddesk-auth-modal.is-active').removeClass('is-active').attr('aria-hidden', 'true');
 			scopedModal.addClass('is-active').attr('aria-hidden', 'false');
 			$('body').addClass('threaddesk-modal-open');
 			showChooserStep(scopedModal);
