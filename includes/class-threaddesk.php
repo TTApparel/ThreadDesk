@@ -88,6 +88,7 @@ class TTA_ThreadDesk {
 		add_action( 'user_register', array( $this, 'handle_user_register' ) );
 		add_action( 'init', array( $this, 'handle_auth_login' ) );
 		add_action( 'init', array( $this, 'handle_auth_register' ) );
+		add_action( 'wp_login', array( $this, 'handle_wp_login_merge_guest_drafts' ), 10, 2 );
 		add_shortcode( 'threaddesk', array( $this, 'render_shortcode' ) );
 		add_shortcode( 'threaddesk_auth', array( $this, 'render_auth_shortcode' ) );
 		add_shortcode( 'threaddesk_screenprint', array( $this, 'render_screenprint_shortcode' ) );
@@ -3704,10 +3705,10 @@ class TTA_ThreadDesk {
 			$user->set_role( 'customer' );
 		}
 
-			$this->auth_notice = __( 'Registration successful. Please check your email for confirmation.', 'threaddesk' );
-			$this->auth_register_success = true;
-			$this->auth_active_panel = '';
-		}
+		$this->merge_guest_drafts_to_user( $user_id );
+
+		$this->auth_notice = __( 'Registration successful. Please check your email for confirmation.', 'threaddesk' );
+	}
 
 
 	public function render_admin_quotes_page() {
@@ -3990,6 +3991,144 @@ class TTA_ThreadDesk {
 			return;
 		}
 		TTA_ThreadDesk_Data::append_user_activity( $user_id, $message, $context );
+	}
+
+	private function get_guest_token_cookie_name() {
+		return 'tta_threaddesk_guest_token';
+	}
+
+	private function get_current_guest_token() {
+		$cookie_name = $this->get_guest_token_cookie_name();
+		$token       = isset( $_COOKIE[ $cookie_name ] ) ? sanitize_text_field( wp_unslash( $_COOKIE[ $cookie_name ] ) ) : '';
+
+		if ( '' === $token && isset( $_REQUEST['tta_guest_token'] ) ) {
+			$token = sanitize_text_field( wp_unslash( $_REQUEST['tta_guest_token'] ) );
+		}
+
+		return preg_replace( '/[^A-Za-z0-9_\-]/', '', $token );
+	}
+
+	private function clear_guest_token_cookie() {
+		$cookie_name = $this->get_guest_token_cookie_name();
+		setcookie( $cookie_name, '', time() - HOUR_IN_SECONDS, COOKIEPATH ? COOKIEPATH : '/', COOKIE_DOMAIN, is_ssl(), true );
+		if ( COOKIEPATH && COOKIEPATH !== SITECOOKIEPATH ) {
+			setcookie( $cookie_name, '', time() - HOUR_IN_SECONDS, SITECOOKIEPATH, COOKIE_DOMAIN, is_ssl(), true );
+		}
+		unset( $_COOKIE[ $cookie_name ] );
+	}
+
+	private function resolve_guest_import_title_collision( $post_type, $user_id, $post_id, $title ) {
+		$title = sanitize_text_field( (string) $title );
+		if ( '' === $title ) {
+			$title = 'tta_design' === $post_type ? __( 'Design', 'threaddesk' ) : __( 'Layout', 'threaddesk' );
+		}
+
+		$collision = get_posts(
+			array(
+				'post_type'      => $post_type,
+				'post_status'    => array( 'private', 'publish', 'draft', 'pending' ),
+				'author'         => $user_id,
+				'title'          => $title,
+				'exclude'        => array( $post_id ),
+				'posts_per_page' => 1,
+				'fields'         => 'ids',
+			)
+		);
+
+		if ( empty( $collision ) ) {
+			return $title;
+		}
+
+		$renamed = sprintf( __( '%1$s (Imported #%2$d)', 'threaddesk' ), $title, (int) $post_id );
+		return sanitize_text_field( $renamed );
+	}
+
+	private function merge_guest_drafts_to_user( $user_id ) {
+		$user_id = absint( $user_id );
+		if ( $user_id <= 0 ) {
+			return 0;
+		}
+
+		$guest_token = $this->get_current_guest_token();
+		if ( '' === $guest_token ) {
+			return 0;
+		}
+
+		$meta_keys = array( 'tta_guest_token', 'threaddesk_guest_token', 'guest_token' );
+		$post_ids  = array();
+
+		foreach ( array( 'tta_layout', 'tta_design' ) as $post_type ) {
+			foreach ( $meta_keys as $meta_key ) {
+				$ids = get_posts(
+					array(
+						'post_type'      => $post_type,
+						'post_status'    => array( 'private', 'publish', 'draft', 'pending' ),
+						'posts_per_page' => -1,
+						'fields'         => 'ids',
+						'author'         => 0,
+						'meta_query'     => array(
+							array(
+								'key'   => $meta_key,
+								'value' => $guest_token,
+							),
+						),
+					)
+				);
+				if ( ! empty( $ids ) ) {
+					$post_ids = array_merge( $post_ids, $ids );
+				}
+			}
+		}
+
+		$post_ids       = array_values( array_unique( array_map( 'absint', $post_ids ) ) );
+		$imported_count = 0;
+
+		foreach ( $post_ids as $post_id ) {
+			$post = get_post( $post_id );
+			if ( ! $post instanceof WP_Post || ! in_array( $post->post_type, array( 'tta_layout', 'tta_design' ), true ) ) {
+				continue;
+			}
+
+			if ( (int) $post->post_author > 0 && (int) $post->post_author !== $user_id ) {
+				continue;
+			}
+
+			$new_title = $this->resolve_guest_import_title_collision( $post->post_type, $user_id, $post->ID, $post->post_title );
+			$updated   = wp_update_post(
+				array(
+					'ID'          => $post->ID,
+					'post_author' => $user_id,
+					'post_title'  => $new_title,
+				),
+				true
+			);
+
+			if ( is_wp_error( $updated ) ) {
+				continue;
+			}
+
+			foreach ( $meta_keys as $meta_key ) {
+				delete_post_meta( $post->ID, $meta_key );
+			}
+
+			$entity_label = 'tta_design' === $post->post_type ? __( 'design draft', 'threaddesk' ) : __( 'layout draft', 'threaddesk' );
+			$this->log_user_activity( $user_id, sprintf( __( 'Imported guest %1$s: %2$s', 'threaddesk' ), $entity_label, get_the_title( $post->ID ) ), 'account' );
+			$imported_count++;
+		}
+
+		if ( $imported_count > 0 ) {
+			$this->clear_guest_token_cookie();
+		}
+
+		return $imported_count;
+	}
+
+	public function handle_wp_login_merge_guest_drafts( $user_login, $user ) {
+		if ( ! $user instanceof WP_User ) {
+			return;
+		}
+
+		$this->merge_guest_drafts_to_user( (int) $user->ID );
 	}
 
 	private function get_user_company_label( $user_id ) {
@@ -5269,8 +5408,8 @@ class TTA_ThreadDesk {
 			return;
 		}
 
-			$this->auth_notice = __( 'Login successful. Welcome back!', 'threaddesk' );
-			$this->auth_login_success = true;
-			$this->auth_active_panel = '';
-		}
+		$this->auth_notice = __( 'Login successful. Welcome back!', 'threaddesk' );
+		$this->merge_guest_drafts_to_user( (int) $user->ID );
+		$this->auth_login_success = true;
+	}
 }
