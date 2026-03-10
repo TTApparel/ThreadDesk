@@ -1254,7 +1254,7 @@ class TTA_ThreadDesk {
 				'post_title'  => $layout_title,
 				'post_author' => $current_user_id,
 			);
-			if ( 'guest' === $owner_context['type'] ) {
+			if ( 0 === (int) $owner_context['user_id'] ) {
 				$layout_insert_data['post_author'] = 0;
 			}
 			$layout_id = wp_insert_post( $layout_insert_data );
@@ -1283,8 +1283,8 @@ class TTA_ThreadDesk {
 		if ( ! $is_update ) {
 			update_post_meta( $layout_id, 'created_at', current_time( 'mysql' ) );
 		}
-		if ( 'guest' === $owner_context['type'] ) {
-			update_post_meta( $layout_id, '_tta_guest_token', $owner_context['id'] );
+		if ( 0 === (int) $owner_context['user_id'] ) {
+			update_post_meta( $layout_id, '_tta_guest_token', isset( $owner_context['guest_token_hash'] ) ? (string) $owner_context['guest_token_hash'] : '' );
 		} else {
 			delete_post_meta( $layout_id, '_tta_guest_token' );
 		}
@@ -1401,7 +1401,7 @@ class TTA_ThreadDesk {
 				'post_title'  => $title,
 				'post_author' => $current_user_id,
 			);
-			if ( 'guest' === $owner_context['type'] ) {
+			if ( 0 === (int) $owner_context['user_id'] ) {
 				$design_insert_data['post_author'] = 0;
 			}
 			$design_id = wp_insert_post( $design_insert_data );
@@ -1570,8 +1570,8 @@ class TTA_ThreadDesk {
 		update_post_meta( $design_id, 'design_color_count', $color_count );
 		update_post_meta( $design_id, 'design_analysis_settings', wp_json_encode( $settings_clean ) );
 		update_post_meta( $design_id, 'created_at', current_time( 'mysql' ) );
-		if ( 'guest' === $owner_context['type'] ) {
-			update_post_meta( $design_id, '_tta_guest_token', $owner_context['id'] );
+		if ( 0 === (int) $owner_context['user_id'] ) {
+			update_post_meta( $design_id, '_tta_guest_token', isset( $owner_context['guest_token_hash'] ) ? (string) $owner_context['guest_token_hash'] : '' );
 		} else {
 			delete_post_meta( $design_id, '_tta_guest_token' );
 		}
@@ -1876,12 +1876,12 @@ class TTA_ThreadDesk {
 			'posts_per_page' => 100,
 			'post_status'    => array( 'private', 'publish' ),
 		);
-		if ( 'user' === $owner_context['type'] ) {
+		if ( (int) $owner_context['user_id'] > 0 ) {
 			$layout_query_args['author'] = $user_id;
 		} else {
 			$layout_query_args['author']     = 0;
 			$layout_query_args['meta_key']   = '_tta_guest_token';
-			$layout_query_args['meta_value'] = $owner_context['id'];
+			$layout_query_args['meta_value'] = isset( $owner_context['guest_token_hash'] ) ? (string) $owner_context['guest_token_hash'] : '';
 		}
 		$layout_posts = get_posts( $layout_query_args );
 
@@ -2194,12 +2194,12 @@ class TTA_ThreadDesk {
 			'posts_per_page' => 100,
 			'post_status'    => array( 'private', 'publish' ),
 		);
-		if ( 'user' === $owner_context['type'] ) {
+		if ( (int) $owner_context['user_id'] > 0 ) {
 			$design_query_args['author'] = $user_id;
 		} else {
 			$design_query_args['author']     = 0;
 			$design_query_args['meta_key']   = '_tta_guest_token';
-			$design_query_args['meta_value'] = $owner_context['id'];
+			$design_query_args['meta_value'] = isset( $owner_context['guest_token_hash'] ) ? (string) $owner_context['guest_token_hash'] : '';
 		}
 		$design_posts = get_posts( $design_query_args );
 		foreach ( $design_posts as $design_post ) {
