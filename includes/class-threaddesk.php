@@ -2311,6 +2311,8 @@ class TTA_ThreadDesk {
 		<script data-cfasync="false">
 		(function(){
 			const root=document.getElementById(<?php echo wp_json_encode( $instance_id ); ?>); if(!root){return;}
+			window.root=root;
+			window.threaddeskScreenprintRoot=root;
 			let layouts=[];
 			try{layouts=JSON.parse(root.getAttribute('data-threaddesk-screenprint-layouts')||'[]');}
 			catch(e){console.error('[ThreadDesk screenprint init]',e);layouts=[];}
