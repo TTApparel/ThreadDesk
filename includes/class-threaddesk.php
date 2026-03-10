@@ -2325,6 +2325,7 @@ class TTA_ThreadDesk {
 			const i18nSelectedColorPrefix=<?php echo wp_json_encode( __( 'Color', 'threaddesk' ) ); ?>;
 			const i18nDesignFallback=<?php echo wp_json_encode( __( 'Design', 'threaddesk' ) ); ?>;
 			const i18nAdjust=<?php echo wp_json_encode( __( 'ADJUST', 'threaddesk' ) ); ?>;
+			const i18nApproxSizePrefix=<?php echo wp_json_encode( __( 'Approx. size', 'threaddesk' ) ); ?>;
 			const i18nCreateLayout=<?php echo wp_json_encode( __( 'CREATE A LAYOUT', 'threaddesk' ) ); ?>;
 			const i18nCreateLayoutHint=<?php echo wp_json_encode( __( 'Need a new layout? Start in the placements builder.', 'threaddesk' ) ); ?>;
 			const createLayoutCategory=String(root.getAttribute('data-threaddesk-screenprint-create-layout-category')||'').trim();
@@ -2484,10 +2485,30 @@ class TTA_ThreadDesk {
 					placement.className='threaddesk-layout-viewer__placement-option threaddesk-screenprint__active-placement-option';
 					placement.setAttribute('aria-hidden','true');
 					placement.textContent=placementLabel;
+					const adjustPalette=document.createElement('div');
+					adjustPalette.className='threaddesk-layout-viewer__adjust-palette threaddesk-screenprint__active-adjust-palette';
+					adjustPalette.setAttribute('aria-hidden','true');
+					const paletteCurrent=Array.isArray(entry.paletteCurrent)?entry.paletteCurrent:[];
+					paletteCurrent.forEach((rawColor)=>{
+						const color=String(rawColor||'').trim();
+						if(!color){return;}
+						const dot=document.createElement('span');
+						dot.className='threaddesk-layout-viewer__palette-dot';
+						dot.setAttribute('aria-hidden','true');
+						dot.style.setProperty('--threaddesk-layout-palette-color',color);
+						adjustPalette.appendChild(dot);
+					});
+					const sizeReading=document.createElement('p');
+					sizeReading.className='threaddesk-layout-viewer__size-reading threaddesk-screenprint__active-size-reading';
+					sizeReading.setAttribute('aria-hidden','true');
+					const sliderValue=Number(entry.sliderValue||100);
+					sizeReading.textContent=i18nApproxSizePrefix+': '+String(Math.round(Number.isFinite(sliderValue)?sliderValue:100))+'%';
 					item.appendChild(img);
 					item.appendChild(name);
 					itemWrap.appendChild(item);
 					itemWrap.appendChild(placement);
+					itemWrap.appendChild(adjustPalette);
+					itemWrap.appendChild(sizeReading);
 					item.addEventListener('click',()=>{
 						if(!selected){return;}
 						const currentPlacementKey=String(entry.placementKey||'').trim();
