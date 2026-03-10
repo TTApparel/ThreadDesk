@@ -2321,7 +2321,7 @@ class TTA_ThreadDesk {
 			const initialColorKey=String(root.getAttribute('data-threaddesk-screenprint-initial-color')||'').trim();
 			const i18nNoPreview=<?php echo wp_json_encode( __( 'No placement preview', 'threaddesk' ) ); ?>;
 			const i18nPrintCountLabel=<?php echo wp_json_encode( __( 'Print count', 'threaddesk' ) ); ?>;
-			const i18nSelectedPrefix=<?php echo wp_json_encode( __( 'Selected layout', 'threaddesk' ) ); ?>;
+			const i18nSelectedPrefix=<?php echo wp_json_encode( __( 'LAYOUT', 'threaddesk' ) ); ?>;
 			const i18nSelectedColorPrefix=<?php echo wp_json_encode( __( 'Color', 'threaddesk' ) ); ?>;
 			const i18nDesignFallback=<?php echo wp_json_encode( __( 'Design', 'threaddesk' ) ); ?>;
 			const i18nAdjust=<?php echo wp_json_encode( __( 'ADJUST', 'threaddesk' ) ); ?>;
