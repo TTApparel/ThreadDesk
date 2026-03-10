@@ -27,6 +27,7 @@ if ( ! defined( 'THREDDESK_URL' ) ) {
 }
 
 require_once THREDDESK_PATH . 'includes/class-threaddesk.php';
+require_once THREDDESK_PATH . 'includes/class-threaddesk-guest-token-service.php';
 require_once THREDDESK_PATH . 'includes/class-threaddesk-assets.php';
 require_once THREDDESK_PATH . 'includes/class-threaddesk-endpoints.php';
 require_once THREDDESK_PATH . 'includes/class-threaddesk-render.php';
