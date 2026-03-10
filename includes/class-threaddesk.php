@@ -75,6 +75,11 @@ class TTA_ThreadDesk {
 		add_shortcode( 'threaddesk', array( $this, 'render_shortcode' ) );
 		add_shortcode( 'threaddesk_auth', array( $this, 'render_auth_shortcode' ) );
 		add_shortcode( 'threaddesk_screenprint', array( $this, 'render_screenprint_shortcode' ) );
+
+		add_filter( 'woocommerce_add_to_cart_validation', array( $this, 'validate_screenprint_cart_selection' ), 10, 5 );
+		add_filter( 'woocommerce_add_cart_item_data', array( $this, 'capture_screenprint_cart_item_data' ), 10, 3 );
+		add_filter( 'woocommerce_get_cart_item_from_session', array( $this, 'restore_screenprint_cart_item_data' ), 10, 3 );
+		add_filter( 'woocommerce_get_item_data', array( $this, 'render_screenprint_cart_item_display_data' ), 10, 2 );
 	}
 
 	/**
@@ -2138,6 +2143,10 @@ class TTA_ThreadDesk {
 		ob_start();
 		?>
 		<div class="threaddesk-screenprint" id="<?php echo esc_attr( $instance_id ); ?>" data-threaddesk-screenprint-layouts="<?php echo esc_attr( wp_json_encode( $layout_items ) ); ?>" data-threaddesk-screenprint-images-by-color="<?php echo esc_attr( wp_json_encode( $screenprint_images_by_color ) ); ?>" data-threaddesk-screenprint-initial-color="<?php echo esc_attr( $initial_color_key ); ?>" data-threaddesk-screenprint-create-layout-category="<?php echo esc_attr( $default_category_slug ); ?>" data-threaddesk-screenprint-create-layout-category-id="<?php echo esc_attr( (string) $default_category_id ); ?>" data-threaddesk-screenprint-open-chooser="<?php echo $screenprint_open_chooser ? '1' : '0'; ?>">
+			<input type="hidden" name="threaddesk_layout_id" value="0" data-threaddesk-cart-layout-id />
+			<input type="hidden" name="threaddesk_layout_color" value="" data-threaddesk-cart-layout-color />
+			<input type="hidden" name="threaddesk_layout_design_ids" value="" data-threaddesk-cart-layout-design-ids />
+			<input type="hidden" name="threaddesk_layout_snapshot" value="" data-threaddesk-cart-layout-snapshot />
 			<div class="threaddesk-screenprint__color-picker" data-threaddesk-screenprint-color-picker style="display:flex;flex-wrap:wrap;gap:10px;align-items:stretch;justify-content:center;">
 				<?php foreach ( $screenprint_color_choices as $choice_index => $choice ) : ?>
 					<button type="button" class="threaddesk-screenprint__open-color" data-threaddesk-screenprint-open-color="<?php echo esc_attr( $choice['key'] ); ?>" aria-label="<?php echo esc_attr( $choice['label'] ); ?>" style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:8px 0;width:70px;border:1px solid #dcdcde;background:#fff;border-radius:4px;cursor:pointer;position:relative;overflow:visible;<?php echo 0 === (int) $choice_index ? 'box-shadow:0 0 0 1px #2271b1;' : ''; ?>">
@@ -2353,6 +2362,60 @@ class TTA_ThreadDesk {
 			let selected=null; let angle='front'; let selectedColor=initialColorKey; let stageRatioLocked=false; let colorsExpanded=false; let activePlacementKey=''; let dragState=null;
 			if(!selectedColor||!imageMap[selectedColor]){const keys=Object.keys(imageMap||{}); selectedColor=keys.length?keys[0]:'';}
 			let images=(imageMap&&imageMap[selectedColor])?imageMap[selectedColor]:{};
+			const cartForm=(root.closest('form.cart'))||(root.closest('.product')?root.closest('.product').querySelector('form.cart'):null)||document.querySelector('form.cart');
+			const cartLayoutIdField=root.querySelector('[data-threaddesk-cart-layout-id]');
+			const cartLayoutColorField=root.querySelector('[data-threaddesk-cart-layout-color]');
+			const cartLayoutDesignIdsField=root.querySelector('[data-threaddesk-cart-layout-design-ids]');
+			const cartLayoutSnapshotField=root.querySelector('[data-threaddesk-cart-layout-snapshot]');
+			const ensureCartFieldsInForm=()=>{
+				if(!cartForm){return;}
+				[cartLayoutIdField,cartLayoutColorField,cartLayoutDesignIdsField,cartLayoutSnapshotField].forEach((field)=>{
+					if(!field||field.form===cartForm){return;}
+					cartForm.appendChild(field);
+				});
+			};
+			const syncCartSelection=()=>{
+				ensureCartFieldsInForm();
+				if(!cartLayoutIdField||!cartLayoutColorField||!cartLayoutDesignIdsField||!cartLayoutSnapshotField){return;}
+				if(!selected||!selected.id){
+					cartLayoutIdField.value='0';
+					cartLayoutColorField.value='';
+					cartLayoutDesignIdsField.value='';
+					cartLayoutSnapshotField.value='';
+					return;
+				}
+				const seenDesignIds=[];
+				const summaryPlacements=[];
+				const byAngle=(selected.placementsByAngle&&typeof selected.placementsByAngle==='object')?selected.placementsByAngle:{};
+				Object.keys(byAngle).forEach((angleKey)=>{
+					const raw=byAngle[angleKey];
+					const entries=Array.isArray(raw)?raw:(raw&&typeof raw==='object'?Object.values(raw):[]);
+					entries.forEach((entry)=>{
+						if(!entry||typeof entry!=='object'){return;}
+						const designId=Number(entry.designId||0);
+						if(designId>0&&!seenDesignIds.includes(designId)){seenDesignIds.push(designId);}
+						summaryPlacements.push({
+							placementKey:String(entry.placementKey||'').trim(),
+							placementLabel:String(entry.placementLabel||'').trim(),
+							designId:designId,
+							designName:String(entry.designName||'').trim()
+						});
+					});
+				});
+				const snapshot={
+					layoutId:Number(selected.id||0),
+					layoutTitle:String(selected.title||'').trim(),
+					layoutStatus:String(selected.statusLabel||'').trim(),
+					printCount:Number(selected.printCount||0),
+					selectedColor:String(selectedColor||'').trim(),
+					designIds:seenDesignIds,
+					placements:summaryPlacements
+				};
+				cartLayoutIdField.value=String(snapshot.layoutId||0);
+				cartLayoutColorField.value=snapshot.selectedColor;
+				cartLayoutDesignIdsField.value=seenDesignIds.join(',');
+				cartLayoutSnapshotField.value=JSON.stringify(snapshot);
+			};
 			const setStep=(step)=>{
 				const showChooser=step==='chooser';
 				if(chooserStep){chooserStep.hidden=!showChooser;chooserStep.classList.toggle('is-active',showChooser);chooserStep.setAttribute('aria-hidden',showChooser?'false':'true');}
@@ -2586,6 +2649,7 @@ class TTA_ThreadDesk {
 				root.querySelectorAll('[data-threaddesk-screenprint-open-color]').forEach((item)=>{item.style.boxShadow='none';});
 				btn.style.boxShadow='0 0 0 1px #2271b1';
 				openScreenprintChooserModal();
+			syncCartSelection();
 			};
 			root.querySelectorAll('[data-threaddesk-screenprint-open-color]').forEach((btn)=>{
 				btn.addEventListener('click',()=>{onScreenprintColorClick(btn);});
@@ -2700,6 +2764,8 @@ class TTA_ThreadDesk {
 			document.addEventListener('touchend',()=>{dragState=null;});
 			document.addEventListener('touchcancel',()=>{dragState=null;});
 			window.addEventListener('resize',syncScreenprintPanelHeight);
+			ensureCartFieldsInForm();
+			syncCartSelection();
 			{
 				const createBtn=document.createElement('button');
 				createBtn.type='button';
@@ -2786,7 +2852,7 @@ class TTA_ThreadDesk {
 				btn.appendChild(preview);
 				btn.appendChild(titleWrap);
 				btn.appendChild(meta);
-				btn.addEventListener('click',()=>{selected=layout; if(selectedLabel){selectedLabel.textContent=i18nSelectedPrefix+': '+title;} setStep('viewer'); render(); window.requestAnimationFrame(syncScreenprintPanelHeight);});
+				btn.addEventListener('click',()=>{selected=layout; if(selectedLabel){selectedLabel.textContent=i18nSelectedPrefix+': '+title;} setStep('viewer'); render(); syncCartSelection(); window.requestAnimationFrame(syncScreenprintPanelHeight);});
 				options.appendChild(btn);
 			});
 			root.querySelectorAll('[data-threaddesk-screenprint-angle]').forEach((btn)=>btn.addEventListener('click',()=>{
@@ -2828,6 +2894,214 @@ class TTA_ThreadDesk {
 			'back'  => (string) $back_url,
 			'right' => (string) $right_url,
 		);
+	}
+
+
+	private function get_current_actor_guest_token() {
+		if ( is_user_logged_in() ) {
+			return '';
+		}
+
+		$token = isset( $_COOKIE['tta_threaddesk_guest_token'] ) ? sanitize_text_field( wp_unslash( $_COOKIE['tta_threaddesk_guest_token'] ) ) : '';
+		if ( '' === $token && isset( $_REQUEST['tta_threaddesk_guest_token'] ) ) {
+			$token = sanitize_text_field( wp_unslash( $_REQUEST['tta_threaddesk_guest_token'] ) );
+		}
+
+		return preg_replace( '/[^a-zA-Z0-9_-]/', '', (string) $token );
+	}
+
+	private function actor_owns_threaddesk_post( $post, $expected_post_type ) {
+		if ( ! $post instanceof WP_Post || $expected_post_type !== $post->post_type ) {
+			return false;
+		}
+
+		if ( is_user_logged_in() ) {
+			return (int) $post->post_author === get_current_user_id();
+		}
+
+		$guest_token = $this->get_current_actor_guest_token();
+		if ( '' === $guest_token ) {
+			return false;
+		}
+
+		$owner_token = sanitize_text_field( (string) get_post_meta( $post->ID, 'threaddesk_guest_token', true ) );
+		if ( '' === $owner_token ) {
+			return false;
+		}
+
+		return hash_equals( $owner_token, $guest_token );
+	}
+
+	private function build_screenprint_layout_cart_snapshot( $layout_post, $selected_color = '' ) {
+		$layout_id = $layout_post instanceof WP_Post ? (int) $layout_post->ID : 0;
+		if ( $layout_id <= 0 ) {
+			return array();
+		}
+
+		$payload_raw = (string) get_post_meta( $layout_id, 'layout_payload', true );
+		$payload = json_decode( $payload_raw, true );
+		if ( ! is_array( $payload ) ) {
+			$payload = array();
+		}
+
+		$placements_by_angle = isset( $payload['placementsByAngle'] ) && is_array( $payload['placementsByAngle'] ) ? $payload['placementsByAngle'] : array();
+		$design_ids = array();
+		$placement_summary = array();
+		foreach ( $placements_by_angle as $angle_entries ) {
+			if ( ! is_array( $angle_entries ) ) {
+				continue;
+			}
+			foreach ( $angle_entries as $placement_key => $entry ) {
+				if ( ! is_array( $entry ) ) {
+					continue;
+				}
+				$design_id = isset( $entry['designId'] ) ? absint( $entry['designId'] ) : 0;
+				if ( $design_id > 0 ) {
+					$design_ids[] = $design_id;
+				}
+				$placement_summary[] = array(
+					'placement_key'   => sanitize_key( (string) $placement_key ),
+					'placement_label' => isset( $entry['placementLabel'] ) ? sanitize_text_field( (string) $entry['placementLabel'] ) : '',
+					'design_id'       => $design_id,
+					'design_name'     => isset( $entry['designName'] ) ? sanitize_text_field( (string) $entry['designName'] ) : '',
+				);
+			}
+		}
+
+		$design_ids = array_values( array_unique( array_filter( array_map( 'absint', $design_ids ) ) ) );
+
+		return array(
+			'layout_id'          => $layout_id,
+			'layout_title'       => sanitize_text_field( (string) get_the_title( $layout_id ) ),
+			'layout_status'      => $this->get_layout_status( $layout_id ),
+			'selected_color'     => sanitize_key( (string) $selected_color ),
+			'design_ids'         => $design_ids,
+			'placement_summary'  => $placement_summary,
+			'placement_count'    => count( $placement_summary ),
+		);
+	}
+
+	public function validate_screenprint_cart_selection( $passed, $product_id, $quantity, $variation_id = 0, $variations = array() ) {
+		$layout_id = isset( $_POST['threaddesk_layout_id'] ) ? absint( $_POST['threaddesk_layout_id'] ) : 0;
+		if ( $layout_id <= 0 ) {
+			return $passed;
+		}
+
+		$layout_post = get_post( $layout_id );
+		if ( ! $this->actor_owns_threaddesk_post( $layout_post, 'tta_layout' ) ) {
+			if ( function_exists( 'wc_add_notice' ) ) {
+				wc_add_notice( __( 'The selected layout is invalid or no longer belongs to your account.', 'threaddesk' ), 'error' );
+			}
+			return false;
+		}
+
+		$snapshot = $this->build_screenprint_layout_cart_snapshot( $layout_post, isset( $_POST['threaddesk_layout_color'] ) ? sanitize_key( wp_unslash( $_POST['threaddesk_layout_color'] ) ) : '' );
+		$layout_design_ids = isset( $snapshot['design_ids'] ) && is_array( $snapshot['design_ids'] ) ? $snapshot['design_ids'] : array();
+		$posted_design_ids = array();
+		if ( isset( $_POST['threaddesk_layout_design_ids'] ) ) {
+			$posted_raw = sanitize_text_field( wp_unslash( $_POST['threaddesk_layout_design_ids'] ) );
+			$posted_design_ids = array_values( array_unique( array_filter( array_map( 'absint', preg_split( '/[\s,]+/', $posted_raw ) ) ) ) );
+		}
+
+		if ( ! empty( $posted_design_ids ) ) {
+			$invalid_posted_ids = array_diff( $posted_design_ids, $layout_design_ids );
+			if ( ! empty( $invalid_posted_ids ) ) {
+				if ( function_exists( 'wc_add_notice' ) ) {
+					wc_add_notice( __( 'One or more selected designs are invalid for the chosen layout.', 'threaddesk' ), 'error' );
+				}
+				return false;
+			}
+		}
+
+		foreach ( $layout_design_ids as $design_id ) {
+			$design_post = get_post( $design_id );
+			if ( ! $this->actor_owns_threaddesk_post( $design_post, 'tta_design' ) ) {
+				if ( function_exists( 'wc_add_notice' ) ) {
+					wc_add_notice( __( 'One or more designs in the selected layout are not available for your account.', 'threaddesk' ), 'error' );
+				}
+				return false;
+			}
+		}
+
+		return $passed;
+	}
+
+	public function capture_screenprint_cart_item_data( $cart_item_data, $product_id, $variation_id ) {
+		$layout_id = isset( $_POST['threaddesk_layout_id'] ) ? absint( $_POST['threaddesk_layout_id'] ) : 0;
+		if ( $layout_id <= 0 ) {
+			return $cart_item_data;
+		}
+
+		$layout_post = get_post( $layout_id );
+		if ( ! $this->actor_owns_threaddesk_post( $layout_post, 'tta_layout' ) ) {
+			return $cart_item_data;
+		}
+
+		$selected_color = isset( $_POST['threaddesk_layout_color'] ) ? sanitize_key( wp_unslash( $_POST['threaddesk_layout_color'] ) ) : '';
+		$snapshot = $this->build_screenprint_layout_cart_snapshot( $layout_post, $selected_color );
+		if ( empty( $snapshot ) ) {
+			return $cart_item_data;
+		}
+
+		$cart_item_data['threaddesk_screenprint'] = $snapshot;
+		$cart_item_data['threaddesk_screenprint_signature'] = md5( wp_json_encode( $snapshot ) . '|' . microtime( true ) );
+
+		return $cart_item_data;
+	}
+
+	public function restore_screenprint_cart_item_data( $cart_item, $session_values, $cart_item_key ) {
+		if ( isset( $session_values['threaddesk_screenprint'] ) && is_array( $session_values['threaddesk_screenprint'] ) ) {
+			$cart_item['threaddesk_screenprint'] = $session_values['threaddesk_screenprint'];
+		}
+		if ( isset( $session_values['threaddesk_screenprint_signature'] ) ) {
+			$cart_item['threaddesk_screenprint_signature'] = sanitize_text_field( (string) $session_values['threaddesk_screenprint_signature'] );
+		}
+
+		return $cart_item;
+	}
+
+	public function render_screenprint_cart_item_display_data( $item_data, $cart_item ) {
+		if ( empty( $cart_item['threaddesk_screenprint'] ) || ! is_array( $cart_item['threaddesk_screenprint'] ) ) {
+			return $item_data;
+		}
+
+		$snapshot = $cart_item['threaddesk_screenprint'];
+		$layout_title = isset( $snapshot['layout_title'] ) ? sanitize_text_field( (string) $snapshot['layout_title'] ) : '';
+		$selected_color = isset( $snapshot['selected_color'] ) ? sanitize_text_field( (string) $snapshot['selected_color'] ) : '';
+		$placement_summary = isset( $snapshot['placement_summary'] ) && is_array( $snapshot['placement_summary'] ) ? $snapshot['placement_summary'] : array();
+		$design_summary = array();
+		foreach ( $placement_summary as $entry ) {
+			if ( ! is_array( $entry ) ) {
+				continue;
+			}
+			$placement_label = isset( $entry['placement_label'] ) ? sanitize_text_field( (string) $entry['placement_label'] ) : '';
+			$design_name = isset( $entry['design_name'] ) ? sanitize_text_field( (string) $entry['design_name'] ) : '';
+			if ( '' === $placement_label && '' === $design_name ) {
+				continue;
+			}
+			$design_summary[] = trim( $placement_label . ( '' !== $design_name ? ': ' . $design_name : '' ) );
+		}
+
+		if ( '' !== $layout_title ) {
+			$item_data[] = array(
+				'key'   => __( 'ThreadDesk layout', 'threaddesk' ),
+				'value' => $layout_title,
+			);
+		}
+		if ( '' !== $selected_color ) {
+			$item_data[] = array(
+				'key'   => __( 'ThreadDesk color', 'threaddesk' ),
+				'value' => $selected_color,
+			);
+		}
+		if ( ! empty( $design_summary ) ) {
+			$item_data[] = array(
+				'key'   => __( 'ThreadDesk placements', 'threaddesk' ),
+				'value' => implode( ', ', $design_summary ),
+			);
+		}
+
+		return $item_data;
 	}
 
 	public function render_auth_shortcode() {
