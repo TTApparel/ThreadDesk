@@ -945,79 +945,7 @@ class TTA_ThreadDesk {
 	}
 
 
-	private function clear_guest_token_cookie() {
-		$cookie_name = 'tta_td_guest';
-		if ( ! headers_sent() ) {
-			setcookie(
-				$cookie_name,
-				'',
-				array(
-					'expires'  => time() - HOUR_IN_SECONDS,
-					'path'     => COOKIEPATH ? COOKIEPATH : '/',
-					'domain'   => COOKIE_DOMAIN,
-					'secure'   => is_ssl(),
-					'httponly' => true,
-					'samesite' => 'Lax',
-				)
-			);
-		}
-		unset( $_COOKIE[ $cookie_name ] );
-	}
-
-	private function can_access_actor_post( $post, $actor ) {
-		if ( ! $post instanceof WP_Post || ! is_array( $actor ) ) {
-			return false;
-		}
-
-		if ( 'user' === $actor['type'] ) {
-			return (int) $post->post_author === (int) $actor['id'];
-		}
-
-		if ( 'guest' !== $actor['type'] ) {
-			return false;
-		}
-
-		$post_token = $this->sanitize_guest_token( (string) get_post_meta( $post->ID, '_tta_guest_token', true ) );
-		return '' !== $post_token && hash_equals( $post_token, (string) $actor['id'] );
-	}
-
-	private function migrate_guest_entities_to_user( $user_id ) {
-		$user_id      = absint( $user_id );
-		$guest_token  = isset( $_COOKIE['tta_td_guest'] ) ? $this->sanitize_guest_token( wp_unslash( $_COOKIE['tta_td_guest'] ) ) : '';
-
-		if ( $user_id <= 0 || '' === $guest_token ) {
-			return;
-		}
-
-		$query = new WP_Query(
-			array(
-				'post_type'      => array( 'tta_design', 'tta_layout' ),
-				'post_status'    => array( 'private', 'publish' ),
-				'fields'         => 'ids',
-				'posts_per_page' => -1,
-				'meta_key'       => '_tta_guest_token',
-				'meta_value'     => $guest_token,
-			)
-		);
-
-		if ( ! empty( $query->posts ) ) {
-			foreach ( $query->posts as $post_id ) {
-				wp_update_post(
-					array(
-						'ID'          => (int) $post_id,
-						'post_author' => $user_id,
-					)
-				);
-				delete_post_meta( (int) $post_id, '_tta_guest_token' );
-			}
-		}
-		wp_reset_postdata();
-
-		$this->clear_guest_token_cookie();
-	}
-
-
-	private function get_user_design_storage( $user_id, $actor = null ) {
+	private function get_user_design_storage( $user_id, $owner_context = array() ) {
 		$uploads = wp_upload_dir();
 		$basedir = isset( $uploads['basedir'] ) ? (string) $uploads['basedir'] : '';
 		$baseurl = isset( $uploads['baseurl'] ) ? (string) $uploads['baseurl'] : '';
@@ -1026,19 +954,19 @@ class TTA_ThreadDesk {
 		}
 
 		$folder = '';
-		if ( is_array( $actor ) && isset( $actor['type'] ) && 'guest' === $actor['type'] ) {
-			$guest_token = $this->sanitize_guest_token( isset( $actor['id'] ) ? (string) $actor['id'] : '' );
-			if ( '' !== $guest_token ) {
-				$folder = 'guest-' . substr( $guest_token, 0, 16 );
-			}
-		}
-
-		if ( '' === $folder ) {
-			$user    = get_userdata( $user_id );
-			$login   = $user ? (string) $user->user_login : 'user-' . (string) $user_id;
-			$folder  = sanitize_file_name( $login );
+		if ( $user_id > 0 ) {
+			$user   = get_userdata( $user_id );
+			$login  = $user ? (string) $user->user_login : 'user-' . (string) $user_id;
+			$folder = sanitize_file_name( $login );
 			if ( '' === $folder ) {
 				$folder = 'user-' . (string) $user_id;
+			}
+		} else {
+			$guest_hash = isset( $owner_context['guest_token_hash'] ) ? sanitize_key( (string) $owner_context['guest_token_hash'] ) : '';
+			if ( '' === $guest_hash ) {
+				$folder = 'guest';
+			} else {
+				$folder = 'guest-' . substr( $guest_hash, 0, 20 );
 			}
 		}
 
@@ -1380,7 +1308,7 @@ class TTA_ThreadDesk {
 		$upload            = null;
 		$file_name         = '';
 		$title_input       = isset( $_POST['threaddesk_design_title'] ) ? sanitize_text_field( wp_unslash( $_POST['threaddesk_design_title'] ) ) : '';
-		$storage           = $this->get_user_design_storage( $current_user_id > 0 ? $current_user_id : 0, $actor );
+		$storage           = $this->get_user_design_storage( $current_user_id, $owner_context );
 		$return_context   = isset( $_POST['threaddesk_design_return_context'] ) ? sanitize_key( wp_unslash( $_POST['threaddesk_design_return_context'] ) ) : '';
 		$return_category  = isset( $_POST['threaddesk_design_return_layout_category'] ) ? sanitize_key( wp_unslash( $_POST['threaddesk_design_return_layout_category'] ) ) : '';
 		$return_placement = isset( $_POST['threaddesk_design_return_layout_placement'] ) ? sanitize_key( wp_unslash( $_POST['threaddesk_design_return_layout_placement'] ) ) : '';
@@ -1683,8 +1611,7 @@ class TTA_ThreadDesk {
 			exit;
 		}
 
-		$owner_user_id = (int) $design->post_author;
-		$storage = $this->get_user_design_storage( $owner_user_id, $actor );
+		$storage = $this->get_user_design_storage( (int) $design->post_author, $owner_context );
 		if ( ! $storage ) {
 			if ( function_exists( 'wc_add_notice' ) ) {
 				wc_add_notice( __( 'Unable to access your design storage directory.', 'threaddesk' ), 'error' );

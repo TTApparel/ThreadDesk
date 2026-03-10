@@ -19,7 +19,7 @@ class TTA_ThreadDesk_Guest_Token_Service {
 	 * @return void
 	 */
 	public function register_hooks() {
-		add_action( 'init', array( $this, 'ensure_guest_token' ), 1 );
+		add_action( 'wp', array( $this, 'ensure_guest_token' ), 1 );
 		add_action( 'wp_login', array( $this, 'rotate_token' ) );
 		add_action( 'wp_logout', array( $this, 'rotate_token' ) );
 		add_action( 'admin_post_tta_threaddesk_reset_guest_token', array( $this, 'handle_explicit_reset' ) );
@@ -33,7 +33,7 @@ class TTA_ThreadDesk_Guest_Token_Service {
 	 * @return void
 	 */
 	public function ensure_guest_token() {
-		if ( is_user_logged_in() || headers_sent() ) {
+		if ( ! $this->should_manage_guest_cookie() || is_user_logged_in() || headers_sent() ) {
 			return;
 		}
 
@@ -71,6 +71,11 @@ class TTA_ThreadDesk_Guest_Token_Service {
 	 * @return string
 	 */
 	public function rotate_token() {
+		$existing_token = isset( $_COOKIE[ self::COOKIE_NAME ] ) ? sanitize_text_field( wp_unslash( $_COOKIE[ self::COOKIE_NAME ] ) ) : '';
+		if ( '' !== $existing_token ) {
+			delete_transient( $this->transient_key( $existing_token ) );
+		}
+
 		if ( headers_sent() ) {
 			return '';
 		}
@@ -88,6 +93,7 @@ class TTA_ThreadDesk_Guest_Token_Service {
 
 		$this->set_token_state( $token, $state );
 		$this->send_cookie( $token, $now + $this->get_ttl_seconds() );
+		$_COOKIE[ self::COOKIE_NAME ] = $token;
 
 		return $token;
 	}
@@ -166,11 +172,9 @@ class TTA_ThreadDesk_Guest_Token_Service {
 	 * @return void
 	 */
 	public function handle_explicit_reset() {
-		if ( isset( $_REQUEST['_wpnonce'] ) ) {
-			$nonce = sanitize_text_field( wp_unslash( $_REQUEST['_wpnonce'] ) );
-			if ( ! wp_verify_nonce( $nonce, 'tta_threaddesk_reset_guest_token' ) ) {
-				wp_die( esc_html__( 'Invalid token reset request.', 'threaddesk' ) );
-			}
+		$nonce = isset( $_REQUEST['_wpnonce'] ) ? sanitize_text_field( wp_unslash( $_REQUEST['_wpnonce'] ) ) : '';
+		if ( '' === $nonce || ! wp_verify_nonce( $nonce, 'tta_threaddesk_reset_guest_token' ) ) {
+			wp_die( esc_html__( 'Invalid token reset request.', 'threaddesk' ) );
 		}
 
 		$this->rotate_token();
@@ -209,12 +213,29 @@ class TTA_ThreadDesk_Guest_Token_Service {
 	}
 
 	/**
+	 * @return bool
+	 */
+	private function should_manage_guest_cookie() {
+		if ( is_admin() || wp_doing_ajax() || wp_doing_cron() ) {
+			return false;
+		}
+
+		if ( defined( 'REST_REQUEST' ) && REST_REQUEST ) {
+			return false;
+		}
+
+		return true;
+	}
+
+	/**
 	 * @param string $token
 	 * @param int    $expires
 	 *
 	 * @return void
 	 */
 	private function send_cookie( $token, $expires ) {
+		$secure = is_ssl() || 'https' === wp_parse_url( home_url( '/' ), PHP_URL_SCHEME );
+
 		setcookie(
 			self::COOKIE_NAME,
 			$token,
@@ -222,7 +243,7 @@ class TTA_ThreadDesk_Guest_Token_Service {
 				'expires'  => (int) $expires,
 				'path'     => COOKIEPATH ? COOKIEPATH : '/',
 				'domain'   => COOKIE_DOMAIN,
-				'secure'   => true,
+				'secure'   => $secure,
 				'httponly' => true,
 				'samesite' => 'Lax',
 			)
