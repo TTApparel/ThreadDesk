@@ -15,6 +15,7 @@ class TTA_ThreadDesk {
 	private $auth_errors = array();
 	private $auth_active_panel = '';
 	private $auth_login_success = false;
+	private $auth_register_success = false;
 
 	public static function instance() {
 		if ( null === self::$instance ) {
@@ -1744,9 +1745,7 @@ class TTA_ThreadDesk {
 			return '';
 		}
 
-		if ( ! is_user_logged_in() ) {
-			return '<p>' . esc_html__( 'Please log in to use saved screenprint layouts.', 'threaddesk' ) . '</p>';
-		}
+		$is_authenticated = is_user_logged_in();
 
 		$product_id = get_the_ID();
 		$product = function_exists( 'wc_get_product' ) ? wc_get_product( $product_id ) : false;
@@ -1754,7 +1753,7 @@ class TTA_ThreadDesk {
 			return '';
 		}
 
-		$user_id = get_current_user_id();
+		$user_id = $is_authenticated ? get_current_user_id() : 0;
 		$product_term_ids = wp_get_post_terms( $product_id, 'product_cat', array( 'fields' => 'ids' ) );
 		$product_term_slugs = wp_get_post_terms( $product_id, 'product_cat', array( 'fields' => 'slugs' ) );
 		$product_term_ids = is_array( $product_term_ids ) ? array_map( 'absint', $product_term_ids ) : array();
@@ -2137,7 +2136,7 @@ class TTA_ThreadDesk {
 
 		ob_start();
 		?>
-		<div class="threaddesk-screenprint" id="<?php echo esc_attr( $instance_id ); ?>" data-threaddesk-screenprint-layouts="<?php echo esc_attr( wp_json_encode( $layout_items ) ); ?>" data-threaddesk-screenprint-images-by-color="<?php echo esc_attr( wp_json_encode( $screenprint_images_by_color ) ); ?>" data-threaddesk-screenprint-initial-color="<?php echo esc_attr( $initial_color_key ); ?>" data-threaddesk-screenprint-create-layout-category="<?php echo esc_attr( $default_category_slug ); ?>" data-threaddesk-screenprint-create-layout-category-id="<?php echo esc_attr( (string) $default_category_id ); ?>" data-threaddesk-screenprint-open-chooser="<?php echo $screenprint_open_chooser ? '1' : '0'; ?>">
+		<div class="threaddesk-screenprint" id="<?php echo esc_attr( $instance_id ); ?>" data-threaddesk-screenprint-layouts="<?php echo esc_attr( wp_json_encode( $layout_items ) ); ?>" data-threaddesk-screenprint-images-by-color="<?php echo esc_attr( wp_json_encode( $screenprint_images_by_color ) ); ?>" data-threaddesk-screenprint-initial-color="<?php echo esc_attr( $initial_color_key ); ?>" data-threaddesk-screenprint-create-layout-category="<?php echo esc_attr( $default_category_slug ); ?>" data-threaddesk-screenprint-create-layout-category-id="<?php echo esc_attr( (string) $default_category_id ); ?>" data-threaddesk-screenprint-open-chooser="<?php echo $screenprint_open_chooser ? '1' : '0'; ?>" data-threaddesk-screenprint-authenticated="<?php echo $is_authenticated ? '1' : '0'; ?>">
 			<div class="threaddesk-screenprint__color-picker" data-threaddesk-screenprint-color-picker style="display:flex;flex-wrap:wrap;gap:10px;align-items:stretch;justify-content:center;">
 				<?php foreach ( $screenprint_color_choices as $choice_index => $choice ) : ?>
 					<button type="button" class="threaddesk-screenprint__open-color" data-threaddesk-screenprint-open-color="<?php echo esc_attr( $choice['key'] ); ?>" aria-label="<?php echo esc_attr( $choice['label'] ); ?>" style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:8px 0;width:70px;border:1px solid #dcdcde;background:#fff;border-radius:4px;cursor:pointer;position:relative;overflow:visible;<?php echo 0 === (int) $choice_index ? 'box-shadow:0 0 0 1px #2271b1;' : ''; ?>">
@@ -2160,9 +2159,7 @@ class TTA_ThreadDesk {
 					<div class="threaddesk-layout-modal__content is-active" data-threaddesk-screenprint-step="chooser" aria-hidden="false">
 						<h3><?php echo esc_html__( 'Choose from your saved layouts', 'threaddesk' ); ?></h3>
 						<div class="threaddesk-layout-modal__options" data-threaddesk-screenprint-options></div>
-						<?php if ( empty( $layout_items ) ) : ?>
-							<p class="threaddesk-layout-modal__empty"><?php echo esc_html__( 'No saved layouts match this product categories yet.', 'threaddesk' ); ?></p>
-						<?php endif; ?>
+						<p class="threaddesk-layout-modal__empty" data-threaddesk-screenprint-empty <?php echo empty( $layout_items ) ? '' : 'hidden'; ?>><?php echo $is_authenticated ? esc_html__( 'No saved layouts match this product categories yet.', 'threaddesk' ) : esc_html__( 'No saved layouts in this browser yet.', 'threaddesk' ); ?></p>
 					</div>
 					<div class="threaddesk-layout-modal__content threaddesk-layout-viewer" data-threaddesk-screenprint-step="viewer" aria-hidden="true" hidden>
 						<div class="threaddesk-layout-viewer__left-column">
@@ -2328,15 +2325,21 @@ class TTA_ThreadDesk {
 			const i18nApproxSizePrefix=<?php echo wp_json_encode( __( 'Approx. size', 'threaddesk' ) ); ?>;
 			const i18nCreateLayout=<?php echo wp_json_encode( __( 'CREATE A LAYOUT', 'threaddesk' ) ); ?>;
 			const i18nCreateLayoutHint=<?php echo wp_json_encode( __( 'Need a new layout? Start in the placements builder.', 'threaddesk' ) ); ?>;
+			const i18nSavedInBrowser=<?php echo wp_json_encode( __( 'Saved in this browser', 'threaddesk' ) ); ?>;
+			const i18nSavedInAccount=<?php echo wp_json_encode( __( 'Saved in your account', 'threaddesk' ) ); ?>;
+			const i18nGuestEmpty=<?php echo wp_json_encode( __( 'No saved layouts in this browser yet.', 'threaddesk' ) ); ?>;
+			const i18nUserEmpty=<?php echo wp_json_encode( __( 'No saved layouts match this product categories yet.', 'threaddesk' ) ); ?>;
 			const createLayoutCategory=String(root.getAttribute('data-threaddesk-screenprint-create-layout-category')||'').trim();
 			const createLayoutCategoryId=Number(root.getAttribute('data-threaddesk-screenprint-create-layout-category-id')||0);
 			const shouldOpenChooser=String(root.getAttribute('data-threaddesk-screenprint-open-chooser')||'0').trim()==='1';
+			const isAuthenticated=String(root.getAttribute('data-threaddesk-screenprint-authenticated')||'0').trim()==='1';
 			const modal=root.querySelector('[data-threaddesk-screenprint-modal]');
 			if(!modal){console.error('[ThreadDesk] screenprint modal missing');return;}
 			const colorPicker=root.querySelector('[data-threaddesk-screenprint-color-picker]');
 			const showAllWrap=root.querySelector('.hide-colors');
 			const showAllBtn=root.querySelector('[data-threaddesk-screenprint-show-all-colors]');
 			const options=root.querySelector('[data-threaddesk-screenprint-options]');
+			const emptyState=root.querySelector('[data-threaddesk-screenprint-empty]');
 			const chooserStep=root.querySelector('[data-threaddesk-screenprint-step="chooser"]');
 			const viewerStep=root.querySelector('[data-threaddesk-screenprint-step="viewer"]');
 			const selectedLabel=root.querySelector('[data-threaddesk-screenprint-selected]');
@@ -2349,7 +2352,7 @@ class TTA_ThreadDesk {
 			const overlayWrap=root.querySelector('[data-threaddesk-screenprint-overlay]');
 			const stage=root.querySelector('[data-threaddesk-screenprint-stage]');
 			const angleThumbs=root.querySelectorAll('[data-threaddesk-screenprint-angle-image]');
-			if(!colorPicker||!options||!chooserStep||!viewerStep){return;}
+				if(!colorPicker||!options||!chooserStep||!viewerStep){return;}
 			let selected=null; let angle='front'; let selectedColor=initialColorKey; let stageRatioLocked=false; let colorsExpanded=false; let activePlacementKey=''; let dragState=null;
 			if(!selectedColor||!imageMap[selectedColor]){const keys=Object.keys(imageMap||{}); selectedColor=keys.length?keys[0]:'';}
 			let images=(imageMap&&imageMap[selectedColor])?imageMap[selectedColor]:{};
@@ -2700,8 +2703,10 @@ class TTA_ThreadDesk {
 			document.addEventListener('touchend',()=>{dragState=null;});
 			document.addEventListener('touchcancel',()=>{dragState=null;});
 			window.addEventListener('resize',syncScreenprintPanelHeight);
-			{
-				const createBtn=document.createElement('button');
+				const renderLayoutOptions=()=>{
+					options.innerHTML='';
+					{
+					const createBtn=document.createElement('button');
 				createBtn.type='button';
 				createBtn.className='threaddesk-screenprint-option threaddesk-screenprint-option--create threaddesk__card threaddesk__card--design';
 				const createPreview=document.createElement('div');
@@ -2734,9 +2739,9 @@ class TTA_ThreadDesk {
 					document.body.classList.remove('threaddesk-modal-open');
 					window.setTimeout(()=>{layoutOpen.click();},0);
 				});
-				options.appendChild(createBtn);
-			}
-			(layouts||[]).forEach((layout)=>{
+					options.appendChild(createBtn);
+					}
+					(layouts||[]).forEach((layout)=>{
 				const btn=document.createElement('button');
 				btn.type='button';
 				btn.className='threaddesk-screenprint-option threaddesk__card threaddesk__card--design';
@@ -2778,18 +2783,33 @@ class TTA_ThreadDesk {
 				meta.className='threaddesk__card-design-color-count';
 				const count=document.createElement('span');
 				count.textContent=i18nPrintCountLabel+': '+String(Number(layout.printCount||0));
-				const status=document.createElement('span');
-				status.className='threaddesk__card-design-status threaddesk__card-design-status--'+String(layout.statusKey||'pending');
-				status.textContent=String(layout.statusLabel||'Pending').toUpperCase();
-				meta.appendChild(count);
-				meta.appendChild(status);
+					const status=document.createElement('span');
+					status.className='threaddesk__card-design-status threaddesk__card-design-status--'+String(layout.statusKey||'pending');
+					status.textContent=String(layout.statusLabel||'Pending').toUpperCase();
+					const source=document.createElement('span');
+					source.className='threaddesk-screenprint-option__source';
+					source.textContent=isAuthenticated?i18nSavedInAccount:i18nSavedInBrowser;
+					meta.appendChild(count);
+					meta.appendChild(status);
+					meta.appendChild(source);
 				btn.appendChild(preview);
 				btn.appendChild(titleWrap);
 				btn.appendChild(meta);
 				btn.addEventListener('click',()=>{selected=layout; if(selectedLabel){selectedLabel.textContent=i18nSelectedPrefix+': '+title;} setStep('viewer'); render(); window.requestAnimationFrame(syncScreenprintPanelHeight);});
-				options.appendChild(btn);
-			});
-			root.querySelectorAll('[data-threaddesk-screenprint-angle]').forEach((btn)=>btn.addEventListener('click',()=>{
+					options.appendChild(btn);
+					});
+					if(emptyState){
+						emptyState.textContent=isAuthenticated?i18nUserEmpty:i18nGuestEmpty;
+						emptyState.hidden=Array.isArray(layouts)&&layouts.length>0;
+					}
+				};
+				renderLayoutOptions();
+				document.addEventListener('threaddesk:auth-success',()=>{
+					try{layouts=JSON.parse(root.getAttribute('data-threaddesk-screenprint-layouts')||'[]');}
+					catch(e){layouts=[];}
+					renderLayoutOptions();
+				});
+				root.querySelectorAll('[data-threaddesk-screenprint-angle]').forEach((btn)=>btn.addEventListener('click',()=>{
 				angle=btn.getAttribute('data-threaddesk-screenprint-angle')||'front';
 				root.querySelectorAll('[data-threaddesk-screenprint-angle]').forEach((item)=>item.classList.remove('is-active'));
 				btn.classList.add('is-active');
@@ -2925,7 +2945,7 @@ class TTA_ThreadDesk {
 					</button>
 				</div>
 			</div>
-			<div class="threaddesk-auth-modal" aria-hidden="true" data-threaddesk-auth-default="<?php echo esc_attr( $this->auth_active_panel ); ?>">
+			<div class="threaddesk-auth-modal" aria-hidden="true" data-threaddesk-auth-default="<?php echo esc_attr( $this->auth_active_panel ); ?>" data-threaddesk-auth-refresh-layouts="<?php echo ( $this->auth_login_success || $this->auth_register_success ) ? '1' : '0'; ?>">
 				<div class="threaddesk-auth-modal__overlay" data-threaddesk-auth-close></div>
 				<div class="threaddesk-auth-modal__panel" role="dialog" aria-label="<?php echo esc_attr__( 'Account modal', 'threaddesk' ); ?>" aria-modal="true">
 					<div class="threaddesk-auth-modal__actions">
@@ -3203,8 +3223,10 @@ class TTA_ThreadDesk {
 			$user->set_role( 'customer' );
 		}
 
-		$this->auth_notice = __( 'Registration successful. Please check your email for confirmation.', 'threaddesk' );
-	}
+			$this->auth_notice = __( 'Registration successful. Please check your email for confirmation.', 'threaddesk' );
+			$this->auth_register_success = true;
+			$this->auth_active_panel = '';
+		}
 
 
 	public function render_admin_quotes_page() {
@@ -4766,7 +4788,8 @@ class TTA_ThreadDesk {
 			return;
 		}
 
-		$this->auth_notice = __( 'Login successful. Welcome back!', 'threaddesk' );
-		$this->auth_login_success = true;
-	}
+			$this->auth_notice = __( 'Login successful. Welcome back!', 'threaddesk' );
+			$this->auth_login_success = true;
+			$this->auth_active_panel = '';
+		}
 }
