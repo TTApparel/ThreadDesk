@@ -2330,6 +2330,7 @@ class TTA_ThreadDesk {
 			const createLayoutCategoryId=Number(root.getAttribute('data-threaddesk-screenprint-create-layout-category-id')||0);
 			const shouldOpenChooser=String(root.getAttribute('data-threaddesk-screenprint-open-chooser')||'0').trim()==='1';
 			const modal=root.querySelector('[data-threaddesk-screenprint-modal]');
+			if(!modal){console.error('[ThreadDesk] screenprint modal missing');return;}
 			const colorPicker=root.querySelector('[data-threaddesk-screenprint-color-picker]');
 			const showAllWrap=root.querySelector('.hide-colors');
 			const showAllBtn=root.querySelector('[data-threaddesk-screenprint-show-all-colors]');
@@ -2346,7 +2347,7 @@ class TTA_ThreadDesk {
 			const overlayWrap=root.querySelector('[data-threaddesk-screenprint-overlay]');
 			const stage=root.querySelector('[data-threaddesk-screenprint-stage]');
 			const angleThumbs=root.querySelectorAll('[data-threaddesk-screenprint-angle-image]');
-			if(!modal||!colorPicker||!options||!chooserStep||!viewerStep){return;}
+			if(!colorPicker||!options||!chooserStep||!viewerStep){return;}
 			let selected=null; let angle='front'; let selectedColor=initialColorKey; let stageRatioLocked=false; let colorsExpanded=false; let activePlacementKey=''; let dragState=null;
 			if(!selectedColor||!imageMap[selectedColor]){const keys=Object.keys(imageMap||{}); selectedColor=keys.length?keys[0]:'';}
 			let images=(imageMap&&imageMap[selectedColor])?imageMap[selectedColor]:{};
