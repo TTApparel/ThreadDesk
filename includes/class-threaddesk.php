@@ -2311,8 +2311,12 @@ class TTA_ThreadDesk {
 		<script data-cfasync="false">
 		(function(){
 			const root=document.getElementById(<?php echo wp_json_encode( $instance_id ); ?>); if(!root){return;}
-			const layouts=JSON.parse(root.getAttribute('data-threaddesk-screenprint-layouts')||'[]');
-			const imageMap=JSON.parse(root.getAttribute('data-threaddesk-screenprint-images-by-color')||'{}');
+			let layouts=[];
+			try{layouts=JSON.parse(root.getAttribute('data-threaddesk-screenprint-layouts')||'[]');}
+			catch(e){console.error('[ThreadDesk screenprint init]',e);layouts=[];}
+			let imageMap={};
+			try{imageMap=JSON.parse(root.getAttribute('data-threaddesk-screenprint-images-by-color')||'{}');}
+			catch(e){console.error('[ThreadDesk screenprint init]',e);imageMap={};}
 			const initialColorKey=String(root.getAttribute('data-threaddesk-screenprint-initial-color')||'').trim();
 			const i18nNoPreview=<?php echo wp_json_encode( __( 'No placement preview', 'threaddesk' ) ); ?>;
 			const i18nPrintCountLabel=<?php echo wp_json_encode( __( 'Print count', 'threaddesk' ) ); ?>;
@@ -2564,6 +2568,7 @@ class TTA_ThreadDesk {
 			root.querySelectorAll('[data-threaddesk-screenprint-back]').forEach((el)=>{
 				el.addEventListener('click',()=>{setStep('chooser');});
 			});
+			console.debug('[ThreadDesk] screenprint listeners bound');
 			const lockStageRatio=(src)=>{
 				if(stageRatioLocked||!stage||!src){return;}
 				const probe=new Image();
