@@ -2285,6 +2285,7 @@ body.threaddesk-modal-open {
 }
 
 .threaddesk-screenprint__active-adjust-palette,
+.threaddesk-screenprint__active-adjust-palette-options,
 .threaddesk-screenprint__active-size-reading {
 	display: none;
 }
@@ -2297,6 +2298,11 @@ body.threaddesk-modal-open {
 	display: flex;
 	margin-top: 8px;
 	margin-bottom: 0;
+}
+
+.threaddesk-screenprint__selected-design-item.is-active .threaddesk-screenprint__active-adjust-palette-options.is-open {
+	display: flex;
+	margin: 6px 0 0;
 }
 
 .threaddesk-screenprint__selected-design-item.is-active .threaddesk-screenprint__active-size-reading {
