@@ -2409,9 +2409,12 @@ class TTA_ThreadDesk {
 				activePlacementKey=String(placementKey||'').trim();
 				if(!selectedDesignList){return;}
 				selectedDesignList.classList.toggle('has-active-placement',!!activePlacementKey);
-				selectedDesignList.querySelectorAll('.threaddesk-screenprint__selected-design-option').forEach((btn)=>{
-					const key=String(btn.getAttribute('data-threaddesk-screenprint-placement-key')||'').trim();
-					btn.classList.toggle('is-active',!!activePlacementKey&&key===activePlacementKey);
+				selectedDesignList.querySelectorAll('.threaddesk-screenprint__selected-design-item').forEach((item)=>{
+					const key=String(item.getAttribute('data-threaddesk-screenprint-placement-key')||'').trim();
+					const isActive=!!activePlacementKey&&key===activePlacementKey;
+					item.classList.toggle('is-active',isActive);
+					const button=item.querySelector('.threaddesk-screenprint__selected-design-option');
+					if(button){button.classList.toggle('is-active',isActive);}
 				});
 			};
 			const getPlacementEntry=(map,targetAngle,placementKey)=>{
@@ -2461,10 +2464,12 @@ class TTA_ThreadDesk {
 					if(!src){return;}
 					const title=String(entry.designName||entry.placementLabel||i18nDesignFallback).trim()||i18nDesignFallback;
 					const placementLabel=String(entry.placementLabel||entry.placementKey||'').trim()||'Placement';
+					const itemWrap=document.createElement('div');
+					itemWrap.className='threaddesk-screenprint__selected-design-item';
+					itemWrap.setAttribute('data-threaddesk-screenprint-placement-key',String(entry.placementKey||'').trim());
 					const item=document.createElement('button');
 					item.type='button';
 					item.className='threaddesk-layout-viewer__design-option threaddesk-screenprint__selected-design-option';
-					item.setAttribute('data-threaddesk-screenprint-placement-key',String(entry.placementKey||'').trim());
 					item.setAttribute('data-threaddesk-tooltip',i18nAdjust);
 					item.setAttribute('aria-label',i18nAdjust+' '+title);
 					const img=document.createElement('img');
@@ -2481,7 +2486,8 @@ class TTA_ThreadDesk {
 					placement.textContent=placementLabel;
 					item.appendChild(img);
 					item.appendChild(name);
-					item.appendChild(placement);
+					itemWrap.appendChild(item);
+					itemWrap.appendChild(placement);
 					item.addEventListener('click',()=>{
 						if(!selected){return;}
 						const currentPlacementKey=String(entry.placementKey||'').trim();
@@ -2491,7 +2497,7 @@ class TTA_ThreadDesk {
 						setActivePlacement(currentPlacementKey);
 						render();
 					});
-					selectedDesignList.appendChild(item);
+					selectedDesignList.appendChild(itemWrap);
 					count++;
 				});
 				setActivePlacement(activePlacementKey);
