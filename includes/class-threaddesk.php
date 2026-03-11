@@ -2654,11 +2654,25 @@ class TTA_ThreadDesk {
 			};
 			const setStep=(step)=>{
 				const showChooser=step==='chooser';
-				const showViewer=step==='viewer';
-				const showQuantities=step==='quantities';
-				if(chooserStep){chooserStep.hidden=!showChooser;chooserStep.classList.toggle('is-active',showChooser);chooserStep.setAttribute('aria-hidden',showChooser?'false':'true');}
-				if(viewerStep){viewerStep.hidden=!showViewer;viewerStep.classList.toggle('is-active',showViewer);viewerStep.setAttribute('aria-hidden',showViewer?'false':'true');}
-				if(quantitiesStep){quantitiesStep.hidden=!showQuantities;quantitiesStep.classList.toggle('is-active',showQuantities);quantitiesStep.setAttribute('aria-hidden',showQuantities?'false':'true');}
+				const nextStep=showChooser?chooserStep:viewerStep;
+				const prevStep=showChooser?viewerStep:chooserStep;
+				const activeEl=document.activeElement;
+				const focusWasInPrev=!!(prevStep&&activeEl&&prevStep.contains(activeEl));
+				if(nextStep){
+					nextStep.hidden=false;
+					nextStep.classList.add('is-active');
+					nextStep.setAttribute('aria-hidden','false');
+				}
+				if(focusWasInPrev&&nextStep){
+					const focusTarget=nextStep.querySelector('[data-threaddesk-screenprint-back], [data-threaddesk-screenprint-close], [data-threaddesk-screenprint-options] button, [data-threaddesk-screenprint-angle], button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])');
+					if(focusTarget&&typeof focusTarget.focus==='function'){focusTarget.focus({preventScroll:true});}
+					else if(activeEl&&typeof activeEl.blur==='function'){activeEl.blur();}
+				}
+				if(prevStep){
+					prevStep.hidden=true;
+					prevStep.classList.remove('is-active');
+					prevStep.setAttribute('aria-hidden','true');
+				}
 			};
 			const openScreenprintChooserModal=()=>{
 				if(!modal){return;}
@@ -2747,6 +2761,47 @@ class TTA_ThreadDesk {
 				selectedColorLabel.textContent=(i18nSelectedColorPrefix||'Color')+': '+(label||'--');
 			};
 			const getEntrySource=(entry)=>String((entry&&entry.sourceUrl)|| (entry&&entry.designUrl) || (entry&&entry.previewUrl) || (entry&&entry.preview) || (entry&&entry.url) || (entry&&entry.imageUrl) || (entry&&entry.mockupUrl) || (entry&&entry.svgUrl) || '').trim();
+			const normalizeHexColor=(value)=>{
+				const raw=String(value||'').trim();
+				if(raw.toLowerCase()==='transparent'){return 'transparent';}
+				if(!raw){return '';}
+				const hex=raw.charAt(0)==='#'?raw:('#'+raw);
+				return /^#[0-9a-fA-F]{6}$/.test(hex)?hex.toUpperCase():'';
+			};
+			const escapeRegex=(value)=>String(value||'').replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+			const decodeSvgDataUrl=(source)=>{
+				const raw=String(source||'').trim();
+				const marker='data:image/svg+xml,';
+				const markerBase64='data:image/svg+xml;base64,';
+				if(raw.indexOf(markerBase64)===0){
+					try{return atob(raw.substring(markerBase64.length));}catch(e){return ''; }
+				}
+				if(raw.indexOf(marker)===0){
+					try{return decodeURIComponent(raw.substring(marker.length));}catch(e){return raw.substring(marker.length);}
+				}
+				if(raw.indexOf('<svg')!==-1){return raw;}
+				return '';
+			};
+			const encodeSvgDataUrl=(svgMarkup)=>'data:image/svg+xml,'+encodeURIComponent(String(svgMarkup||''));
+			const applyEntryPalette=(entry)=>{
+				if(!entry||typeof entry!=='object'){return;}
+				const paletteBase=Array.isArray(entry.paletteBase)?entry.paletteBase:[];
+				const paletteCurrent=Array.isArray(entry.paletteCurrent)?entry.paletteCurrent:[];
+				if(!paletteBase.length||!paletteCurrent.length){return;}
+				const originalSource=String(entry.__paletteSource||entry.baseUrl||entry.url||entry.sourceUrl||entry.designUrl||entry.previewUrl||entry.preview||'').trim();
+				if(!originalSource){return;}
+				const svgMarkup=decodeSvgDataUrl(originalSource);
+				if(!svgMarkup){return;}
+				let nextMarkup=svgMarkup;
+				for(let i=0;i<Math.min(paletteBase.length,paletteCurrent.length);i++){
+					const from=normalizeHexColor(paletteBase[i]);
+					const to=normalizeHexColor(paletteCurrent[i]);
+					if(!from||!to||from===to){continue;}
+					nextMarkup=nextMarkup.replace(new RegExp(escapeRegex(from),'gi'),to);
+				}
+				entry.__paletteSource=originalSource;
+				entry.url=encodeSvgDataUrl(nextMarkup);
+			};
 			const setActivePlacement=(placementKey)=>{
 				activePlacementKey=String(placementKey||'').trim();
 				if(!selectedDesignList){
@@ -2874,6 +2929,8 @@ class TTA_ThreadDesk {
 								event.stopPropagation();
 								if(!Array.isArray(entry.paletteCurrent)){entry.paletteCurrent=[];}
 								entry.paletteCurrent[activeEditor]=choice;
+								applyEntryPalette(entry);
+								activePaletteEditor=null;
 								render();
 							});
 							adjustPaletteOptions.appendChild(choiceBtn);
