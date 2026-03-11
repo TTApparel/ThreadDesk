@@ -2387,7 +2387,7 @@ body.threaddesk-modal-open {
 .threaddesk-screenprint__quantity-item {
 	border: 1px solid #dcdcde;
 	border-radius: 8px;
-	padding: 10px;
+	padding: 0 10px;
 	display: grid;
 	grid-template-columns: minmax(0, 1fr) auto auto;
 	align-items: center;
