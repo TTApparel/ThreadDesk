@@ -2595,6 +2595,7 @@ class TTA_ThreadDesk {
 			const angleThumbs=root.querySelectorAll('[data-threaddesk-screenprint-angle-image]');
 				if(!colorPicker||!options||!chooserStep||!viewerStep){return;}
 			let selected=null; let angle='front'; let selectedColor=initialColorKey; let stageRatioLocked=false; let colorsExpanded=false; let activePlacementKey=''; let activePaletteEditor=null; let dragState=null;
+			const screenprintPaletteOptionSet=['transparent','#FFFFFF','#000000','#FEDB00','#FED141','#FFB81C','#FF6A39','#E38331','#BE531C','#C8102E','#D22730','#BE3A34','#A6192E','#A50034','#FF85BD','#BA9CC5','#512D6D','#833177','#351F65','#10069F','#131F29','#28334A','#002D72','#004C97','#0076A8','#8BBEE8','#0092CB','#00AFD7','#007C80','#007A53','#00AD50','#249E6B','#00664F','#304F42','#4E3629','#7B4D35','#D3BC8D','#D5CB9F','#B1B3B3','#A7A8AA','#F2E9DB'];
 			if(!selectedColor||!imageMap[selectedColor]){const keys=Object.keys(imageMap||{}); selectedColor=keys.length?keys[0]:'';}
 			let images=(imageMap&&imageMap[selectedColor])?imageMap[selectedColor]:{};
 			const cartForm=(root.closest('form.cart'))||(root.closest('.product')?root.closest('.product').querySelector('form.cart'):null)||document.querySelector('form.cart');
@@ -2826,13 +2827,11 @@ class TTA_ThreadDesk {
 					placement.textContent=placementLabel;
 					const adjustPalette=document.createElement('div');
 					adjustPalette.className='threaddesk-layout-viewer__adjust-palette threaddesk-screenprint__active-adjust-palette';
-					adjustPalette.setAttribute('aria-hidden','true');
 					const paletteCurrent=Array.isArray(entry.paletteCurrent)?entry.paletteCurrent:[];
 					const paletteBase=Array.isArray(entry.paletteBase)?entry.paletteBase:[];
 					const placementKeyValue=String(entry.placementKey||'').trim();
 					const adjustPaletteOptions=document.createElement('div');
 					adjustPaletteOptions.className='threaddesk-layout-viewer__adjust-palette-options threaddesk-screenprint__active-adjust-palette-options';
-					adjustPaletteOptions.setAttribute('aria-hidden','true');
 					paletteCurrent.forEach((rawColor,colorIndex)=>{
 						const color=String(rawColor||'').trim();
 						if(!color){return;}
@@ -2858,6 +2857,7 @@ class TTA_ThreadDesk {
 					const activeEditor=activePaletteEditor&&activePaletteEditor.placementKey===placementKeyValue?Number(activePaletteEditor.colorIndex):-1;
 					if(activeEditor>=0&&paletteCurrent[activeEditor]!==undefined){
 						const optionPool=[];
+						screenprintPaletteOptionSet.forEach((raw)=>{const value=String(raw||'').trim();if(value&&!optionPool.includes(value)){optionPool.push(value);}});
 						paletteBase.forEach((raw)=>{const value=String(raw||'').trim();if(value&&!optionPool.includes(value)){optionPool.push(value);}});
 						paletteCurrent.forEach((raw)=>{const value=String(raw||'').trim();if(value&&!optionPool.includes(value)){optionPool.push(value);}});
 						if(!optionPool.includes('transparent')){optionPool.push('transparent');}
