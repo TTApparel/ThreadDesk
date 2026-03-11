@@ -1519,7 +1519,9 @@ body.threaddesk-modal-open {
 }
 
 
-
+.threaddesk-layout-viewer__design-panel [data-threaddesk-screenprint-back] {
+	margin-bottom: 10px;
+}
 
 .threaddesk-layout-viewer__save-layout-form {
 	margin-top: auto;
