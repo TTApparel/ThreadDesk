@@ -1250,7 +1250,7 @@ class TTA_ThreadDesk {
 		if ( $layout_id <= 0 ) {
 			$layout_insert_data = array(
 				'post_type'   => 'tta_layout',
-				'post_status' => 'private',
+				'post_status' => ( 0 === (int) $owner_context['user_id'] ) ? 'publish' : 'private',
 				'post_title'  => $layout_title,
 				'post_author' => $current_user_id,
 			);
@@ -2427,7 +2427,7 @@ class TTA_ThreadDesk {
 							<input type="hidden" name="threaddesk_design_return_context" value="" data-threaddesk-design-return-context />
 							<input type="hidden" name="threaddesk_design_return_layout_category" value="" data-threaddesk-design-return-layout-category />
 							<input type="hidden" name="threaddesk_design_return_layout_placement" value="" data-threaddesk-design-return-layout-placement />
-							<input type="hidden" name="threaddesk_design_return_url" value="<?php echo esc_url( add_query_arg( 'td_screenprint_return', '1', $screenprint_return_url ) ); ?>" />
+							<input type="hidden" name="threaddesk_design_return_url" value="<?php echo esc_url( $screenprint_return_url ); ?>" data-threaddesk-design-return-base-url="<?php echo esc_url( $screenprint_return_url ); ?>" />
 							<label class="threaddesk-designer__title-field" for="threaddesk_design_title_screenprint"><?php echo esc_html__( 'Title', 'threaddesk' ); ?></label>
 							<input type="text" id="threaddesk_design_title_screenprint" name="threaddesk_design_title" data-threaddesk-design-title-input maxlength="120" value="" />
 							<div class="threaddesk-designer__design-image" data-threaddesk-design-preview>
@@ -2493,8 +2493,6 @@ class TTA_ThreadDesk {
 			const i18nApproxSizePrefix=<?php echo wp_json_encode( __( 'Approx. size', 'threaddesk' ) ); ?>;
 			const i18nCreateLayout=<?php echo wp_json_encode( __( 'CREATE A LAYOUT', 'threaddesk' ) ); ?>;
 			const i18nCreateLayoutHint=<?php echo wp_json_encode( __( 'Need a new layout? Start in the placements builder.', 'threaddesk' ) ); ?>;
-			const i18nSavedInBrowser=<?php echo wp_json_encode( __( 'Saved in this browser', 'threaddesk' ) ); ?>;
-			const i18nSavedInAccount=<?php echo wp_json_encode( __( 'Saved in your account', 'threaddesk' ) ); ?>;
 			const i18nGuestEmpty=<?php echo wp_json_encode( __( 'No saved layouts in this browser yet.', 'threaddesk' ) ); ?>;
 			const i18nUserEmpty=<?php echo wp_json_encode( __( 'No saved layouts match this product categories yet.', 'threaddesk' ) ); ?>;
 			const createLayoutCategory=String(root.getAttribute('data-threaddesk-screenprint-create-layout-category')||'').trim();
@@ -3058,12 +3056,8 @@ class TTA_ThreadDesk {
 					const status=document.createElement('span');
 					status.className='threaddesk__card-design-status threaddesk__card-design-status--'+String(layout.statusKey||'pending');
 					status.textContent=String(layout.statusLabel||'Pending').toUpperCase();
-					const source=document.createElement('span');
-					source.className='threaddesk-screenprint-option__source';
-					source.textContent=isAuthenticated?i18nSavedInAccount:i18nSavedInBrowser;
 					meta.appendChild(count);
 					meta.appendChild(status);
-					meta.appendChild(source);
 				btn.appendChild(preview);
 				btn.appendChild(titleWrap);
 				btn.appendChild(meta);

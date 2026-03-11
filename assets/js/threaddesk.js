@@ -1563,6 +1563,7 @@ jQuery(function ($) {
 		const returnContextField = designForm.find('[data-threaddesk-design-return-context]');
 		const returnCategoryField = designForm.find('[data-threaddesk-design-return-layout-category]');
 		const returnPlacementField = designForm.find('[data-threaddesk-design-return-layout-placement]');
+		const returnUrlField = designForm.find('[name="threaddesk_design_return_url"]');
 		const designTitleInput = designModal.find('[data-threaddesk-design-title-input]');
 		const updatePreviewMaxHeight = function () {
 			const panelHeight = Math.round(designModal.find('.threaddesk-auth-modal__panel').innerHeight() || 0);
@@ -2555,13 +2556,44 @@ jQuery(function ($) {
 			event.preventDefault();
 			const fromLayoutViewer = layoutModal.length && layoutModal.hasClass('is-active');
 			if (fromLayoutViewer) {
+				const category = String(layoutModal.attr('data-threaddesk-current-category') || '').trim();
+				const placement = String(layoutModal.attr('data-threaddesk-current-placement') || '').trim();
 				returnContextField.val('layout_viewer');
-				returnCategoryField.val(String(layoutModal.attr('data-threaddesk-current-category') || '').trim());
-				returnPlacementField.val(String(layoutModal.attr('data-threaddesk-current-placement') || '').trim());
+				returnCategoryField.val(category);
+				returnPlacementField.val(placement);
+				if (returnUrlField.length) {
+					const baseReturnUrl = String(returnUrlField.attr('data-threaddesk-design-return-base-url') || returnUrlField.val() || '').trim();
+					if (baseReturnUrl) {
+						try {
+							const resolved = new URL(baseReturnUrl, window.location.href);
+							resolved.searchParams.set('td_layout_return', '1');
+							resolved.searchParams.set('td_layout_step', 'designs');
+							if (category) {
+								resolved.searchParams.set('td_layout_category', category);
+							} else {
+								resolved.searchParams.delete('td_layout_category');
+							}
+							if (placement) {
+								resolved.searchParams.set('td_layout_placement', placement);
+							} else {
+								resolved.searchParams.delete('td_layout_placement');
+							}
+							returnUrlField.val(resolved.toString());
+						} catch (e) {
+							returnUrlField.val(baseReturnUrl);
+						}
+					}
+				}
 			} else {
 				returnContextField.val('');
 				returnCategoryField.val('');
 				returnPlacementField.val('');
+				if (returnUrlField.length) {
+					const baseReturnUrl = String(returnUrlField.attr('data-threaddesk-design-return-base-url') || '').trim();
+					if (baseReturnUrl) {
+						returnUrlField.val(baseReturnUrl);
+					}
+				}
 			}
 			openAndPromptDesignUpload();
 		});
