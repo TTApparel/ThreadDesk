@@ -2594,7 +2594,7 @@ class TTA_ThreadDesk {
 			const overlayWrap=root.querySelector('[data-threaddesk-screenprint-overlay]');
 			const stage=root.querySelector('[data-threaddesk-screenprint-stage]');
 			const angleThumbs=root.querySelectorAll('[data-threaddesk-screenprint-angle-image]');
-				if(!colorPicker||!options||!chooserStep||!viewerStep){return;}
+				if(!colorPicker||!options||!chooserStep||!viewerStep||!quantitiesStep){return;}
 			let selected=null; let angle='front'; let selectedColor=initialColorKey; let stageRatioLocked=false; let colorsExpanded=false; let activePlacementKey=''; let activePaletteEditor=null; let dragState=null;
 			const screenprintPaletteOptionSet=['transparent','#FFFFFF','#000000','#FEDB00','#FED141','#FFB81C','#FF6A39','#E38331','#BE531C','#C8102E','#D22730','#BE3A34','#A6192E','#A50034','#FF85BD','#BA9CC5','#512D6D','#833177','#351F65','#10069F','#131F29','#28334A','#002D72','#004C97','#0076A8','#8BBEE8','#0092CB','#00AFD7','#007C80','#007A53','#00AD50','#249E6B','#00664F','#304F42','#4E3629','#7B4D35','#D3BC8D','#D5CB9F','#B1B3B3','#A7A8AA','#F2E9DB'];
 			if(!selectedColor||!imageMap[selectedColor]){const keys=Object.keys(imageMap||{}); selectedColor=keys.length?keys[0]:'';}
@@ -2655,25 +2655,11 @@ class TTA_ThreadDesk {
 			};
 			const setStep=(step)=>{
 				const showChooser=step==='chooser';
-				const nextStep=showChooser?chooserStep:viewerStep;
-				const prevStep=showChooser?viewerStep:chooserStep;
-				const activeEl=document.activeElement;
-				const focusWasInPrev=!!(prevStep&&activeEl&&prevStep.contains(activeEl));
-				if(nextStep){
-					nextStep.hidden=false;
-					nextStep.classList.add('is-active');
-					nextStep.setAttribute('aria-hidden','false');
-				}
-				if(focusWasInPrev&&nextStep){
-					const focusTarget=nextStep.querySelector('[data-threaddesk-screenprint-back], [data-threaddesk-screenprint-close], [data-threaddesk-screenprint-options] button, [data-threaddesk-screenprint-angle], button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])');
-					if(focusTarget&&typeof focusTarget.focus==='function'){focusTarget.focus({preventScroll:true});}
-					else if(activeEl&&typeof activeEl.blur==='function'){activeEl.blur();}
-				}
-				if(prevStep){
-					prevStep.hidden=true;
-					prevStep.classList.remove('is-active');
-					prevStep.setAttribute('aria-hidden','true');
-				}
+				const showViewer=step==='viewer';
+				const showQuantities=step==='quantities';
+				if(chooserStep){chooserStep.hidden=!showChooser;chooserStep.classList.toggle('is-active',showChooser);chooserStep.setAttribute('aria-hidden',showChooser?'false':'true');}
+				if(viewerStep){viewerStep.hidden=!showViewer;viewerStep.classList.toggle('is-active',showViewer);viewerStep.setAttribute('aria-hidden',showViewer?'false':'true');}
+				if(quantitiesStep){quantitiesStep.hidden=!showQuantities;quantitiesStep.classList.toggle('is-active',showQuantities);quantitiesStep.setAttribute('aria-hidden',showQuantities?'false':'true');}
 			};
 			const openScreenprintChooserModal=()=>{
 				if(!modal){return;}
@@ -2724,7 +2710,11 @@ class TTA_ThreadDesk {
 					input.step='1';
 					input.value='0';
 					input.className='threaddesk-screenprint__quantity-input';
-					input.setAttribute('data-threaddesk-screenprint-variation-id',String((row&&row.variationId)||0));
+					const variationId=String((row&&row.variationId)||0);
+					input.setAttribute('data-threaddesk-screenprint-variation-id',variationId);
+					input.name='threaddesk_variation_quantity_'+variationId;
+					input.id='threaddesk-screenprint-quantity-'+variationId;
+					inputWrap.setAttribute('for',input.id);
 					inputWrap.appendChild(input);
 					item.appendChild(details);
 					item.appendChild(stock);
@@ -3044,11 +3034,19 @@ class TTA_ThreadDesk {
 				el.addEventListener('click',()=>{setStep('chooser');});
 			});
 			if(openQuantitiesButton){
-				openQuantitiesButton.addEventListener('click',()=>{
+				openQuantitiesButton.addEventListener('click',(event)=>{
+					event.preventDefault();
 					renderVariationQuantities();
 					setStep('quantities');
 				});
 			}
+			root.addEventListener('click',(event)=>{
+				const trigger=event.target&&event.target.closest?event.target.closest('[data-threaddesk-screenprint-open-quantities]'):null;
+				if(!trigger){return;}
+				event.preventDefault();
+				renderVariationQuantities();
+				setStep('quantities');
+			});
 			root.querySelectorAll('[data-threaddesk-screenprint-back-to-viewer]').forEach((el)=>{
 				el.addEventListener('click',()=>{setStep('viewer');});
 			});
