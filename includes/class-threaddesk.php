@@ -2357,21 +2357,22 @@ class TTA_ThreadDesk {
 								</button>
 							</div>
 						</div>
-						<div class="threaddesk-layout-viewer__design-panel">
-							<button type="button" class="threaddesk-layout-viewer__back-button" data-threaddesk-screenprint-back><?php echo esc_html__( 'Back to Saved Layouts', 'threaddesk' ); ?></button>
-							<h4><?php echo esc_html__( 'Applied Layout', 'threaddesk' ); ?></h4>
-							<p data-threaddesk-screenprint-selected><?php echo esc_html__( 'No layout selected yet.', 'threaddesk' ); ?></p>
-							<p class="threaddesk-screenprint__selected-color" data-threaddesk-screenprint-selected-color><?php echo esc_html__( 'Color: --', 'threaddesk' ); ?></p>
-							<div class="threaddesk-screenprint__selected-designs">
-								<div class="threaddesk-layout-viewer__design-list threaddesk-screenprint__selected-design-list" data-threaddesk-screenprint-selected-design-list></div>
-								<p class="threaddesk-layout-viewer__placement-empty" data-threaddesk-screenprint-selected-design-empty><?php echo esc_html__( 'No designs on this view yet.', 'threaddesk' ); ?></p>
+						<div class="threaddesk-screenprint__right-column">
+							<div class="threaddesk-layout-viewer__design-panel">
+								<button type="button" class="threaddesk-layout-viewer__back-button" data-threaddesk-screenprint-back><?php echo esc_html__( 'Back to Saved Layouts', 'threaddesk' ); ?></button>
+								<h4><?php echo esc_html__( 'Applied Layout', 'threaddesk' ); ?></h4>
+								<p data-threaddesk-screenprint-selected><?php echo esc_html__( 'No layout selected yet.', 'threaddesk' ); ?></p>
+								<p class="threaddesk-screenprint__selected-color" data-threaddesk-screenprint-selected-color><?php echo esc_html__( 'Color: --', 'threaddesk' ); ?></p>
+								<div class="threaddesk-screenprint__selected-designs">
+									<div class="threaddesk-layout-viewer__design-list threaddesk-screenprint__selected-design-list" data-threaddesk-screenprint-selected-design-list></div>
+									<p class="threaddesk-layout-viewer__placement-empty" data-threaddesk-screenprint-selected-design-empty><?php echo esc_html__( 'No designs on this view yet.', 'threaddesk' ); ?></p>
+								</div>
 							</div>
 							<button type="button" class="threaddesk-screenprint__quantities-button" data-threaddesk-screenprint-open-quantities><?php echo esc_html__( 'ADD QUANTITIES', 'threaddesk' ); ?></button>
 						</div>
 					</div>
 					<div class="threaddesk-layout-modal__content threaddesk-screenprint__quantities-step" data-threaddesk-screenprint-step="quantities" aria-hidden="true" hidden>
 						<h4><?php echo esc_html__( 'Add quantities', 'threaddesk' ); ?></h4>
-						<p><?php echo esc_html__( 'Enter the quantity you want for each size and color variation.', 'threaddesk' ); ?></p>
 						<div class="threaddesk-screenprint__quantities-list" data-threaddesk-screenprint-quantities-list></div>
 						<p class="threaddesk-layout-viewer__placement-empty" data-threaddesk-screenprint-quantities-empty hidden><?php echo esc_html__( 'No size/color variations are available for this product.', 'threaddesk' ); ?></p>
 						<button type="button" class="threaddesk-layout-viewer__back-button" data-threaddesk-screenprint-back-to-viewer><?php echo esc_html__( '← Back to applied layout', 'threaddesk' ); ?></button>
@@ -2654,25 +2655,11 @@ class TTA_ThreadDesk {
 			};
 			const setStep=(step)=>{
 				const showChooser=step==='chooser';
-				const nextStep=showChooser?chooserStep:viewerStep;
-				const prevStep=showChooser?viewerStep:chooserStep;
-				const activeEl=document.activeElement;
-				const focusWasInPrev=!!(prevStep&&activeEl&&prevStep.contains(activeEl));
-				if(nextStep){
-					nextStep.hidden=false;
-					nextStep.classList.add('is-active');
-					nextStep.setAttribute('aria-hidden','false');
-				}
-				if(focusWasInPrev&&nextStep){
-					const focusTarget=nextStep.querySelector('[data-threaddesk-screenprint-back], [data-threaddesk-screenprint-close], [data-threaddesk-screenprint-options] button, [data-threaddesk-screenprint-angle], button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])');
-					if(focusTarget&&typeof focusTarget.focus==='function'){focusTarget.focus({preventScroll:true});}
-					else if(activeEl&&typeof activeEl.blur==='function'){activeEl.blur();}
-				}
-				if(prevStep){
-					prevStep.hidden=true;
-					prevStep.classList.remove('is-active');
-					prevStep.setAttribute('aria-hidden','true');
-				}
+				const showViewer=step==='viewer';
+				const showQuantities=step==='quantities';
+				if(chooserStep){chooserStep.hidden=!showChooser;chooserStep.classList.toggle('is-active',showChooser);chooserStep.setAttribute('aria-hidden',showChooser?'false':'true');}
+				if(viewerStep){viewerStep.hidden=!showViewer;viewerStep.classList.toggle('is-active',showViewer);viewerStep.setAttribute('aria-hidden',showViewer?'false':'true');}
+				if(quantitiesStep){quantitiesStep.hidden=!showQuantities;quantitiesStep.classList.toggle('is-active',showQuantities);quantitiesStep.setAttribute('aria-hidden',showQuantities?'false':'true');}
 			};
 			const openScreenprintChooserModal=()=>{
 				if(!modal){return;}

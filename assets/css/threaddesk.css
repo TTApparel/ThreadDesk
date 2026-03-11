@@ -1438,6 +1438,13 @@ body.threaddesk-modal-open {
 	min-height: 0;
 }
 
+.threaddesk-screenprint__right-column {
+	display: grid;
+	grid-template-rows: minmax(0, 1fr) auto;
+	row-gap: 14px;
+	height: 100%;
+}
+
 .threaddesk-layout-viewer__panel-step:not([hidden]) {
 	display: flex;
 	flex-direction: column;
@@ -1531,6 +1538,10 @@ body.threaddesk-modal-open {
 
 .threaddesk-layout-viewer__add-design-button {
 	margin-top: auto;
+}
+
+.threaddesk-screenprint__right-column > .threaddesk-screenprint__quantities-button {
+	margin-top: 0;
 }
 
 .threaddesk-layout-viewer__placement-list {
@@ -1914,6 +1925,10 @@ body.threaddesk-modal-open {
 		width: 100%;
 		max-height: none;
 		overflow: visible;
+	}
+
+	.threaddesk-screenprint__right-column {
+		height: auto;
 	}
 
 	.threaddesk-layout-viewer__angles {
