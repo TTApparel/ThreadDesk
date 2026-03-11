@@ -2549,7 +2549,7 @@ class TTA_ThreadDesk {
 				const byAngle=(selected.placementsByAngle&&typeof selected.placementsByAngle==='object')?selected.placementsByAngle:{};
 				Object.keys(byAngle).forEach((angleKey)=>{
 					const raw=byAngle[angleKey];
-					const entries=normalizePlacementEntries(raw);
+					const entries=normalizePlacementEntries(raw,angleKey);
 					entries.forEach((entry)=>{
 						if(!entry||typeof entry!=='object'){return;}
 						const designId=Number(entry.designId||0);
@@ -2680,7 +2680,7 @@ class TTA_ThreadDesk {
 				const byAngle=(map&&typeof map==='object')?map:{};
 				Object.keys(byAngle).forEach((angleKey)=>{
 					const raw=byAngle[angleKey];
-					const items=normalizePlacementEntries(raw);
+					const items=normalizePlacementEntries(raw,angleKey);
 					items.forEach((entry)=>{
 						if(!entry||typeof entry!=='object'){return;}
 						const key=String(entry.placementKey||'').trim();
@@ -2886,20 +2886,35 @@ class TTA_ThreadDesk {
 				});
 				probe.src=src;
 			};
-			function normalizePlacementEntries(raw){
+			function normalizePlacementEntries(raw, angleKey){
+				const angle=String(angleKey||'').trim()||'angle';
+				const withFallbackKey=(entry,fallbackKey)=>{
+					if(!entry||typeof entry!=='object'){return null;}
+					const existingKey=String(entry.placementKey||'').trim();
+					if(existingKey){return entry;}
+					const labelKey=String(entry.placementLabel||entry.designName||'').trim();
+					return Object.assign({},entry,{placementKey:labelKey||fallbackKey});
+				};
 				if(Array.isArray(raw)){
-					return raw.map((entry)=>{
-						if(!entry||typeof entry!=='object'){return entry;}
-						if(String(entry.placementKey||'').trim()){return entry;}
-						return Object.assign({},entry,{placementKey:String(entry.placementLabel||'').trim()});
-					});
+					return raw.map((entry,index)=>{
+						if(entry&&typeof entry==='object'){
+							return withFallbackKey(entry,'placement-'+angle+'-'+String(index+1));
+						}
+						const src=String(entry||'').trim();
+						if(!src){return null;}
+						return {placementKey:'placement-'+angle+'-'+String(index+1),url:src,placementLabel:'Placement'};
+					}).filter(Boolean);
 				}
 				if(raw&&typeof raw==='object'){
-					return Object.entries(raw).map(([entryKey,entry])=>{
-						if(!entry||typeof entry!=='object'){return entry;}
-						if(String(entry.placementKey||'').trim()){return entry;}
-						return Object.assign({},entry,{placementKey:String(entryKey||'').trim()});
-					});
+					return Object.entries(raw).map(([entryKey,entry],index)=>{
+						const key=String(entryKey||'').trim()||('placement-'+angle+'-'+String(index+1));
+						if(entry&&typeof entry==='object'){
+							return withFallbackKey(entry,key);
+						}
+						const src=String(entry||'').trim();
+						if(!src){return null;}
+						return {placementKey:key,url:src,placementLabel:'Placement'};
+					}).filter(Boolean);
 				}
 				return [];
 			};
@@ -2910,7 +2925,7 @@ class TTA_ThreadDesk {
 				for(let i=0;i<candidates.length;i++){
 					const key=candidates[i];
 					const raw=map&&Object.prototype.hasOwnProperty.call(map,key)?map[key]:null;
-					const entries=normalizePlacementEntries(raw);
+					const entries=normalizePlacementEntries(raw,key);
 					if(entries.length){return entries;}
 				}
 				return [];
