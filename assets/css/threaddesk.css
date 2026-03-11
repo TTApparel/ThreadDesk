@@ -2337,7 +2337,9 @@ body.threaddesk-modal-open {
 	border-radius: 8px;
 	padding: 10px;
 	display: grid;
-	gap: 6px;
+	grid-template-columns: minmax(0, 1fr) auto auto;
+	align-items: center;
+	gap: 12px;
 }
 
 .threaddesk-screenprint__quantity-details {
@@ -2347,6 +2349,7 @@ body.threaddesk-modal-open {
 .threaddesk-screenprint__quantity-stock {
 	font-size: 12px;
 	color: #4b5563;
+	white-space: nowrap;
 }
 
 .threaddesk-screenprint__quantity-input-wrap {

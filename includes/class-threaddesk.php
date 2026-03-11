@@ -2212,6 +2212,7 @@ class TTA_ThreadDesk {
 				$attributes = isset( $available_variation['attributes'] ) && is_array( $available_variation['attributes'] ) ? $available_variation['attributes'] : array();
 				$size_label = '';
 				$color_label = '';
+				$color_key = '';
 				foreach ( $attributes as $attribute_key => $attribute_value ) {
 					$key = sanitize_key( str_replace( 'attribute_', '', (string) $attribute_key ) );
 					if ( '' === $key ) {
@@ -2231,8 +2232,13 @@ class TTA_ThreadDesk {
 					if ( '' === $size_label && false !== strpos( $key, 'size' ) ) {
 						$size_label = $resolved_label;
 					}
-					if ( '' === $color_label && false !== strpos( $key, 'color' ) ) {
-						$color_label = $resolved_label;
+					if ( false !== strpos( $key, 'color' ) ) {
+						if ( '' === $color_label ) {
+							$color_label = $resolved_label;
+						}
+						if ( '' === $color_key ) {
+							$color_key = sanitize_key( (string) $raw_value );
+						}
 					}
 				}
 
@@ -2242,6 +2248,7 @@ class TTA_ThreadDesk {
 					'variationId' => $variation_id,
 					'size'        => '' !== $size_label ? $size_label : __( 'N/A', 'threaddesk' ),
 					'color'       => '' !== $color_label ? $color_label : __( 'N/A', 'threaddesk' ),
+					'colorKey'    => '' !== $color_key ? $color_key : '',
 					'inventory'   => null !== $stock_quantity ? (int) $stock_quantity : ( $in_stock ? __( 'In stock', 'threaddesk' ) : __( 'Out of stock', 'threaddesk' ) ),
 					'inStock'     => (bool) $in_stock,
 				);
@@ -2647,25 +2654,11 @@ class TTA_ThreadDesk {
 			};
 			const setStep=(step)=>{
 				const showChooser=step==='chooser';
-				const nextStep=showChooser?chooserStep:viewerStep;
-				const prevStep=showChooser?viewerStep:chooserStep;
-				const activeEl=document.activeElement;
-				const focusWasInPrev=!!(prevStep&&activeEl&&prevStep.contains(activeEl));
-				if(nextStep){
-					nextStep.hidden=false;
-					nextStep.classList.add('is-active');
-					nextStep.setAttribute('aria-hidden','false');
-				}
-				if(focusWasInPrev&&nextStep){
-					const focusTarget=nextStep.querySelector('[data-threaddesk-screenprint-back], [data-threaddesk-screenprint-close], [data-threaddesk-screenprint-options] button, [data-threaddesk-screenprint-angle], button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])');
-					if(focusTarget&&typeof focusTarget.focus==='function'){focusTarget.focus({preventScroll:true});}
-					else if(activeEl&&typeof activeEl.blur==='function'){activeEl.blur();}
-				}
-				if(prevStep){
-					prevStep.hidden=true;
-					prevStep.classList.remove('is-active');
-					prevStep.setAttribute('aria-hidden','true');
-				}
+				const showViewer=step==='viewer';
+				const showQuantities=step==='quantities';
+				if(chooserStep){chooserStep.hidden=!showChooser;chooserStep.classList.toggle('is-active',showChooser);chooserStep.setAttribute('aria-hidden',showChooser?'false':'true');}
+				if(viewerStep){viewerStep.hidden=!showViewer;viewerStep.classList.toggle('is-active',showViewer);viewerStep.setAttribute('aria-hidden',showViewer?'false':'true');}
+				if(quantitiesStep){quantitiesStep.hidden=!showQuantities;quantitiesStep.classList.toggle('is-active',showQuantities);quantitiesStep.setAttribute('aria-hidden',showQuantities?'false':'true');}
 			};
 			const openScreenprintChooserModal=()=>{
 				if(!modal){return;}
@@ -2686,17 +2679,23 @@ class TTA_ThreadDesk {
 				const stageHeight=Math.round(stage.getBoundingClientRect().height||0);
 				if(stageHeight>0){viewerStep.style.setProperty('--threaddesk-screenprint-stage-rendered-height',stageHeight+'px');}
 			};
+			const normalizeColorValue=(value)=>String(value||'').trim().toLowerCase().replace(/\s+/g,'-');
 			const renderVariationQuantities=()=>{
 				if(!quantitiesList){return;}
 				quantitiesList.innerHTML='';
-				const rows=Array.isArray(variationRows)?variationRows:[];
+				const rows=(Array.isArray(variationRows)?variationRows:[]).filter((row)=>{
+					const rowColorKey=normalizeColorValue(row&&row.colorKey);
+					const selectedColorKey=normalizeColorValue(selectedColor);
+					if(rowColorKey&&selectedColorKey){return rowColorKey===selectedColorKey;}
+					return normalizeColorValue(row&&row.color)===normalizeColorValue(getSelectedColorLabel());
+				});
 				if(quantitiesEmpty){quantitiesEmpty.hidden=rows.length>0;}
 				rows.forEach((row)=>{
 					const item=document.createElement('div');
 					item.className='threaddesk-screenprint__quantity-item';
 					const details=document.createElement('div');
 					details.className='threaddesk-screenprint__quantity-details';
-					details.textContent=String((row&&row.size)||'N/A')+' / '+String((row&&row.color)||'N/A');
+					details.textContent=String((row&&row.size)||'N/A');
 					const stock=document.createElement('div');
 					stock.className='threaddesk-screenprint__quantity-stock';
 					const inventoryValue=(row&&row.inventory)!==undefined?(row&&row.inventory):'--';
