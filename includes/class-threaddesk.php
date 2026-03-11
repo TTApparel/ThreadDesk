@@ -1250,7 +1250,7 @@ class TTA_ThreadDesk {
 		if ( $layout_id <= 0 ) {
 			$layout_insert_data = array(
 				'post_type'   => 'tta_layout',
-				'post_status' => 'private',
+				'post_status' => ( 0 === (int) $owner_context['user_id'] ) ? 'publish' : 'private',
 				'post_title'  => $layout_title,
 				'post_author' => $current_user_id,
 			);
@@ -2427,7 +2427,7 @@ class TTA_ThreadDesk {
 							<input type="hidden" name="threaddesk_design_return_context" value="" data-threaddesk-design-return-context />
 							<input type="hidden" name="threaddesk_design_return_layout_category" value="" data-threaddesk-design-return-layout-category />
 							<input type="hidden" name="threaddesk_design_return_layout_placement" value="" data-threaddesk-design-return-layout-placement />
-							<input type="hidden" name="threaddesk_design_return_url" value="<?php echo esc_url( add_query_arg( 'td_screenprint_return', '1', $screenprint_return_url ) ); ?>" />
+							<input type="hidden" name="threaddesk_design_return_url" value="<?php echo esc_url( $screenprint_return_url ); ?>" data-threaddesk-design-return-base-url="<?php echo esc_url( $screenprint_return_url ); ?>" />
 							<label class="threaddesk-designer__title-field" for="threaddesk_design_title_screenprint"><?php echo esc_html__( 'Title', 'threaddesk' ); ?></label>
 							<input type="text" id="threaddesk_design_title_screenprint" name="threaddesk_design_title" data-threaddesk-design-title-input maxlength="120" value="" />
 							<div class="threaddesk-designer__design-image" data-threaddesk-design-preview>
@@ -2493,8 +2493,6 @@ class TTA_ThreadDesk {
 			const i18nApproxSizePrefix=<?php echo wp_json_encode( __( 'Approx. size', 'threaddesk' ) ); ?>;
 			const i18nCreateLayout=<?php echo wp_json_encode( __( 'CREATE A LAYOUT', 'threaddesk' ) ); ?>;
 			const i18nCreateLayoutHint=<?php echo wp_json_encode( __( 'Need a new layout? Start in the placements builder.', 'threaddesk' ) ); ?>;
-			const i18nSavedInBrowser=<?php echo wp_json_encode( __( 'Saved in this browser', 'threaddesk' ) ); ?>;
-			const i18nSavedInAccount=<?php echo wp_json_encode( __( 'Saved in your account', 'threaddesk' ) ); ?>;
 			const i18nGuestEmpty=<?php echo wp_json_encode( __( 'No saved layouts in this browser yet.', 'threaddesk' ) ); ?>;
 			const i18nUserEmpty=<?php echo wp_json_encode( __( 'No saved layouts match this product categories yet.', 'threaddesk' ) ); ?>;
 			const createLayoutCategory=String(root.getAttribute('data-threaddesk-screenprint-create-layout-category')||'').trim();
@@ -2551,7 +2549,7 @@ class TTA_ThreadDesk {
 				const byAngle=(selected.placementsByAngle&&typeof selected.placementsByAngle==='object')?selected.placementsByAngle:{};
 				Object.keys(byAngle).forEach((angleKey)=>{
 					const raw=byAngle[angleKey];
-					const entries=Array.isArray(raw)?raw:(raw&&typeof raw==='object'?Object.values(raw):[]);
+					const entries=normalizePlacementEntries(raw,angleKey);
 					entries.forEach((entry)=>{
 						if(!entry||typeof entry!=='object'){return;}
 						const designId=Number(entry.designId||0);
@@ -2631,12 +2629,19 @@ class TTA_ThreadDesk {
 				const label=getSelectedColorLabel();
 				selectedColorLabel.textContent=(i18nSelectedColorPrefix||'Color')+': '+(label||'--');
 			};
+			const getEntrySource=(entry)=>String((entry&&entry.sourceUrl)|| (entry&&entry.designUrl) || (entry&&entry.previewUrl) || (entry&&entry.preview) || (entry&&entry.url) || (entry&&entry.imageUrl) || (entry&&entry.mockupUrl) || (entry&&entry.svgUrl) || '').trim();
 			const setActivePlacement=(placementKey)=>{
 				activePlacementKey=String(placementKey||'').trim();
+				if(!selectedDesignList){
+					if(activePaletteEditor&&activePaletteEditor.placementKey!==activePlacementKey){activePaletteEditor=null;}
+					return;
+				}
+				const items=Array.from(selectedDesignList.querySelectorAll('.threaddesk-screenprint__selected-design-item'));
+				const hasMatch=!!activePlacementKey&&items.some((item)=>String(item.getAttribute('data-threaddesk-screenprint-placement-key')||'').trim()===activePlacementKey);
+				if(!hasMatch){activePlacementKey='';}
 				if(activePaletteEditor&&activePaletteEditor.placementKey!==activePlacementKey){activePaletteEditor=null;}
-				if(!selectedDesignList){return;}
 				selectedDesignList.classList.toggle('has-active-placement',!!activePlacementKey);
-				selectedDesignList.querySelectorAll('.threaddesk-screenprint__selected-design-item').forEach((item)=>{
+				items.forEach((item)=>{
 					const key=String(item.getAttribute('data-threaddesk-screenprint-placement-key')||'').trim();
 					const isActive=!!activePlacementKey&&key===activePlacementKey;
 					item.classList.toggle('is-active',isActive);
@@ -2653,17 +2658,9 @@ class TTA_ThreadDesk {
 				for(let i=0;i<candidates.length;i++){
 					const candidate=candidates[i];
 					const raw=map&&Object.prototype.hasOwnProperty.call(map,candidate)?map[candidate]:null;
-					if(Array.isArray(raw)){
-						for(let j=0;j<raw.length;j++){
-							if(String(raw[j]&&raw[j].placementKey||'').trim()===key){return raw[j];}
-						}
-						continue;
-					}
-					if(raw&&typeof raw==='object'){
-						const values=Object.values(raw);
-						for(let j=0;j<values.length;j++){
-							if(String(values[j]&&values[j].placementKey||'').trim()===key){return values[j];}
-						}
+					const entries=normalizePlacementEntries(raw,candidate);
+					for(let j=0;j<entries.length;j++){
+						if(String(entries[j]&&entries[j].placementKey||'').trim()===key){return entries[j];}
 					}
 				}
 				return null;
@@ -2676,7 +2673,7 @@ class TTA_ThreadDesk {
 				const byAngle=(map&&typeof map==='object')?map:{};
 				Object.keys(byAngle).forEach((angleKey)=>{
 					const raw=byAngle[angleKey];
-					const items=Array.isArray(raw)?raw:(raw&&typeof raw==='object'?Object.values(raw):[]);
+					const items=normalizePlacementEntries(raw,angleKey);
 					items.forEach((entry)=>{
 						if(!entry||typeof entry!=='object'){return;}
 						const key=String(entry.placementKey||'').trim();
@@ -2687,7 +2684,7 @@ class TTA_ThreadDesk {
 				let count=0;
 				order.forEach((placementKey)=>{
 					const entry=grouped[placementKey];
-					const src=String(entry.sourceUrl||entry.designUrl||entry.previewUrl||entry.preview||entry.url||'').trim();
+					const src=getEntrySource(entry);
 					if(!src){return;}
 					const title=String(entry.designName||entry.placementLabel||i18nDesignFallback).trim()||i18nDesignFallback;
 					const placementLabel=String(entry.placementLabel||entry.placementKey||'').trim()||'Placement';
@@ -2882,6 +2879,38 @@ class TTA_ThreadDesk {
 				});
 				probe.src=src;
 			};
+			function normalizePlacementEntries(raw, angleKey){
+				const angle=String(angleKey||'').trim()||'angle';
+				const withFallbackKey=(entry,fallbackKey)=>{
+					if(!entry||typeof entry!=='object'){return null;}
+					const existingKey=String(entry.placementKey||'').trim();
+					if(existingKey){return entry;}
+					const labelKey=String(entry.placementLabel||entry.designName||'').trim();
+					return Object.assign({},entry,{placementKey:labelKey||fallbackKey});
+				};
+				if(Array.isArray(raw)){
+					return raw.map((entry,index)=>{
+						if(entry&&typeof entry==='object'){
+							return withFallbackKey(entry,'placement-'+angle+'-'+String(index+1));
+						}
+						const src=String(entry||'').trim();
+						if(!src){return null;}
+						return {placementKey:'placement-'+angle+'-'+String(index+1),url:src,placementLabel:'Placement'};
+					}).filter(Boolean);
+				}
+				if(raw&&typeof raw==='object'){
+					return Object.entries(raw).map(([entryKey,entry],index)=>{
+						const key=String(entryKey||'').trim()||('placement-'+angle+'-'+String(index+1));
+						if(entry&&typeof entry==='object'){
+							return withFallbackKey(entry,key);
+						}
+						const src=String(entry||'').trim();
+						if(!src){return null;}
+						return {placementKey:key,url:src,placementLabel:'Placement'};
+					}).filter(Boolean);
+				}
+				return [];
+			};
 			const getAngleEntries=(map,targetAngle)=>{
 				const candidates=[targetAngle];
 				if(targetAngle==='left'){candidates.push('side');}
@@ -2889,8 +2918,8 @@ class TTA_ThreadDesk {
 				for(let i=0;i<candidates.length;i++){
 					const key=candidates[i];
 					const raw=map&&Object.prototype.hasOwnProperty.call(map,key)?map[key]:null;
-					if(Array.isArray(raw)){return raw;}
-					if(raw&&typeof raw==='object'){return Object.values(raw);}
+					const entries=normalizePlacementEntries(raw,key);
+					if(entries.length){return entries;}
 				}
 				return [];
 			};
@@ -2902,7 +2931,7 @@ class TTA_ThreadDesk {
 					if(!imageWrap){return;}
 					const entries=getAngleEntries(map,targetAngle);
 					entries.forEach((entry)=>{
-						const src=String(entry.sourceUrl||entry.designUrl||entry.previewUrl||entry.preview||entry.url||'').trim();
+						const src=getEntrySource(entry);
 						if(!src){return;}
 						const img=document.createElement('img');
 						img.className='threaddesk-layout-viewer__angle-overlay';
@@ -2925,7 +2954,7 @@ class TTA_ThreadDesk {
 				main.style.display=main.src?'block':'none';
 				overlayWrap.innerHTML='';
 				entries.forEach((entry)=>{
-					const src=String(entry.sourceUrl||entry.designUrl||entry.previewUrl||entry.preview||entry.url||'').trim();
+					const src=getEntrySource(entry);
 					if(!src){return;}
 					const placementKey=String(entry.placementKey||'').trim();
 					const img=document.createElement('img');
@@ -3058,12 +3087,8 @@ class TTA_ThreadDesk {
 					const status=document.createElement('span');
 					status.className='threaddesk__card-design-status threaddesk__card-design-status--'+String(layout.statusKey||'pending');
 					status.textContent=String(layout.statusLabel||'Pending').toUpperCase();
-					const source=document.createElement('span');
-					source.className='threaddesk-screenprint-option__source';
-					source.textContent=isAuthenticated?i18nSavedInAccount:i18nSavedInBrowser;
 					meta.appendChild(count);
 					meta.appendChild(status);
-					meta.appendChild(source);
 				btn.appendChild(preview);
 				btn.appendChild(titleWrap);
 				btn.appendChild(meta);
