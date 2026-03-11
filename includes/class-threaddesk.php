@@ -2629,6 +2629,7 @@ class TTA_ThreadDesk {
 				const label=getSelectedColorLabel();
 				selectedColorLabel.textContent=(i18nSelectedColorPrefix||'Color')+': '+(label||'--');
 			};
+			const getEntrySource=(entry)=>String((entry&&entry.sourceUrl)|| (entry&&entry.designUrl) || (entry&&entry.previewUrl) || (entry&&entry.preview) || (entry&&entry.url) || (entry&&entry.imageUrl) || (entry&&entry.mockupUrl) || (entry&&entry.svgUrl) || '').trim();
 			const setActivePlacement=(placementKey)=>{
 				activePlacementKey=String(placementKey||'').trim();
 				if(!selectedDesignList){
@@ -2657,17 +2658,9 @@ class TTA_ThreadDesk {
 				for(let i=0;i<candidates.length;i++){
 					const candidate=candidates[i];
 					const raw=map&&Object.prototype.hasOwnProperty.call(map,candidate)?map[candidate]:null;
-					if(Array.isArray(raw)){
-						for(let j=0;j<raw.length;j++){
-							if(String(raw[j]&&raw[j].placementKey||'').trim()===key){return raw[j];}
-						}
-						continue;
-					}
-					if(raw&&typeof raw==='object'){
-						const values=Object.values(raw);
-						for(let j=0;j<values.length;j++){
-							if(String(values[j]&&values[j].placementKey||'').trim()===key){return values[j];}
-						}
+					const entries=normalizePlacementEntries(raw,candidate);
+					for(let j=0;j<entries.length;j++){
+						if(String(entries[j]&&entries[j].placementKey||'').trim()===key){return entries[j];}
 					}
 				}
 				return null;
@@ -2691,7 +2684,7 @@ class TTA_ThreadDesk {
 				let count=0;
 				order.forEach((placementKey)=>{
 					const entry=grouped[placementKey];
-					const src=String(entry.sourceUrl||entry.designUrl||entry.previewUrl||entry.preview||entry.url||'').trim();
+					const src=getEntrySource(entry);
 					if(!src){return;}
 					const title=String(entry.designName||entry.placementLabel||i18nDesignFallback).trim()||i18nDesignFallback;
 					const placementLabel=String(entry.placementLabel||entry.placementKey||'').trim()||'Placement';
@@ -2938,7 +2931,7 @@ class TTA_ThreadDesk {
 					if(!imageWrap){return;}
 					const entries=getAngleEntries(map,targetAngle);
 					entries.forEach((entry)=>{
-						const src=String(entry.sourceUrl||entry.designUrl||entry.previewUrl||entry.preview||entry.url||'').trim();
+						const src=getEntrySource(entry);
 						if(!src){return;}
 						const img=document.createElement('img');
 						img.className='threaddesk-layout-viewer__angle-overlay';
@@ -2961,7 +2954,7 @@ class TTA_ThreadDesk {
 				main.style.display=main.src?'block':'none';
 				overlayWrap.innerHTML='';
 				entries.forEach((entry)=>{
-					const src=String(entry.sourceUrl||entry.designUrl||entry.previewUrl||entry.preview||entry.url||'').trim();
+					const src=getEntrySource(entry);
 					if(!src){return;}
 					const placementKey=String(entry.placementKey||'').trim();
 					const img=document.createElement('img');
