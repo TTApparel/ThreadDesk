@@ -405,6 +405,37 @@ class TTA_ThreadDesk {
 		register_setting( 'tta_threaddesk_settings', 'tta_threaddesk_cover_image_url', array( 'sanitize_callback' => 'esc_url_raw' ) );
 		register_setting( 'tta_threaddesk_settings', 'tta_threaddesk_default_company', array( 'sanitize_callback' => 'sanitize_text_field' ) );
 		register_setting( 'tta_threaddesk_settings', 'tta_threaddesk_layout_categories', array( 'sanitize_callback' => array( $this, 'sanitize_layout_categories' ) ) );
+		register_setting( 'tta_threaddesk_settings', 'tta_threaddesk_print_pricing', array( 'sanitize_callback' => array( $this, 'sanitize_print_pricing_settings' ) ) );
+	}
+
+	private function get_default_print_pricing_settings() {
+		return array(
+			'setup_cost'       => 50,
+			'color_setup_cost' => 30,
+			'repeat_reduction' => 15,
+			'print_cost'       => 1.25,
+			'color_cost'       => 0.10,
+			'garment_cost'     => 50,
+		);
+	}
+
+	public function sanitize_print_pricing_settings( $value ) {
+		$defaults = $this->get_default_print_pricing_settings();
+		if ( ! is_array( $value ) ) {
+			return $defaults;
+		}
+
+		$sanitized = $defaults;
+		foreach ( $defaults as $key => $default_value ) {
+			$raw_value = isset( $value[ $key ] ) ? $value[ $key ] : $default_value;
+			$number = is_numeric( $raw_value ) ? (float) $raw_value : (float) $default_value;
+			if ( $number < 0 ) {
+				$number = 0;
+			}
+			$sanitized[ $key ] = in_array( $key, array( 'setup_cost', 'color_setup_cost', 'repeat_reduction', 'garment_cost' ), true ) ? round( $number, 2 ) : round( $number, 4 );
+		}
+
+		return $sanitized;
 	}
 
 	public function sanitize_layout_categories( $value ) {
@@ -493,6 +524,8 @@ class TTA_ThreadDesk {
 		$cover_image        = get_option( 'tta_threaddesk_cover_image_url', '' );
 		$company            = get_option( 'tta_threaddesk_default_company', '' );
 		$layout_categories  = get_option( 'tta_threaddesk_layout_categories', array() );
+		$print_pricing      = get_option( 'tta_threaddesk_print_pricing', array() );
+		$print_pricing      = wp_parse_args( is_array( $print_pricing ) ? $print_pricing : array(), $this->get_default_print_pricing_settings() );
 		$placement_terms    = taxonomy_exists( 'product_cat' ) ? get_terms(
 			array(
 				'taxonomy'   => 'product_cat',
@@ -541,6 +574,38 @@ class TTA_ThreadDesk {
 						</th>
 						<td>
 							<input type="text" class="regular-text" id="tta_threaddesk_default_company" name="tta_threaddesk_default_company" value="<?php echo esc_attr( $company ); ?>" />
+						</td>
+					</tr>
+					<tr>
+						<th scope="row"><?php echo esc_html__( 'Print Cost Variables', 'threaddesk' ); ?></th>
+						<td>
+							<p class="description"><?php echo esc_html__( 'Used for estimated unit-cost values in the Screenprint quantities step.', 'threaddesk' ); ?></p>
+							<div style="display:grid;grid-template-columns:repeat(2,minmax(220px,1fr));gap:10px;max-width:760px;">
+								<label>
+									<span><?php echo esc_html__( 'Setup Cost', 'threaddesk' ); ?></span><br />
+									<input type="number" min="0" step="0.01" name="tta_threaddesk_print_pricing[setup_cost]" value="<?php echo esc_attr( (string) $print_pricing['setup_cost'] ); ?>" />
+								</label>
+								<label>
+									<span><?php echo esc_html__( 'Color Setup Cost', 'threaddesk' ); ?></span><br />
+									<input type="number" min="0" step="0.01" name="tta_threaddesk_print_pricing[color_setup_cost]" value="<?php echo esc_attr( (string) $print_pricing['color_setup_cost'] ); ?>" />
+								</label>
+								<label>
+									<span><?php echo esc_html__( 'Repeat Reduction', 'threaddesk' ); ?></span><br />
+									<input type="number" min="0" step="0.01" name="tta_threaddesk_print_pricing[repeat_reduction]" value="<?php echo esc_attr( (string) $print_pricing['repeat_reduction'] ); ?>" />
+								</label>
+								<label>
+									<span><?php echo esc_html__( 'Print Cost', 'threaddesk' ); ?></span><br />
+									<input type="number" min="0" step="0.0001" name="tta_threaddesk_print_pricing[print_cost]" value="<?php echo esc_attr( (string) $print_pricing['print_cost'] ); ?>" />
+								</label>
+								<label>
+									<span><?php echo esc_html__( 'Color Cost', 'threaddesk' ); ?></span><br />
+									<input type="number" min="0" step="0.0001" name="tta_threaddesk_print_pricing[color_cost]" value="<?php echo esc_attr( (string) $print_pricing['color_cost'] ); ?>" />
+								</label>
+								<label>
+									<span><?php echo esc_html__( 'Garment Cost (%)', 'threaddesk' ); ?></span><br />
+									<input type="number" min="0" step="0.01" name="tta_threaddesk_print_pricing[garment_cost]" value="<?php echo esc_attr( (string) $print_pricing['garment_cost'] ); ?>" />
+								</label>
+							</div>
 						</td>
 					</tr>
 					<tr>
@@ -2196,6 +2261,64 @@ class TTA_ThreadDesk {
 		}
 
 		$saved_designs = array();
+		$screenprint_variations = array();
+		if ( $product && is_callable( array( $product, 'is_type' ) ) && $product->is_type( 'variable' ) ) {
+			$available_variations = is_callable( array( $product, 'get_available_variations' ) ) ? $product->get_available_variations() : array();
+			foreach ( $available_variations as $available_variation ) {
+				$variation_id = isset( $available_variation['variation_id'] ) ? absint( $available_variation['variation_id'] ) : 0;
+				if ( $variation_id <= 0 ) {
+					continue;
+				}
+				$variation_product = function_exists( 'wc_get_product' ) ? wc_get_product( $variation_id ) : false;
+				if ( ! $variation_product ) {
+					continue;
+				}
+
+				$attributes = isset( $available_variation['attributes'] ) && is_array( $available_variation['attributes'] ) ? $available_variation['attributes'] : array();
+				$size_label = '';
+				$color_label = '';
+				$color_key = '';
+				foreach ( $attributes as $attribute_key => $attribute_value ) {
+					$key = sanitize_key( str_replace( 'attribute_', '', (string) $attribute_key ) );
+					if ( '' === $key ) {
+						continue;
+					}
+					$raw_value = sanitize_text_field( (string) $attribute_value );
+					if ( '' === $raw_value ) {
+						continue;
+					}
+					$resolved_label = $raw_value;
+					if ( 0 === strpos( $key, 'pa_' ) ) {
+						$term = get_term_by( 'slug', $raw_value, $key );
+						if ( $term && ! is_wp_error( $term ) && ! empty( $term->name ) ) {
+							$resolved_label = (string) $term->name;
+						}
+					}
+					if ( '' === $size_label && false !== strpos( $key, 'size' ) ) {
+						$size_label = $resolved_label;
+					}
+					if ( false !== strpos( $key, 'color' ) ) {
+						if ( '' === $color_label ) {
+							$color_label = $resolved_label;
+						}
+						if ( '' === $color_key ) {
+							$color_key = sanitize_key( (string) $raw_value );
+						}
+					}
+				}
+
+				$stock_quantity = $variation_product->managing_stock() ? $variation_product->get_stock_quantity() : null;
+				$in_stock = $variation_product->is_in_stock();
+				$screenprint_variations[] = array(
+					'variationId' => $variation_id,
+					'size'        => '' !== $size_label ? $size_label : __( 'N/A', 'threaddesk' ),
+					'color'       => '' !== $color_label ? $color_label : __( 'N/A', 'threaddesk' ),
+					'colorKey'    => '' !== $color_key ? $color_key : '',
+					'inventory'   => null !== $stock_quantity ? (int) $stock_quantity : ( $in_stock ? __( 'In stock', 'threaddesk' ) : __( 'Out of stock', 'threaddesk' ) ),
+					'inStock'     => (bool) $in_stock,
+				);
+			}
+		}
 		$design_query_args = array(
 			'post_type'      => 'tta_design',
 			'posts_per_page' => 100,
@@ -2238,10 +2361,12 @@ class TTA_ThreadDesk {
 
 		wp_enqueue_style( 'threaddesk', THREDDESK_URL . 'assets/css/threaddesk.css', array(), THREDDESK_VERSION );
 		wp_enqueue_script( 'threaddesk', THREDDESK_URL . 'assets/js/threaddesk.js', array( 'jquery' ), THREDDESK_VERSION, true );
+		$print_pricing_settings = get_option( 'tta_threaddesk_print_pricing', array() );
+		$print_pricing_settings = wp_parse_args( is_array( $print_pricing_settings ) ? $print_pricing_settings : array(), $this->get_default_print_pricing_settings() );
 
 		ob_start();
 		?>
-		<div class="threaddesk-screenprint" id="<?php echo esc_attr( $instance_id ); ?>" data-threaddesk-screenprint-layouts="<?php echo esc_attr( wp_json_encode( $layout_items ) ); ?>" data-threaddesk-screenprint-images-by-color="<?php echo esc_attr( wp_json_encode( $screenprint_images_by_color ) ); ?>" data-threaddesk-screenprint-initial-color="<?php echo esc_attr( $initial_color_key ); ?>" data-threaddesk-screenprint-create-layout-category="<?php echo esc_attr( $default_category_slug ); ?>" data-threaddesk-screenprint-create-layout-category-id="<?php echo esc_attr( (string) $default_category_id ); ?>" data-threaddesk-screenprint-open-chooser="<?php echo $screenprint_open_chooser ? '1' : '0'; ?>" data-threaddesk-screenprint-authenticated="<?php echo $is_authenticated ? '1' : '0'; ?>">
+		<div class="threaddesk-screenprint" id="<?php echo esc_attr( $instance_id ); ?>" data-threaddesk-screenprint-layouts="<?php echo esc_attr( wp_json_encode( $layout_items ) ); ?>" data-threaddesk-screenprint-images-by-color="<?php echo esc_attr( wp_json_encode( $screenprint_images_by_color ) ); ?>" data-threaddesk-screenprint-initial-color="<?php echo esc_attr( $initial_color_key ); ?>" data-threaddesk-screenprint-create-layout-category="<?php echo esc_attr( $default_category_slug ); ?>" data-threaddesk-screenprint-create-layout-category-id="<?php echo esc_attr( (string) $default_category_id ); ?>" data-threaddesk-screenprint-open-chooser="<?php echo $screenprint_open_chooser ? '1' : '0'; ?>" data-threaddesk-screenprint-authenticated="<?php echo $is_authenticated ? '1' : '0'; ?>" data-threaddesk-screenprint-variations="<?php echo esc_attr( wp_json_encode( $screenprint_variations ) ); ?>" data-threaddesk-screenprint-pricing="<?php echo esc_attr( wp_json_encode( $print_pricing_settings ) ); ?>">
 			<div class="threaddesk-screenprint__color-picker" data-threaddesk-screenprint-color-picker style="display:flex;flex-wrap:wrap;gap:10px;align-items:stretch;justify-content:center;">
 				<?php foreach ( $screenprint_color_choices as $choice_index => $choice ) : ?>
 					<button type="button" class="threaddesk-screenprint__open-color" data-threaddesk-screenprint-open-color="<?php echo esc_attr( $choice['key'] ); ?>" aria-label="<?php echo esc_attr( $choice['label'] ); ?>" style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:8px 0;width:70px;border:1px solid #dcdcde;background:#fff;border-radius:4px;cursor:pointer;position:relative;overflow:visible;<?php echo 0 === (int) $choice_index ? 'box-shadow:0 0 0 1px #2271b1;' : ''; ?>">
@@ -2299,16 +2424,25 @@ class TTA_ThreadDesk {
 								</button>
 							</div>
 						</div>
-						<div class="threaddesk-layout-viewer__design-panel">
-							<button type="button" class="threaddesk-layout-viewer__back-button" data-threaddesk-screenprint-back><?php echo esc_html__( 'Back to Saved Layouts', 'threaddesk' ); ?></button>
-							<h4><?php echo esc_html__( 'Applied Layout', 'threaddesk' ); ?></h4>
-							<p data-threaddesk-screenprint-selected><?php echo esc_html__( 'No layout selected yet.', 'threaddesk' ); ?></p>
-							<p class="threaddesk-screenprint__selected-color" data-threaddesk-screenprint-selected-color><?php echo esc_html__( 'Color: --', 'threaddesk' ); ?></p>
-							<div class="threaddesk-screenprint__selected-designs">
-								<div class="threaddesk-layout-viewer__design-list threaddesk-screenprint__selected-design-list" data-threaddesk-screenprint-selected-design-list></div>
-								<p class="threaddesk-layout-viewer__placement-empty" data-threaddesk-screenprint-selected-design-empty><?php echo esc_html__( 'No designs on this view yet.', 'threaddesk' ); ?></p>
+						<div class="threaddesk-screenprint__right-column">
+							<div class="threaddesk-layout-viewer__design-panel">
+								<button type="button" class="threaddesk-layout-viewer__back-button" data-threaddesk-screenprint-back><?php echo esc_html__( 'Back to Saved Layouts', 'threaddesk' ); ?></button>
+								<h4><?php echo esc_html__( 'Applied Layout', 'threaddesk' ); ?></h4>
+								<p data-threaddesk-screenprint-selected><?php echo esc_html__( 'No layout selected yet.', 'threaddesk' ); ?></p>
+								<p class="threaddesk-screenprint__selected-color" data-threaddesk-screenprint-selected-color><?php echo esc_html__( 'Color: --', 'threaddesk' ); ?></p>
+								<div class="threaddesk-screenprint__selected-designs">
+									<div class="threaddesk-layout-viewer__design-list threaddesk-screenprint__selected-design-list" data-threaddesk-screenprint-selected-design-list></div>
+									<p class="threaddesk-layout-viewer__placement-empty" data-threaddesk-screenprint-selected-design-empty><?php echo esc_html__( 'No designs on this view yet.', 'threaddesk' ); ?></p>
+								</div>
 							</div>
+							<button type="button" class="threaddesk-screenprint__quantities-button" data-threaddesk-screenprint-open-quantities><?php echo esc_html__( 'ADD QUANTITIES', 'threaddesk' ); ?></button>
 						</div>
+					</div>
+					<div class="threaddesk-layout-modal__content threaddesk-screenprint__quantities-step" data-threaddesk-screenprint-step="quantities" aria-hidden="true" hidden>
+						<h4><?php echo esc_html__( 'Add quantities', 'threaddesk' ); ?></h4>
+						<div class="threaddesk-screenprint__quantities-list" data-threaddesk-screenprint-quantities-list></div>
+						<p class="threaddesk-layout-viewer__placement-empty" data-threaddesk-screenprint-quantities-empty hidden><?php echo esc_html__( 'No size/color variations are available for this product.', 'threaddesk' ); ?></p>
+						<button type="button" class="threaddesk-layout-viewer__back-button" data-threaddesk-screenprint-back-to-viewer><?php echo esc_html__( '← Back to applied layout', 'threaddesk' ); ?></button>
 					</div>
 				</div>
 			</div>
@@ -2484,6 +2618,12 @@ class TTA_ThreadDesk {
 			try{imageMap=JSON.parse(root.getAttribute('data-threaddesk-screenprint-images-by-color')||'{}');}
 			catch(e){console.error('[ThreadDesk screenprint init]',e);imageMap={};}
 			const initialColorKey=String(root.getAttribute('data-threaddesk-screenprint-initial-color')||'').trim();
+			let variationRows=[];
+			try{variationRows=JSON.parse(root.getAttribute('data-threaddesk-screenprint-variations')||'[]');}
+			catch(e){console.error('[ThreadDesk screenprint variations]',e);variationRows=[];}
+			let pricingSettings={};
+			try{pricingSettings=JSON.parse(root.getAttribute('data-threaddesk-screenprint-pricing')||'{}');}
+			catch(e){console.error('[ThreadDesk screenprint pricing]',e);pricingSettings={};}
 			const i18nNoPreview=<?php echo wp_json_encode( __( 'No placement preview', 'threaddesk' ) ); ?>;
 			const i18nPrintCountLabel=<?php echo wp_json_encode( __( 'Print count', 'threaddesk' ) ); ?>;
 			const i18nSelectedPrefix=<?php echo wp_json_encode( __( 'LAYOUT', 'threaddesk' ) ); ?>;
@@ -2495,6 +2635,9 @@ class TTA_ThreadDesk {
 			const i18nCreateLayoutHint=<?php echo wp_json_encode( __( 'Need a new layout? Start in the placements builder.', 'threaddesk' ) ); ?>;
 			const i18nGuestEmpty=<?php echo wp_json_encode( __( 'No saved layouts in this browser yet.', 'threaddesk' ) ); ?>;
 			const i18nUserEmpty=<?php echo wp_json_encode( __( 'No saved layouts match this product categories yet.', 'threaddesk' ) ); ?>;
+			const i18nInventoryLabel=<?php echo wp_json_encode( __( 'Inventory', 'threaddesk' ) ); ?>;
+			const i18nQuantityLabel=<?php echo wp_json_encode( __( 'Quantity', 'threaddesk' ) ); ?>;
+			const i18nEstimatedUnitCostLabel=<?php echo wp_json_encode( __( 'Est. Cost/Unit', 'threaddesk' ) ); ?>;
 			const createLayoutCategory=String(root.getAttribute('data-threaddesk-screenprint-create-layout-category')||'').trim();
 			const createLayoutCategoryId=Number(root.getAttribute('data-threaddesk-screenprint-create-layout-category-id')||0);
 			const shouldOpenChooser=String(root.getAttribute('data-threaddesk-screenprint-open-chooser')||'0').trim()==='1';
@@ -2508,17 +2651,21 @@ class TTA_ThreadDesk {
 			const emptyState=root.querySelector('[data-threaddesk-screenprint-empty]');
 			const chooserStep=root.querySelector('[data-threaddesk-screenprint-step="chooser"]');
 			const viewerStep=root.querySelector('[data-threaddesk-screenprint-step="viewer"]');
+			const quantitiesStep=root.querySelector('[data-threaddesk-screenprint-step="quantities"]');
 			const selectedLabel=root.querySelector('[data-threaddesk-screenprint-selected]');
 			const selectedColorLabels=root.querySelectorAll('[data-threaddesk-screenprint-selected-color]');
 			const selectedColorLabel=selectedColorLabels.length?selectedColorLabels[0]:null;
 			if(selectedColorLabels.length>1){for(let i=1;i<selectedColorLabels.length;i++){selectedColorLabels[i].remove();}}
 			const selectedDesignList=root.querySelector('[data-threaddesk-screenprint-selected-design-list]');
+			const openQuantitiesButton=root.querySelector('[data-threaddesk-screenprint-open-quantities]');
+			const quantitiesList=root.querySelector('[data-threaddesk-screenprint-quantities-list]');
+			const quantitiesEmpty=root.querySelector('[data-threaddesk-screenprint-quantities-empty]');
 			const selectedDesignEmpty=root.querySelector('[data-threaddesk-screenprint-selected-design-empty]');
 			const main=root.querySelector('[data-threaddesk-screenprint-main]');
 			const overlayWrap=root.querySelector('[data-threaddesk-screenprint-overlay]');
 			const stage=root.querySelector('[data-threaddesk-screenprint-stage]');
 			const angleThumbs=root.querySelectorAll('[data-threaddesk-screenprint-angle-image]');
-				if(!colorPicker||!options||!chooserStep||!viewerStep){return;}
+				if(!colorPicker||!options||!chooserStep||!viewerStep||!quantitiesStep){return;}
 			let selected=null; let angle='front'; let selectedColor=initialColorKey; let stageRatioLocked=false; let colorsExpanded=false; let activePlacementKey=''; let activePaletteEditor=null; let dragState=null;
 			if(!selectedColor||!imageMap[selectedColor]){const keys=Object.keys(imageMap||{}); selectedColor=keys.length?keys[0]:'';}
 			let images=(imageMap&&imageMap[selectedColor])?imageMap[selectedColor]:{};
@@ -2578,8 +2725,11 @@ class TTA_ThreadDesk {
 			};
 			const setStep=(step)=>{
 				const showChooser=step==='chooser';
+				const showViewer=step==='viewer';
+				const showQuantities=step==='quantities';
 				if(chooserStep){chooserStep.hidden=!showChooser;chooserStep.classList.toggle('is-active',showChooser);chooserStep.setAttribute('aria-hidden',showChooser?'false':'true');}
-				if(viewerStep){viewerStep.hidden=showChooser;viewerStep.classList.toggle('is-active',!showChooser);viewerStep.setAttribute('aria-hidden',showChooser?'true':'false');}
+				if(viewerStep){viewerStep.hidden=!showViewer;viewerStep.classList.toggle('is-active',showViewer);viewerStep.setAttribute('aria-hidden',showViewer?'false':'true');}
+				if(quantitiesStep){quantitiesStep.hidden=!showQuantities;quantitiesStep.classList.toggle('is-active',showQuantities);quantitiesStep.setAttribute('aria-hidden',showQuantities?'false':'true');}
 			};
 			const openScreenprintChooserModal=()=>{
 				if(!modal){return;}
@@ -2599,6 +2749,90 @@ class TTA_ThreadDesk {
 				if(!viewerStep||viewerStep.hidden||!stage){return;}
 				const stageHeight=Math.round(stage.getBoundingClientRect().height||0);
 				if(stageHeight>0){viewerStep.style.setProperty('--threaddesk-screenprint-stage-rendered-height',stageHeight+'px');}
+			};
+			const normalizeColorValue=(value)=>String(value||'').trim().toLowerCase().replace(/\s+/g,'-');
+			const defaultPricing={setup_cost:50,color_setup_cost:30,repeat_reduction:15,print_cost:1.25,color_cost:0.10,garment_cost:50};
+			const getPricingNumber=(key)=>{
+				const fallback=Object.prototype.hasOwnProperty.call(defaultPricing,key)?defaultPricing[key]:0;
+				const raw=Object.prototype.hasOwnProperty.call(pricingSettings,key)?pricingSettings[key]:fallback;
+				const value=Number(raw);
+				return Number.isFinite(value)&&value>=0?value:fallback;
+			};
+			const getSelectedDesignColorCount=()=>{
+				if(!selected||!selected.placementsByAngle||typeof selected.placementsByAngle!=='object'){return 1;}
+				let maxColorCount=0;
+				Object.keys(selected.placementsByAngle).forEach((angleKey)=>{
+					const entries=normalizePlacementEntries(selected.placementsByAngle[angleKey],angleKey);
+					entries.forEach((entry)=>{
+						const paletteCurrent=Array.isArray(entry&&entry.paletteCurrent)?entry.paletteCurrent:[];
+						const paletteOriginal=Array.isArray(entry&&entry.paletteOriginal)?entry.paletteOriginal:[];
+						const palette=(paletteCurrent.length?paletteCurrent:paletteOriginal).filter((color)=>String(color||'').trim()!==''&&String(color||'').trim().toLowerCase()!=='transparent');
+						if(palette.length>maxColorCount){maxColorCount=palette.length;}
+					});
+				});
+				return maxColorCount>0?maxColorCount:1;
+			};
+			const formatCurrency=(value)=>'$'+String(Number(value).toFixed(2));
+			const calculateEstimatedUnitCost=(quantity,colorCount)=>{
+				const qty=Number(quantity);
+				if(!Number.isFinite(qty)||qty<=0){return null;}
+				const count=Math.max(1,Number(colorCount)||1);
+				const setup=getPricingNumber('setup_cost');
+				const colorSetup=getPricingNumber('color_setup_cost');
+				const printCost=getPricingNumber('print_cost');
+				const colorCost=getPricingNumber('color_cost');
+				return ((setup+(colorSetup*count))/qty)+(colorCost*count)+printCost;
+			};
+			const renderVariationQuantities=()=>{
+				if(!quantitiesList){return;}
+				quantitiesList.innerHTML='';
+				const selectedColorCount=getSelectedDesignColorCount();
+				const rows=(Array.isArray(variationRows)?variationRows:[]).filter((row)=>{
+					const rowColorKey=normalizeColorValue(row&&row.colorKey);
+					const selectedColorKey=normalizeColorValue(selectedColor);
+					if(rowColorKey&&selectedColorKey){return rowColorKey===selectedColorKey;}
+					return normalizeColorValue(row&&row.color)===normalizeColorValue(getSelectedColorLabel());
+				});
+				if(quantitiesEmpty){quantitiesEmpty.hidden=rows.length>0;}
+				rows.forEach((row)=>{
+					const item=document.createElement('div');
+					item.className='threaddesk-screenprint__quantity-item';
+					const details=document.createElement('div');
+					details.className='threaddesk-screenprint__quantity-details';
+					details.textContent=String((row&&row.size)||'N/A');
+					const stock=document.createElement('div');
+					stock.className='threaddesk-screenprint__quantity-stock';
+					const inventoryValue=(row&&row.inventory)!==undefined?(row&&row.inventory):'--';
+					stock.textContent=i18nInventoryLabel+': '+String(inventoryValue);
+					const inputWrap=document.createElement('label');
+					inputWrap.className='threaddesk-screenprint__quantity-input-wrap';
+					inputWrap.textContent=i18nQuantityLabel;
+					const input=document.createElement('input');
+					input.type='number';
+					input.min='0';
+					input.step='1';
+					input.value='0';
+					input.className='threaddesk-screenprint__quantity-input';
+					const variationId=String((row&&row.variationId)||0);
+					input.setAttribute('data-threaddesk-screenprint-variation-id',variationId);
+					input.name='threaddesk_variation_quantity_'+variationId;
+					input.id='threaddesk-screenprint-quantity-'+variationId;
+					inputWrap.setAttribute('for',input.id);
+					const estimate=document.createElement('div');
+					estimate.className='threaddesk-screenprint__quantity-estimate';
+					const updateEstimate=()=>{
+						const unitCost=calculateEstimatedUnitCost(input.value,selectedColorCount);
+						estimate.textContent=(i18nEstimatedUnitCostLabel||'Est. Cost/Unit')+': '+(null===unitCost?'--':formatCurrency(unitCost));
+					};
+					input.addEventListener('input',updateEstimate);
+					updateEstimate();
+					inputWrap.appendChild(input);
+					item.appendChild(details);
+					item.appendChild(stock);
+					item.appendChild(inputWrap);
+					item.appendChild(estimate);
+					quantitiesList.appendChild(item);
+				});
 			};
 			const getSideLabel=()=>String((images&&images.sideLabel)||'left').toLowerCase()==='right'?'right':'left';
 			const getAngleTransform=(targetAngle)=>{
@@ -2867,6 +3101,23 @@ class TTA_ThreadDesk {
 			});
 			root.querySelectorAll('[data-threaddesk-screenprint-back]').forEach((el)=>{
 				el.addEventListener('click',()=>{setStep('chooser');});
+			});
+			if(openQuantitiesButton){
+				openQuantitiesButton.addEventListener('click',(event)=>{
+					event.preventDefault();
+					renderVariationQuantities();
+					setStep('quantities');
+				});
+			}
+			root.addEventListener('click',(event)=>{
+				const trigger=event.target&&event.target.closest?event.target.closest('[data-threaddesk-screenprint-open-quantities]'):null;
+				if(!trigger){return;}
+				event.preventDefault();
+				renderVariationQuantities();
+				setStep('quantities');
+			});
+			root.querySelectorAll('[data-threaddesk-screenprint-back-to-viewer]').forEach((el)=>{
+				el.addEventListener('click',()=>{setStep('viewer');});
 			});
 			console.debug('[ThreadDesk] screenprint listeners bound');
 			const lockStageRatio=(src)=>{
