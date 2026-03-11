@@ -2519,7 +2519,7 @@ class TTA_ThreadDesk {
 			const stage=root.querySelector('[data-threaddesk-screenprint-stage]');
 			const angleThumbs=root.querySelectorAll('[data-threaddesk-screenprint-angle-image]');
 				if(!colorPicker||!options||!chooserStep||!viewerStep){return;}
-			let selected=null; let angle='front'; let selectedColor=initialColorKey; let stageRatioLocked=false; let colorsExpanded=false; let activePlacementKey=''; let dragState=null;
+			let selected=null; let angle='front'; let selectedColor=initialColorKey; let stageRatioLocked=false; let colorsExpanded=false; let activePlacementKey=''; let activePaletteEditor=null; let dragState=null;
 			if(!selectedColor||!imageMap[selectedColor]){const keys=Object.keys(imageMap||{}); selectedColor=keys.length?keys[0]:'';}
 			let images=(imageMap&&imageMap[selectedColor])?imageMap[selectedColor]:{};
 			const cartForm=(root.closest('form.cart'))||(root.closest('.product')?root.closest('.product').querySelector('form.cart'):null)||document.querySelector('form.cart');
