@@ -2631,10 +2631,16 @@ class TTA_ThreadDesk {
 			};
 			const setActivePlacement=(placementKey)=>{
 				activePlacementKey=String(placementKey||'').trim();
+				if(!selectedDesignList){
+					if(activePaletteEditor&&activePaletteEditor.placementKey!==activePlacementKey){activePaletteEditor=null;}
+					return;
+				}
+				const items=Array.from(selectedDesignList.querySelectorAll('.threaddesk-screenprint__selected-design-item'));
+				const hasMatch=!!activePlacementKey&&items.some((item)=>String(item.getAttribute('data-threaddesk-screenprint-placement-key')||'').trim()===activePlacementKey);
+				if(!hasMatch){activePlacementKey='';}
 				if(activePaletteEditor&&activePaletteEditor.placementKey!==activePlacementKey){activePaletteEditor=null;}
-				if(!selectedDesignList){return;}
 				selectedDesignList.classList.toggle('has-active-placement',!!activePlacementKey);
-				selectedDesignList.querySelectorAll('.threaddesk-screenprint__selected-design-item').forEach((item)=>{
+				items.forEach((item)=>{
 					const key=String(item.getAttribute('data-threaddesk-screenprint-placement-key')||'').trim();
 					const isActive=!!activePlacementKey&&key===activePlacementKey;
 					item.classList.toggle('is-active',isActive);
