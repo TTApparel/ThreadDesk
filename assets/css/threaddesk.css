@@ -1505,9 +1505,10 @@ body.threaddesk-modal-open {
 	outline: none;
 }
 
-.threaddesk-layout-viewer__add-design-button {
+.threaddesk-layout-viewer__add-design-button,
+.threaddesk-screenprint__quantities-button {
 	width: 100%;
-	margin-top: auto;
+	margin-top: 12px;
 	padding: 10px;
 	border: 1px solid #111;
 	background: #111;
@@ -1519,12 +1520,18 @@ body.threaddesk-modal-open {
 }
 
 .threaddesk-layout-viewer__add-design-button:hover,
-.threaddesk-layout-viewer__add-design-button:focus-visible {
+.threaddesk-layout-viewer__add-design-button:focus-visible,
+.threaddesk-screenprint__quantities-button:hover,
+.threaddesk-screenprint__quantities-button:focus-visible {
 	background: #2d2d2d;
 	outline: none;
 }
 
 
+
+.threaddesk-layout-viewer__add-design-button {
+	margin-top: auto;
+}
 
 .threaddesk-layout-viewer__placement-list {
 	display: grid;
@@ -2308,19 +2315,6 @@ body.threaddesk-modal-open {
 .threaddesk-screenprint__selected-design-item.is-active .threaddesk-screenprint__active-size-reading {
 	display: block;
 	margin: 6px 0 0;
-}
-
-.threaddesk-screenprint__quantities-button {
-	margin-top: 12px;
-	width: 100%;
-	background: #111;
-	color: #fff;
-	border: 1px solid #111;
-	border-radius: 6px;
-	padding: 10px 14px;
-	font-weight: 700;
-	letter-spacing: .04em;
-	cursor: pointer;
 }
 
 .threaddesk-screenprint__quantities-list {
