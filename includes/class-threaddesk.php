@@ -1250,7 +1250,7 @@ class TTA_ThreadDesk {
 		if ( $layout_id <= 0 ) {
 			$layout_insert_data = array(
 				'post_type'   => 'tta_layout',
-				'post_status' => 'private',
+				'post_status' => ( 0 === (int) $owner_context['user_id'] ) ? 'publish' : 'private',
 				'post_title'  => $layout_title,
 				'post_author' => $current_user_id,
 			);
