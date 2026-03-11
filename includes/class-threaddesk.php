@@ -2813,13 +2813,11 @@ class TTA_ThreadDesk {
 					placement.textContent=placementLabel;
 					const adjustPalette=document.createElement('div');
 					adjustPalette.className='threaddesk-layout-viewer__adjust-palette threaddesk-screenprint__active-adjust-palette';
-					adjustPalette.setAttribute('aria-hidden','true');
 					const paletteCurrent=Array.isArray(entry.paletteCurrent)?entry.paletteCurrent:[];
 					const paletteBase=Array.isArray(entry.paletteBase)?entry.paletteBase:[];
 					const placementKeyValue=String(entry.placementKey||'').trim();
 					const adjustPaletteOptions=document.createElement('div');
 					adjustPaletteOptions.className='threaddesk-layout-viewer__adjust-palette-options threaddesk-screenprint__active-adjust-palette-options';
-					adjustPaletteOptions.setAttribute('aria-hidden','true');
 					paletteCurrent.forEach((rawColor,colorIndex)=>{
 						const color=String(rawColor||'').trim();
 						if(!color){return;}
