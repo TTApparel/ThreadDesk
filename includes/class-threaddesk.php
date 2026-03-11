@@ -2549,7 +2549,7 @@ class TTA_ThreadDesk {
 				const byAngle=(selected.placementsByAngle&&typeof selected.placementsByAngle==='object')?selected.placementsByAngle:{};
 				Object.keys(byAngle).forEach((angleKey)=>{
 					const raw=byAngle[angleKey];
-					const entries=Array.isArray(raw)?raw:(raw&&typeof raw==='object'?Object.values(raw):[]);
+					const entries=normalizePlacementEntries(raw);
 					entries.forEach((entry)=>{
 						if(!entry||typeof entry!=='object'){return;}
 						const designId=Number(entry.designId||0);
@@ -2674,7 +2674,7 @@ class TTA_ThreadDesk {
 				const byAngle=(map&&typeof map==='object')?map:{};
 				Object.keys(byAngle).forEach((angleKey)=>{
 					const raw=byAngle[angleKey];
-					const items=Array.isArray(raw)?raw:(raw&&typeof raw==='object'?Object.values(raw):[]);
+					const items=normalizePlacementEntries(raw);
 					items.forEach((entry)=>{
 						if(!entry||typeof entry!=='object'){return;}
 						const key=String(entry.placementKey||'').trim();
@@ -2880,6 +2880,23 @@ class TTA_ThreadDesk {
 				});
 				probe.src=src;
 			};
+			function normalizePlacementEntries(raw){
+				if(Array.isArray(raw)){
+					return raw.map((entry)=>{
+						if(!entry||typeof entry!=='object'){return entry;}
+						if(String(entry.placementKey||'').trim()){return entry;}
+						return Object.assign({},entry,{placementKey:String(entry.placementLabel||'').trim()});
+					});
+				}
+				if(raw&&typeof raw==='object'){
+					return Object.entries(raw).map(([entryKey,entry])=>{
+						if(!entry||typeof entry!=='object'){return entry;}
+						if(String(entry.placementKey||'').trim()){return entry;}
+						return Object.assign({},entry,{placementKey:String(entryKey||'').trim()});
+					});
+				}
+				return [];
+			};
 			const getAngleEntries=(map,targetAngle)=>{
 				const candidates=[targetAngle];
 				if(targetAngle==='left'){candidates.push('side');}
@@ -2887,8 +2904,8 @@ class TTA_ThreadDesk {
 				for(let i=0;i<candidates.length;i++){
 					const key=candidates[i];
 					const raw=map&&Object.prototype.hasOwnProperty.call(map,key)?map[key]:null;
-					if(Array.isArray(raw)){return raw;}
-					if(raw&&typeof raw==='object'){return Object.values(raw);}
+					const entries=normalizePlacementEntries(raw);
+					if(entries.length){return entries;}
 				}
 				return [];
 			};
