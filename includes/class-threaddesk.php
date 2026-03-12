@@ -3013,6 +3013,8 @@ class TTA_ThreadDesk {
 					input.step='1';
 					input.value='0';
 					input.className='threaddesk-screenprint__quantity-input';
+					const stockLimit=Number(inventoryValue);
+					if(Number.isFinite(stockLimit)&&stockLimit>=0){input.max=String(Math.floor(stockLimit));}
 					const variationId=String((row&&row.variationId)||0);
 					input.setAttribute('data-threaddesk-screenprint-variation-id',variationId);
 					input.name='threaddesk_variation_quantity_'+variationId;
@@ -3021,7 +3023,12 @@ class TTA_ThreadDesk {
 					const estimate=document.createElement('div');
 					estimate.className='threaddesk-screenprint__quantity-estimate';
 					estimateRows.push({row,estimate});
-					input.addEventListener('input',refreshAllEstimates);
+					input.addEventListener('input',()=>{
+						const limit=Number(input.max);
+						const value=Number(input.value);
+						if(Number.isFinite(limit)&&Number.isFinite(value)&&value>limit){input.value=String(limit);}
+						refreshAllEstimates();
+					});
 					inputWrap.appendChild(input);
 					item.appendChild(details);
 					item.appendChild(stock);
