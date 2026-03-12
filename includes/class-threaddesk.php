@@ -2972,11 +2972,11 @@ class TTA_ThreadDesk {
 			const i18nAddToQuoteSuccess=<?php echo wp_json_encode( __( 'Quote added successfully.', 'threaddesk' ) ); ?>;
 			const i18nAddToQuoteError=<?php echo wp_json_encode( __( 'Unable to add quote right now.', 'threaddesk' ) ); ?>;
 			const i18nAddToQuoteRequiresQty=<?php echo wp_json_encode( __( 'Please add at least one quantity before creating a quote.', 'threaddesk' ) ); ?>;
-			const i18nQuoteTitlePrompt=<?php echo wp_json_encode( __( 'Enter a title for this quote', 'threaddesk' ) ); ?>;
+			const i18nQuoteTitlePrompt=<?php echo wp_json_encode( __( 'Name your Quote', 'threaddesk' ) ); ?>;
 			const i18nQuoteTitleRequired=<?php echo wp_json_encode( __( 'A quote title is required.', 'threaddesk' ) ); ?>;
 			const i18nQuoteSavedContinue=<?php echo wp_json_encode( __( 'Quote saved. Continue adding articles to this quote?', 'threaddesk' ) ); ?>;
-			const i18nKeepShopping=<?php echo wp_json_encode( __( 'KEEP SHOPPING', 'threaddesk' ) ); ?>;
-			const i18nContinueHere=<?php echo wp_json_encode( __( 'Continue here', 'threaddesk' ) ); ?>;
+			const i18nKeepShopping=<?php echo wp_json_encode( __( 'ADD MORE TO QUOTE', 'threaddesk' ) ); ?>;
+			const i18nContinueHere=<?php echo wp_json_encode( __( 'SUBMIT QUOTE', 'threaddesk' ) ); ?>;
 			const screenprintQuoteAjaxUrl=<?php echo wp_json_encode( admin_url( 'admin-ajax.php' ) ); ?>;
 			const screenprintQuoteNonce=<?php echo wp_json_encode( wp_create_nonce( 'tta_threaddesk_screenprint_quote' ) ); ?>;
 			const screenprintProductId=<?php echo (int) $product_id; ?>;
@@ -3410,39 +3410,71 @@ class TTA_ThreadDesk {
 				});
 				return rows;
 			};
-			const requestQuoteTitle=()=>{
-				const entered=window.prompt(i18nQuoteTitlePrompt||'Enter a title for this quote','');
-				if(null===entered){return null;}
-				const cleaned=String(entered||'').trim();
-				if(!cleaned){window.alert(i18nQuoteTitleRequired||'A quote title is required.');return null;}
-				return cleaned;
-			};
-			const showQuoteSavedPopup=(message)=>{
+			const openQuoteFlowPopup=()=>{
 				const overlay=document.createElement('div');
 				overlay.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;z-index:99999;padding:20px;';
 				const panel=document.createElement('div');
-				panel.style.cssText='background:#fff;max-width:460px;width:100%;border-radius:8px;padding:20px;box-shadow:0 20px 60px rgba(0,0,0,.3);';
+				panel.style.cssText='background:#fff;max-width:520px;width:100%;border-radius:8px;padding:20px;box-shadow:0 20px 60px rgba(0,0,0,.3);';
+				const heading=document.createElement('h4');
+				heading.style.cssText='margin:0 0 8px 0;font-size:18px;line-height:1.3;';
 				const text=document.createElement('p');
-				text.textContent=String(message||i18nQuoteSavedContinue||'Quote saved. Continue adding articles to this quote?');
-				text.style.margin='0 0 16px 0';
+				text.style.cssText='margin:0 0 14px 0;';
+				const input=document.createElement('input');
+				input.type='text';
+				input.style.cssText='width:100%;padding:10px 12px;border:1px solid #c3c4c7;border-radius:4px;margin:0 0 14px 0;';
 				const actions=document.createElement('div');
-				actions.style.cssText='display:flex;gap:10px;justify-content:flex-end;';
-				const continueBtn=document.createElement('button');
-				continueBtn.type='button';
-				continueBtn.textContent=i18nContinueHere||'Continue here';
-				continueBtn.style.cssText='padding:10px 14px;border:1px solid #d0d0d0;background:#fff;border-radius:4px;cursor:pointer;';
-				const keepBtn=document.createElement('button');
-				keepBtn.type='button';
-				keepBtn.textContent=i18nKeepShopping||'KEEP SHOPPING';
-				keepBtn.style.cssText='padding:10px 14px;border:1px solid #2271b1;background:#2271b1;color:#fff;border-radius:4px;cursor:pointer;';
-				continueBtn.addEventListener('click',()=>{overlay.remove();});
-				keepBtn.addEventListener('click',()=>{if(screenprintProductsPageUrl){window.location.href=String(screenprintProductsPageUrl);return;}overlay.remove();});
-				actions.appendChild(continueBtn);
-				actions.appendChild(keepBtn);
+				actions.style.cssText='display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap;';
+				const clearActions=()=>{actions.innerHTML='';};
+				const close=()=>{overlay.remove();};
+				const showNameStep=(onConfirm)=>{
+					heading.textContent=i18nQuoteTitlePrompt||'Name your Quote';
+					text.textContent='';
+					input.value='';
+					input.hidden=false;
+					clearActions();
+					const cancelBtn=document.createElement('button');
+					cancelBtn.type='button';
+					cancelBtn.className='threaddesk-layout-viewer__back-button';
+					cancelBtn.textContent='Cancel';
+					const saveBtn=document.createElement('button');
+					saveBtn.type='button';
+					saveBtn.className='threaddesk-screenprint__quantities-button';
+					saveBtn.textContent='Save Quote';
+					cancelBtn.addEventListener('click',()=>{close();onConfirm(null);});
+					saveBtn.addEventListener('click',()=>{
+						const cleaned=String(input.value||'').trim();
+						if(!cleaned){window.alert(i18nQuoteTitleRequired||'A quote title is required.');input.focus();return;}
+						onConfirm(cleaned);
+					});
+					actions.appendChild(cancelBtn);
+					actions.appendChild(saveBtn);
+					window.setTimeout(()=>{input.focus();},10);
+				};
+				const showSuccessStep=(message)=>{
+					heading.textContent=i18nAddToQuoteSuccess||'Quote added successfully!';
+					text.textContent=String(message||i18nQuoteSavedContinue||'Quote saved. Continue adding articles to this quote?');
+					input.hidden=true;
+					clearActions();
+					const submitQuoteBtn=document.createElement('button');
+					submitQuoteBtn.type='button';
+					submitQuoteBtn.className='threaddesk-layout-viewer__back-button';
+					submitQuoteBtn.textContent=i18nContinueHere||'SUBMIT QUOTE';
+					const addMoreBtn=document.createElement('button');
+					addMoreBtn.type='button';
+					addMoreBtn.className='threaddesk-screenprint__quantities-button';
+					addMoreBtn.textContent=i18nKeepShopping||'ADD MORE TO QUOTE';
+					submitQuoteBtn.addEventListener('click',()=>{close();});
+					addMoreBtn.addEventListener('click',()=>{if(screenprintProductsPageUrl){window.location.href=String(screenprintProductsPageUrl);return;}close();});
+					actions.appendChild(submitQuoteBtn);
+					actions.appendChild(addMoreBtn);
+				};
+				panel.appendChild(heading);
 				panel.appendChild(text);
+				panel.appendChild(input);
 				panel.appendChild(actions);
 				overlay.appendChild(panel);
 				document.body.appendChild(overlay);
+				return {showNameStep,showSuccessStep,close};
 			};
 			const submitAddToQuote=async()=>{
 				const rows=getQuoteRowsForRequest();
@@ -3456,7 +3488,8 @@ class TTA_ThreadDesk {
 				payload.set('layoutTitle',String((selected&&selected.title)||''));
 				payload.set('selectedColor',String(getSelectedColorLabel()||''));
 				payload.set('selectedColorKey',String(selectedColor||''));
-				const quoteTitle=requestQuoteTitle();
+				const popup=openQuoteFlowPopup();
+				const quoteTitle=await new Promise((resolve)=>{popup.showNameStep(resolve);});
 				if(null===quoteTitle){return;}
 				payload.set('quoteTitle',quoteTitle);
 				const activeQuoteId=window.localStorage?String(window.localStorage.getItem('tta_threaddesk_active_quote_id')||'').trim():'';
@@ -3487,8 +3520,9 @@ class TTA_ThreadDesk {
 					const data=await response.json();
 					if(!response.ok||!data||!data.success){throw new Error((data&&data.data&&data.data.message)?data.data.message:(i18nAddToQuoteError||'Unable to add quote right now.'));}
 					if(window.localStorage&&data&&data.data&&data.data.quoteId){window.localStorage.setItem('tta_threaddesk_active_quote_id',String(data.data.quoteId));}
-					showQuoteSavedPopup((data&&data.data&&data.data.message)||i18nAddToQuoteSuccess||'Quote added successfully.');
+					popup.showSuccessStep((data&&data.data&&data.data.message)||i18nQuoteSavedContinue||'Quote saved. Continue adding articles to this quote?');
 				}catch(error){
+					popup.close();
 					window.alert((error&&error.message)?error.message:(i18nAddToQuoteError||'Unable to add quote right now.'));
 				}finally{
 					if(addToQuoteButton){addToQuoteButton.disabled=false;}
