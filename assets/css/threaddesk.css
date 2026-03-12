@@ -2424,4 +2424,5 @@ body.threaddesk-modal-open {
 	font-weight: 600;
 	white-space: nowrap;
 	text-align: right;
+	min-width: 150px;
 }
