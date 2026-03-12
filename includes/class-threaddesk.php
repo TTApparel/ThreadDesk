@@ -5325,7 +5325,16 @@ class TTA_ThreadDesk {
 					continue;
 				}
 				$design_id = isset( $entry['designId'] ) ? absint( $entry['designId'] ) : 0;
-				$design_name = isset( $entry['designName'] ) ? sanitize_text_field( (string) $entry['designName'] ) : __( 'Design', 'threaddesk' );
+				$design_name = isset( $entry['designName'] ) ? sanitize_text_field( (string) $entry['designName'] ) : '';
+				if ( $design_id > 0 ) {
+					$resolved_title = get_the_title( $design_id );
+					if ( is_string( $resolved_title ) && '' !== trim( $resolved_title ) ) {
+						$design_name = sanitize_text_field( $resolved_title );
+					}
+				}
+				if ( '' === $design_name ) {
+					$design_name = __( 'Design', 'threaddesk' );
+				}
 				$placement_label = isset( $entry['placementLabel'] ) ? sanitize_text_field( (string) $entry['placementLabel'] ) : ucwords( str_replace( '_', ' ', (string) $placement_key ) );
 				$slider_value = isset( $entry['sliderValue'] ) ? (float) $entry['sliderValue'] : 100;
 				$design_ratio = isset( $entry['designRatio'] ) ? (float) $entry['designRatio'] : 1;
