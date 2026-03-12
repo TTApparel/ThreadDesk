@@ -1568,6 +1568,11 @@ body.threaddesk-modal-open {
 	outline: none;
 }
 
+.threaddesk-screenprint__quantities-button:disabled {
+	opacity: .55;
+	cursor: not-allowed;
+}
+
 
 
 .threaddesk-layout-viewer__add-design-button {
