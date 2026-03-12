@@ -3117,6 +3117,36 @@ class TTA_ThreadDesk {
 				if(stageHeight>0){viewerStep.style.setProperty('--threaddesk-screenprint-stage-rendered-height',stageHeight+'px');}
 			};
 			const normalizeColorValue=(value)=>String(value||'').trim().toLowerCase().replace(/\s+/g,'-');
+			const getApproxSizeLabel=(placementKey,sliderValue,designRatio)=>{
+				const key=String(placementKey||'').trim().toLowerCase();
+				const slider=Number(sliderValue);
+				const ratioRaw=Number(designRatio);
+				const ratio=(Number.isFinite(ratioRaw)&&ratioRaw>0)?ratioRaw:1;
+				const sliderMin=60;
+				const sliderMax=140;
+				const ranges={
+					full_chest:{min:4.5,max:12.5},
+					back:{min:4.5,max:12.5},
+					left_chest:{approx:4.0},
+					right_chest:{approx:4.0},
+					left_sleeve:{approx:4.0},
+					right_sleeve:{approx:4.0}
+				};
+				const range=Object.prototype.hasOwnProperty.call(ranges,key)?ranges[key]:{approx:4.0};
+				let maxDimension=4.0;
+				if(Object.prototype.hasOwnProperty.call(range,'min')&&Object.prototype.hasOwnProperty.call(range,'max')){
+					const clamped=Math.max(sliderMin,Math.min(sliderMax,Number.isFinite(slider)?slider:100));
+					const normalized=(clamped-sliderMin)/(sliderMax-sliderMin);
+					maxDimension=Number(range.min)+((Number(range.max)-Number(range.min))*normalized);
+				}else{
+					maxDimension=Number(range.approx||4.0)*((Number.isFinite(slider)?slider:100)/100);
+				}
+				let width=maxDimension;
+				let height=maxDimension;
+				if(ratio>1){height=maxDimension/ratio;}
+				else if(ratio>0&&ratio<1){width=maxDimension*ratio;}
+				return i18nApproxSizePrefix+': '+String(width.toFixed(1))+'" W × '+String(height.toFixed(1))+'" H';
+			};
 			const defaultPricing={setup_cost:50,color_setup_cost:30,color_change_cost:5,repeat_reduction:15,print_cost:1.25,color_cost:0.10,garment_cost:50,total_margins:30};
 			const getPricingNumber=(key)=>{
 				const fallback=Object.prototype.hasOwnProperty.call(defaultPricing,key)?defaultPricing[key]:0;
@@ -3749,7 +3779,7 @@ class TTA_ThreadDesk {
 					sizeReading.className='threaddesk-layout-viewer__size-reading threaddesk-screenprint__active-size-reading';
 					sizeReading.setAttribute('aria-hidden','true');
 					const sliderValue=Number(entry.sliderValue||100);
-					sizeReading.textContent=i18nApproxSizePrefix+': '+String(Math.round(Number.isFinite(sliderValue)?sliderValue:100))+'%';
+					sizeReading.textContent=getApproxSizeLabel(entry.placementKey,sliderValue,entry.designRatio);
 					item.appendChild(img);
 					item.appendChild(name);
 					itemWrap.appendChild(item);
