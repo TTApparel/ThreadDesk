@@ -1438,6 +1438,13 @@ body.threaddesk-modal-open {
 	min-height: 0;
 }
 
+.threaddesk-screenprint__right-column {
+	display: grid;
+	grid-template-rows: minmax(0, 1fr) auto;
+	row-gap: 14px;
+	height: 100%;
+}
+
 .threaddesk-layout-viewer__panel-step:not([hidden]) {
 	display: flex;
 	flex-direction: column;
@@ -1455,6 +1462,38 @@ body.threaddesk-modal-open {
 
 .threaddesk-layout-modal [data-threaddesk-screenprint-step="viewer"].is-active .threaddesk-layout-viewer__design-panel {
 	max-height: var(--threaddesk-screenprint-stage-rendered-height, var(--threaddesk-layout-stage-height));
+}
+
+.threaddesk-layout-modal [data-threaddesk-screenprint-step="viewer"].is-active .threaddesk-layout-viewer {
+	grid-template-columns: minmax(0, 1fr) 240px;
+	grid-template-rows: minmax(0, 1fr) auto;
+	align-items: stretch;
+}
+
+.threaddesk-layout-modal [data-threaddesk-screenprint-step="viewer"].is-active .threaddesk-layout-viewer__left-column,
+.threaddesk-layout-modal [data-threaddesk-screenprint-step="viewer"].is-active .threaddesk-screenprint__right-column {
+	display: contents;
+}
+
+.threaddesk-layout-modal [data-threaddesk-screenprint-step="viewer"].is-active .threaddesk-layout-viewer__stage.threaddesk-screenprint__stage {
+	grid-column: 1;
+	grid-row: 1;
+}
+
+.threaddesk-layout-modal [data-threaddesk-screenprint-step="viewer"].is-active .threaddesk-layout-viewer__angles {
+	grid-column: 1;
+	grid-row: 2;
+}
+
+.threaddesk-layout-modal [data-threaddesk-screenprint-step="viewer"].is-active .threaddesk-layout-viewer__design-panel {
+	grid-column: 2;
+	grid-row: 1;
+}
+
+.threaddesk-layout-modal [data-threaddesk-screenprint-step="viewer"].is-active .threaddesk-screenprint__quantities-button {
+	grid-column: 2;
+	grid-row: 2;
+	align-self: center;
 }
 
 .threaddesk-layout-viewer__design-panel h4 {
@@ -1505,9 +1544,10 @@ body.threaddesk-modal-open {
 	outline: none;
 }
 
-.threaddesk-layout-viewer__add-design-button {
+.threaddesk-layout-viewer__add-design-button,
+.threaddesk-screenprint__quantities-button {
 	width: 100%;
-	margin-top: auto;
+	margin-top: 12px;
 	padding: 10px;
 	border: 1px solid #111;
 	background: #111;
@@ -1519,12 +1559,22 @@ body.threaddesk-modal-open {
 }
 
 .threaddesk-layout-viewer__add-design-button:hover,
-.threaddesk-layout-viewer__add-design-button:focus-visible {
+.threaddesk-layout-viewer__add-design-button:focus-visible,
+.threaddesk-screenprint__quantities-button:hover,
+.threaddesk-screenprint__quantities-button:focus-visible {
 	background: #2d2d2d;
 	outline: none;
 }
 
 
+
+.threaddesk-layout-viewer__add-design-button {
+	margin-top: auto;
+}
+
+.threaddesk-screenprint__right-column > .threaddesk-screenprint__quantities-button {
+	margin-top: 0;
+}
 
 .threaddesk-layout-viewer__placement-list {
 	display: grid;
@@ -1902,11 +1952,24 @@ body.threaddesk-modal-open {
 		min-height: 300px;
 	}
 
+	.threaddesk-layout-modal [data-threaddesk-screenprint-step="viewer"].is-active .threaddesk-layout-viewer {
+		grid-template-rows: auto;
+	}
+
+	.threaddesk-layout-modal [data-threaddesk-screenprint-step="viewer"].is-active .threaddesk-layout-viewer__left-column,
+	.threaddesk-layout-modal [data-threaddesk-screenprint-step="viewer"].is-active .threaddesk-screenprint__right-column {
+		display: grid;
+	}
+
 
 	.threaddesk-layout-viewer__design-panel {
 		width: 100%;
 		max-height: none;
 		overflow: visible;
+	}
+
+	.threaddesk-screenprint__right-column {
+		height: auto;
 	}
 
 	.threaddesk-layout-viewer__angles {
@@ -2308,4 +2371,55 @@ body.threaddesk-modal-open {
 .threaddesk-screenprint__selected-design-item.is-active .threaddesk-screenprint__active-size-reading {
 	display: block;
 	margin: 6px 0 0;
+}
+
+.threaddesk-screenprint__quantities-list {
+	display: flex;
+	flex-direction: column;
+	gap: 10px;
+	margin: 12px 0;
+	max-height: 360px;
+	overflow: auto;
+}
+
+.threaddesk-screenprint__quantity-item {
+	border: 1px solid #dcdcde;
+	border-radius: 8px;
+	padding: 0 10px;
+	display: grid;
+	grid-template-columns: minmax(0, 1fr) auto auto auto;
+	align-items: center;
+	gap: 12px;
+}
+
+.threaddesk-screenprint__quantity-details {
+	font-weight: 600;
+}
+
+.threaddesk-screenprint__quantity-stock {
+	font-size: 12px;
+	color: #4b5563;
+	white-space: nowrap;
+}
+
+.threaddesk-screenprint__quantity-input-wrap {
+	display: inline-flex;
+	align-items: center;
+	gap: 8px;
+	font-size: 12px;
+	font-weight: 600;
+}
+
+.threaddesk-screenprint__quantity-input {
+	width: 86px;
+	padding: 6px 8px;
+	border: 1px solid #c3c4c7;
+	border-radius: 4px;
+}
+
+.threaddesk-screenprint__quantity-estimate {
+	font-size: 12px;
+	font-weight: 600;
+	white-space: nowrap;
+	text-align: right;
 }
