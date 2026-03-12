@@ -2456,6 +2456,7 @@ class TTA_ThreadDesk {
 					'size'        => '' !== $size_label ? $size_label : __( 'N/A', 'threaddesk' ),
 					'color'       => '' !== $color_label ? $color_label : __( 'N/A', 'threaddesk' ),
 					'colorKey'    => '' !== $color_key ? $color_key : '',
+					'garmentName' => is_callable( array( $product, 'get_name' ) ) ? (string) $product->get_name() : '',
 					'inventory'   => null !== $stock_quantity ? (int) $stock_quantity : ( $in_stock ? __( 'In stock', 'threaddesk' ) : __( 'Out of stock', 'threaddesk' ) ),
 					'price'       => $variation_price > 0 ? round( $variation_price, 4 ) : 0,
 					'inStock'     => (bool) $in_stock,
@@ -2582,6 +2583,7 @@ class TTA_ThreadDesk {
 					</div>
 					<div class="threaddesk-layout-modal__content threaddesk-screenprint__quantities-step" data-threaddesk-screenprint-step="quantities" aria-hidden="true" hidden>
 						<h4><?php echo esc_html__( 'Add quantities', 'threaddesk' ); ?></h4>
+						<div class="threaddesk-screenprint__quote-designs" data-threaddesk-screenprint-quote-designs></div>
 						<div class="threaddesk-screenprint__quantities-list" data-threaddesk-screenprint-quantities-list></div>
 						<p class="threaddesk-layout-viewer__placement-empty" data-threaddesk-screenprint-quantities-empty hidden><?php echo esc_html__( 'No size/color variations are available for this product.', 'threaddesk' ); ?></p>
 						<button type="button" class="threaddesk-layout-viewer__back-button" data-threaddesk-screenprint-back-to-viewer><?php echo esc_html__( '← Back to applied layout', 'threaddesk' ); ?></button>
@@ -2780,6 +2782,9 @@ class TTA_ThreadDesk {
 			const i18nInventoryLabel=<?php echo wp_json_encode( __( 'Inventory', 'threaddesk' ) ); ?>;
 			const i18nQuantityLabel=<?php echo wp_json_encode( __( 'Quantity', 'threaddesk' ) ); ?>;
 			const i18nEstimatedUnitCostLabel=<?php echo wp_json_encode( __( 'Est. Cost/Unit', 'threaddesk' ) ); ?>;
+			const i18nQuoteDesignsTitle=<?php echo wp_json_encode( __( 'Designs in this quote', 'threaddesk' ) ); ?>;
+			const i18nEstimatedColorCountLabel=<?php echo wp_json_encode( __( 'Estimated color count', 'threaddesk' ) ); ?>;
+			const i18nGarmentsLabel=<?php echo wp_json_encode( __( 'Garments', 'threaddesk' ) ); ?>;
 			const createLayoutCategory=String(root.getAttribute('data-threaddesk-screenprint-create-layout-category')||'').trim();
 			const createLayoutCategoryId=Number(root.getAttribute('data-threaddesk-screenprint-create-layout-category-id')||0);
 			const shouldOpenChooser=String(root.getAttribute('data-threaddesk-screenprint-open-chooser')||'0').trim()==='1';
@@ -2801,6 +2806,7 @@ class TTA_ThreadDesk {
 			const selectedDesignList=root.querySelector('[data-threaddesk-screenprint-selected-design-list]');
 			const openQuantitiesButton=root.querySelector('[data-threaddesk-screenprint-open-quantities]');
 			const quantitiesList=root.querySelector('[data-threaddesk-screenprint-quantities-list]');
+			const quoteDesigns=root.querySelector('[data-threaddesk-screenprint-quote-designs]');
 			const quantitiesEmpty=root.querySelector('[data-threaddesk-screenprint-quantities-empty]');
 			const selectedDesignEmpty=root.querySelector('[data-threaddesk-screenprint-selected-design-empty]');
 			const main=root.querySelector('[data-threaddesk-screenprint-main]');
@@ -2974,6 +2980,52 @@ class TTA_ThreadDesk {
 				if(!Number.isFinite(marginDivisor)||marginDivisor<=0){return baseUnitCost;}
 				return baseUnitCost/marginDivisor;
 			};
+			const getSelectedDesignSummaries=()=>{
+				if(!selected||!selected.placementsByAngle||typeof selected.placementsByAngle!=='object'){return [];}
+				const designMap={};
+				Object.keys(selected.placementsByAngle).forEach((angleKey)=>{
+					const entries=normalizePlacementEntries(selected.placementsByAngle[angleKey],angleKey);
+					entries.forEach((entry)=>{
+						const paletteCurrent=Array.isArray(entry&&entry.paletteCurrent)?entry.paletteCurrent:[];
+						const paletteOriginal=Array.isArray(entry&&entry.paletteOriginal)?entry.paletteOriginal:[];
+						const palette=(paletteCurrent.length?paletteCurrent:paletteOriginal).filter((color)=>String(color||'').trim()!==''&&String(color||'').trim().toLowerCase()!=='transparent');
+						const estimatedColorCount=palette.length>0?palette.length:1;
+						const designLabel=String((entry&&entry.designName)|| (entry&&entry.placementLabel) || i18nDesignFallback).trim()||i18nDesignFallback;
+						const key=String((entry&&entry.url)||designLabel+'|'+angleKey).trim();
+						if(!designMap[key]){designMap[key]={designLabel,estimatedColorCount};return;}
+						designMap[key].estimatedColorCount=Math.max(Number(designMap[key].estimatedColorCount)||1,estimatedColorCount);
+					});
+				});
+				return Object.values(designMap);
+			};
+			const renderQuoteDesignSummary=(rows)=>{
+				if(!quoteDesigns){return;}
+				quoteDesigns.innerHTML='';
+				const designSummaries=getSelectedDesignSummaries();
+				if(!designSummaries.length){quoteDesigns.hidden=true;return;}
+				const garments=[];
+				(rows||[]).forEach((row)=>{
+					const garmentName=String((row&&row.garmentName)||'').trim();
+					const garmentColor=String((row&&row.color)||'').trim();
+					const label=(garmentName||'')+(garmentColor?' - '+garmentColor:'');
+					if(label&&!garments.includes(label)){garments.push(label);}
+				});
+				const title=document.createElement('p');
+				title.className='threaddesk-screenprint__quote-designs-title';
+				title.textContent=i18nQuoteDesignsTitle||'Designs in this quote';
+				const list=document.createElement('ul');
+				list.className='threaddesk-screenprint__quote-designs-list';
+				designSummaries.forEach((summary)=>{
+					const item=document.createElement('li');
+					item.className='threaddesk-screenprint__quote-designs-item';
+					const garmentText=garments.length?garments.join(', '):'--';
+					item.textContent=String(summary.designLabel||i18nDesignFallback)+' • '+(i18nEstimatedColorCountLabel||'Estimated color count')+': '+String(summary.estimatedColorCount||1)+' • '+(i18nGarmentsLabel||'Garments')+': '+garmentText;
+					list.appendChild(item);
+				});
+				quoteDesigns.appendChild(title);
+				quoteDesigns.appendChild(list);
+				quoteDesigns.hidden=false;
+			};
 			const renderVariationQuantities=()=>{
 				if(!quantitiesList){return;}
 				quantitiesList.innerHTML='';
@@ -2986,6 +3038,7 @@ class TTA_ThreadDesk {
 					return normalizeColorValue(row&&row.color)===normalizeColorValue(getSelectedColorLabel());
 				});
 				if(quantitiesEmpty){quantitiesEmpty.hidden=rows.length>0;}
+				renderQuoteDesignSummary(rows);
 				const estimateRows=[];
 				const refreshAllEstimates=()=>{
 					const totalQuantity=getTotalRequestedQuantity();

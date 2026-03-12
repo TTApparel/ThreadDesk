@@ -2384,6 +2384,33 @@ body.threaddesk-modal-open {
 	overflow: auto;
 }
 
+.threaddesk-screenprint__quote-designs {
+	margin: 10px 0 12px;
+	padding: 10px;
+	border: 1px solid #dcdcde;
+	border-radius: 8px;
+	background: #fff;
+}
+
+.threaddesk-screenprint__quote-designs-title {
+	margin: 0 0 8px;
+	font-size: 12px;
+	font-weight: 700;
+}
+
+.threaddesk-screenprint__quote-designs-list {
+	margin: 0;
+	padding-left: 18px;
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+}
+
+.threaddesk-screenprint__quote-designs-item {
+	font-size: 12px;
+	line-height: 1.4;
+}
+
 .threaddesk-screenprint__quantity-item {
 	border: 1px solid #dcdcde;
 	border-radius: 8px;
@@ -2410,6 +2437,7 @@ body.threaddesk-modal-open {
 	gap: 8px;
 	font-size: 12px;
 	font-weight: 600;
+	min-width: 150px;
 }
 
 .threaddesk-screenprint__quantity-input {
