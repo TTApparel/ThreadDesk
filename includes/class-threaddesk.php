@@ -2976,11 +2976,9 @@ class TTA_ThreadDesk {
 					return sum+value;
 				},0);
 			};
-			const calculateEstimatedUnitCost=(totalQuantity,colorCount,printCount,variationPrice)=>{
+			const calculateEstimatedUnitCost=(totalQuantity,designSummaries,variationPrice)=>{
 				const qty=Number(totalQuantity);
 				if(!Number.isFinite(qty)||qty<=0){return null;}
-				const count=Math.max(1,Number(colorCount)||1);
-				const prints=Math.max(1,Number(printCount)||1);
 				const setup=getPricingNumber('setup_cost');
 				const colorSetup=getPricingNumber('color_setup_cost');
 				const printCost=getPricingNumber('print_cost');
@@ -2989,8 +2987,13 @@ class TTA_ThreadDesk {
 				const totalMarginsPct=getPricingNumber('total_margins');
 				const garmentBase=Math.max(0,Number(variationPrice)||0);
 				const garmentValue=garmentBase*(garmentCostPct/100);
-				const unitPrintCost=((setup+(colorSetup*count))/qty)+(colorCost*count)+printCost;
-				const baseUnitCost=garmentValue+(unitPrintCost*prints);
+				const summaries=Array.isArray(designSummaries)?designSummaries:[];
+				const totalUnitPrintCost=summaries.reduce((sum,summary)=>{
+					const count=Math.max(1,Number(summary&&summary.estimatedColorCount)||1);
+					return sum+(((setup+(colorSetup*count))/qty)+(colorCost*count)+printCost);
+				},0);
+				const fallbackCount=Math.max(1,summaries.length||0);
+				const baseUnitCost=garmentValue+(totalUnitPrintCost>0?totalUnitPrintCost:((((setup+(colorSetup*1))/qty)+(colorCost*1)+printCost)*fallbackCount));
 				const marginDivisor=1-(totalMarginsPct/100);
 				if(!Number.isFinite(marginDivisor)||marginDivisor<=0){return baseUnitCost;}
 				return baseUnitCost/marginDivisor;
@@ -3051,8 +3054,7 @@ class TTA_ThreadDesk {
 			const renderVariationQuantities=()=>{
 				if(!quantitiesList){return;}
 				quantitiesList.innerHTML='';
-				const selectedColorCount=getSelectedDesignColorCount();
-				const selectedPrintCount=getSelectedPrintCount();
+				const designSummaries=getSelectedDesignSummaries();
 				const rows=(Array.isArray(variationRows)?variationRows:[]).filter((row)=>{
 					const rowColorKey=normalizeColorValue(row&&row.colorKey);
 					const selectedColorKey=normalizeColorValue(selectedColor);
@@ -3065,7 +3067,7 @@ class TTA_ThreadDesk {
 				const refreshAllEstimates=()=>{
 					const totalQuantity=getTotalRequestedQuantity();
 					estimateRows.forEach((entry)=>{
-						const unitCost=calculateEstimatedUnitCost(totalQuantity,selectedColorCount,selectedPrintCount,entry&&entry.row&&entry.row.price);
+						const unitCost=calculateEstimatedUnitCost(totalQuantity,designSummaries,entry&&entry.row&&entry.row.price);
 						entry.estimate.textContent=(i18nEstimatedUnitCostLabel||'Est. Cost/Unit')+': '+(null===unitCost?'--':formatCurrency(unitCost));
 					});
 				};
