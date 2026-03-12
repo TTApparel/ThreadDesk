@@ -2936,10 +2936,30 @@ class TTA_ThreadDesk {
 				return maxColorCount>0?maxColorCount:1;
 			};
 			const formatCurrency=(value)=>'$'+String(Number(value).toFixed(2));
-			const calculateEstimatedUnitCost=(quantity,colorCount,variationPrice)=>{
-				const qty=Number(quantity);
+			const getSelectedPrintCount=()=>{
+				if(!selected||!selected.placementsByAngle||typeof selected.placementsByAngle!=='object'){return 1;}
+				let printCount=0;
+				Object.keys(selected.placementsByAngle).forEach((angleKey)=>{
+					const entries=normalizePlacementEntries(selected.placementsByAngle[angleKey],angleKey);
+					entries.forEach((entry)=>{
+						if(entry&&entry.url){printCount++;}
+					});
+				});
+				return printCount>0?printCount:1;
+			};
+			const getTotalRequestedQuantity=()=>{
+				if(!quantitiesList){return 0;}
+				return Array.from(quantitiesList.querySelectorAll('.threaddesk-screenprint__quantity-input')).reduce((sum,input)=>{
+					const value=Number(input&&input.value);
+					if(!Number.isFinite(value)||value<=0){return sum;}
+					return sum+value;
+				},0);
+			};
+			const calculateEstimatedUnitCost=(totalQuantity,colorCount,printCount,variationPrice)=>{
+				const qty=Number(totalQuantity);
 				if(!Number.isFinite(qty)||qty<=0){return null;}
 				const count=Math.max(1,Number(colorCount)||1);
+				const prints=Math.max(1,Number(printCount)||1);
 				const setup=getPricingNumber('setup_cost');
 				const colorSetup=getPricingNumber('color_setup_cost');
 				const printCost=getPricingNumber('print_cost');
@@ -2948,7 +2968,8 @@ class TTA_ThreadDesk {
 				const totalMarginsPct=getPricingNumber('total_margins');
 				const garmentBase=Math.max(0,Number(variationPrice)||0);
 				const garmentValue=garmentBase*(garmentCostPct/100);
-				const baseUnitCost=((setup+(colorSetup*count))/qty)+(colorCost*count)+printCost+garmentValue;
+				const unitPrintCost=((setup+(colorSetup*count))/qty)+(colorCost*count)+printCost;
+				const baseUnitCost=garmentValue+(unitPrintCost*prints);
 				const marginDivisor=1-(totalMarginsPct/100);
 				if(!Number.isFinite(marginDivisor)||marginDivisor<=0){return baseUnitCost;}
 				return baseUnitCost/marginDivisor;
@@ -2957,6 +2978,7 @@ class TTA_ThreadDesk {
 				if(!quantitiesList){return;}
 				quantitiesList.innerHTML='';
 				const selectedColorCount=getSelectedDesignColorCount();
+				const selectedPrintCount=getSelectedPrintCount();
 				const rows=(Array.isArray(variationRows)?variationRows:[]).filter((row)=>{
 					const rowColorKey=normalizeColorValue(row&&row.colorKey);
 					const selectedColorKey=normalizeColorValue(selectedColor);
@@ -2964,6 +2986,14 @@ class TTA_ThreadDesk {
 					return normalizeColorValue(row&&row.color)===normalizeColorValue(getSelectedColorLabel());
 				});
 				if(quantitiesEmpty){quantitiesEmpty.hidden=rows.length>0;}
+				const estimateRows=[];
+				const refreshAllEstimates=()=>{
+					const totalQuantity=getTotalRequestedQuantity();
+					estimateRows.forEach((entry)=>{
+						const unitCost=calculateEstimatedUnitCost(totalQuantity,selectedColorCount,selectedPrintCount,entry&&entry.row&&entry.row.price);
+						entry.estimate.textContent=(i18nEstimatedUnitCostLabel||'Est. Cost/Unit')+': '+(null===unitCost?'--':formatCurrency(unitCost));
+					});
+				};
 				rows.forEach((row)=>{
 					const item=document.createElement('div');
 					item.className='threaddesk-screenprint__quantity-item';
@@ -2990,12 +3020,8 @@ class TTA_ThreadDesk {
 					inputWrap.setAttribute('for',input.id);
 					const estimate=document.createElement('div');
 					estimate.className='threaddesk-screenprint__quantity-estimate';
-					const updateEstimate=()=>{
-						const unitCost=calculateEstimatedUnitCost(input.value,selectedColorCount,row&&row.price);
-						estimate.textContent=(i18nEstimatedUnitCostLabel||'Est. Cost/Unit')+': '+(null===unitCost?'--':formatCurrency(unitCost));
-					};
-					input.addEventListener('input',updateEstimate);
-					updateEstimate();
+					estimateRows.push({row,estimate});
+					input.addEventListener('input',refreshAllEstimates);
 					inputWrap.appendChild(input);
 					item.appendChild(details);
 					item.appendChild(stock);
@@ -3003,6 +3029,7 @@ class TTA_ThreadDesk {
 					item.appendChild(estimate);
 					quantitiesList.appendChild(item);
 				});
+				refreshAllEstimates();
 			};
 			const getSideLabel=()=>String((images&&images.sideLabel)||'left').toLowerCase()==='right'?'right':'left';
 			const getAngleTransform=(targetAngle)=>{
