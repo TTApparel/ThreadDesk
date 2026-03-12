@@ -1352,6 +1352,7 @@ class TTA_ThreadDesk {
 		$old_original_path = $design_id ? (string) get_post_meta( $design_id, 'design_original_file_path', true ) : '';
 		$old_svg_path      = $design_id ? (string) get_post_meta( $design_id, 'design_svg_file_path', true ) : '';
 		$old_mockup_path   = $design_id ? (string) get_post_meta( $design_id, 'design_mockup_file_path', true ) : '';
+		$old_design_title  = $design_id ? (string) get_the_title( $design_id ) : '';
 
 		$design_file        = isset( $_FILES['threaddesk_design_file'] ) && is_array( $_FILES['threaddesk_design_file'] ) ? $_FILES['threaddesk_design_file'] : null;
 		$design_upload_name = isset( $design_file['name'] ) ? trim( (string) $design_file['name'] ) : '';
@@ -1583,6 +1584,11 @@ class TTA_ThreadDesk {
 			delete_post_meta( $design_id, '_tta_guest_token' );
 		}
 
+		$current_design_title = (string) get_the_title( $design_id );
+		if ( $design_id > 0 && '' !== $current_design_title && $current_design_title !== $old_design_title ) {
+			$this->sync_design_references_after_title_change( $design_id, $old_design_title, $current_design_title );
+		}
+
 		$this->log_user_activity( $current_user_id, $existing_design_id > 0 ? sprintf( __( 'Design updated: %s', 'threaddesk' ), get_the_title( $design_id ) ) : sprintf( __( 'Design uploaded: %s', 'threaddesk' ), get_the_title( $design_id ) ), 'design' );
 		if ( function_exists( 'wc_add_notice' ) ) {
 			wc_add_notice( __( 'Design saved successfully.', 'threaddesk' ), 'success' );
@@ -1601,6 +1607,7 @@ class TTA_ThreadDesk {
 		$title     = isset( $_POST['design_title'] ) ? sanitize_text_field( wp_unslash( $_POST['design_title'] ) ) : '';
 		$title     = trim( (string) $title );
 		$design    = get_post( $design_id );
+		$old_title = $design instanceof WP_Post ? (string) $design->post_title : '';
 
 		if ( ! $design || 'tta_design' !== $design->post_type || ! $this->can_manage_owned_post( $design, $owner_context ) ) {
 			if ( function_exists( 'wc_add_notice' ) ) {
@@ -1628,6 +1635,9 @@ class TTA_ThreadDesk {
 		}
 
 		wp_update_post( array( 'ID' => $design_id, 'post_title' => $title ) );
+		if ( '' !== $old_title && $old_title !== $title ) {
+			$this->sync_design_references_after_title_change( $design_id, $old_title, $title );
+		}
 		$this->log_user_activity( (int) $design->post_author, sprintf( __( 'Design renamed: %s', 'threaddesk' ), $title ), 'design' );
 		$current_file_name     = (string) get_post_meta( $design_id, 'design_file_name', true );
 		$current_original_path = (string) get_post_meta( $design_id, 'design_original_file_path', true );
@@ -1672,6 +1682,249 @@ class TTA_ThreadDesk {
 	}
 
 
+	private function remove_design_from_related_layouts( $design_id, $design_title = '' ) {
+		$design_id = absint( $design_id );
+		$design_title = sanitize_text_field( (string) $design_title );
+		if ( $design_id <= 0 ) {
+			return;
+		}
+
+		$related_layouts = $this->find_related_posts_by_id_in_meta( $design_id, 'tta_layout' );
+		if ( empty( $related_layouts ) ) {
+			return;
+		}
+
+		foreach ( $related_layouts as $layout_post ) {
+			if ( ! $layout_post instanceof WP_Post ) {
+				continue;
+			}
+			$layout_id = (int) $layout_post->ID;
+			if ( $layout_id <= 0 ) {
+				continue;
+			}
+
+			$payload_raw = (string) get_post_meta( $layout_id, 'layout_payload', true );
+			$payload = json_decode( $payload_raw, true );
+			$payload_changed = false;
+			$placements_changed = false;
+			$placements_by_angle = array();
+
+			if ( is_array( $payload ) ) {
+				$placements_by_angle = isset( $payload['placementsByAngle'] ) && is_array( $payload['placementsByAngle'] ) ? $payload['placementsByAngle'] : array();
+				$placements_by_angle = $this->remove_design_from_placements_by_angle( $placements_by_angle, $design_id, $design_title, $placements_changed );
+				if ( $placements_changed ) {
+					$payload['placementsByAngle'] = $placements_by_angle;
+					$payload['relatedDesignIds'] = $this->collect_design_ids_from_placements_by_angle( $placements_by_angle );
+					$payload_changed = true;
+				}
+			} else {
+				$legacy_raw = (string) get_post_meta( $layout_id, 'layout_placements', true );
+				$legacy = json_decode( $legacy_raw, true );
+				if ( is_array( $legacy ) ) {
+					$placements_by_angle = $this->remove_design_from_placements_by_angle( $legacy, $design_id, $design_title, $placements_changed );
+				}
+			}
+
+			if ( ! $placements_changed ) {
+				continue;
+			}
+
+			if ( $payload_changed ) {
+				update_post_meta( $layout_id, 'layout_payload', wp_json_encode( $payload ) );
+			}
+			update_post_meta( $layout_id, 'layout_placements', wp_json_encode( $placements_by_angle ) );
+			update_post_meta( $layout_id, 'layout_related_design_ids', wp_json_encode( $this->collect_design_ids_from_placements_by_angle( $placements_by_angle ) ) );
+		}
+	}
+
+	private function remove_design_from_placements_by_angle( $placements_by_angle, $design_id, $design_title, &$changed = false ) {
+		$changed = false;
+		$result = array();
+		$target_title = sanitize_text_field( (string) $design_title );
+		foreach ( (array) $placements_by_angle as $angle_key => $angle_entries ) {
+			if ( ! is_array( $angle_entries ) ) {
+				$result[ $angle_key ] = $angle_entries;
+				continue;
+			}
+			$next_entries = array();
+			foreach ( $angle_entries as $placement_key => $entry ) {
+				if ( ! is_array( $entry ) ) {
+					$next_entries[ $placement_key ] = $entry;
+					continue;
+				}
+				$entry_design_id = isset( $entry['designId'] ) ? absint( $entry['designId'] ) : ( isset( $entry['design_id'] ) ? absint( $entry['design_id'] ) : 0 );
+				$entry_design_name = isset( $entry['designName'] ) ? sanitize_text_field( (string) $entry['designName'] ) : ( isset( $entry['design_name'] ) ? sanitize_text_field( (string) $entry['design_name'] ) : '' );
+				$matches_id = $entry_design_id > 0 && $entry_design_id === absint( $design_id );
+				$matches_name = '' !== $target_title && '' !== $entry_design_name && 0 === strcasecmp( $entry_design_name, $target_title );
+				if ( $matches_id || $matches_name ) {
+					$changed = true;
+					continue;
+				}
+				$next_entries[ $placement_key ] = $entry;
+			}
+			$result[ $angle_key ] = $next_entries;
+		}
+		return $result;
+	}
+
+	private function collect_design_ids_from_placements_by_angle( $placements_by_angle ) {
+		$design_ids = array();
+		foreach ( (array) $placements_by_angle as $angle_entries ) {
+			if ( ! is_array( $angle_entries ) ) {
+				continue;
+			}
+			foreach ( $angle_entries as $entry ) {
+				if ( ! is_array( $entry ) ) {
+					continue;
+				}
+				$entry_design_id = isset( $entry['designId'] ) ? absint( $entry['designId'] ) : ( isset( $entry['design_id'] ) ? absint( $entry['design_id'] ) : 0 );
+				if ( $entry_design_id > 0 ) {
+					$design_ids[] = $entry_design_id;
+				}
+			}
+		}
+		return array_values( array_unique( array_filter( array_map( 'absint', $design_ids ) ) ) );
+	}
+
+	private function sync_design_references_after_title_change( $design_id, $old_title, $new_title ) {
+		$design_id = absint( $design_id );
+		$new_title = sanitize_text_field( (string) $new_title );
+		$old_title = sanitize_text_field( (string) $old_title );
+		if ( $design_id <= 0 || '' === $new_title || $new_title === $old_title ) {
+			return;
+		}
+
+		$design_urls = array(
+			'mockup'  => esc_url_raw( (string) get_post_meta( $design_id, 'design_mockup_file_url', true ) ),
+			'preview' => esc_url_raw( (string) get_post_meta( $design_id, 'design_preview_url', true ) ),
+			'svg'     => esc_url_raw( (string) get_post_meta( $design_id, 'design_svg_file_url', true ) ),
+		);
+
+		$related_layouts  = $this->find_related_posts_by_id_in_meta( $design_id, 'tta_layout' );
+		$related_quotes   = $this->find_related_posts_by_id_in_meta( $design_id, 'tta_quote' );
+		$related_invoices = $this->find_related_posts_by_id_in_meta( $design_id, 'shop_order' );
+		$related_posts    = array_merge( $related_layouts, $related_quotes, $related_invoices );
+		$related_posts    = array_values( array_filter( $related_posts, function( $post ) { return $post instanceof WP_Post; } ) );
+
+		$processed_post_ids = array();
+		foreach ( $related_posts as $related_post ) {
+			$post_id = (int) $related_post->ID;
+			if ( $post_id <= 0 || in_array( $post_id, $processed_post_ids, true ) ) {
+				continue;
+			}
+			$processed_post_ids[] = $post_id;
+			$this->update_design_references_in_post_meta( $post_id, $design_id, $old_title, $new_title, $design_urls );
+		}
+	}
+
+	private function update_design_references_in_post_meta( $post_id, $design_id, $old_title, $new_title, $design_urls ) {
+		global $wpdb;
+		$post_id = absint( $post_id );
+		$design_id = absint( $design_id );
+		if ( $post_id <= 0 || $design_id <= 0 ) {
+			return;
+		}
+		$meta_rows = $wpdb->get_results( $wpdb->prepare( "SELECT meta_id, meta_value FROM {$wpdb->postmeta} WHERE post_id = %d", $post_id ) );
+		if ( empty( $meta_rows ) ) {
+			return;
+		}
+		foreach ( $meta_rows as $row ) {
+			$meta_id = isset( $row->meta_id ) ? absint( $row->meta_id ) : 0;
+			if ( $meta_id <= 0 ) {
+				continue;
+			}
+			$raw_value = isset( $row->meta_value ) ? (string) $row->meta_value : '';
+			$value = maybe_unserialize( $raw_value );
+			$changed = $this->update_design_reference_in_value( $value, $design_id, $old_title, $new_title, $design_urls );
+			if ( ! $changed ) {
+				continue;
+			}
+			update_metadata_by_mid( 'post', $meta_id, $value );
+		}
+	}
+
+	private function update_design_reference_in_value( &$value, $design_id, $old_title, $new_title, $design_urls ) {
+		$changed = false;
+		if ( is_array( $value ) ) {
+			$entry_design_id = 0;
+			if ( isset( $value['designId'] ) ) {
+				$entry_design_id = absint( $value['designId'] );
+			} elseif ( isset( $value['design_id'] ) ) {
+				$entry_design_id = absint( $value['design_id'] );
+			}
+			if ( $entry_design_id === (int) $design_id ) {
+				if ( isset( $value['designName'] ) && (string) $value['designName'] !== $new_title ) {
+					$value['designName'] = $new_title;
+					$changed = true;
+				}
+				if ( isset( $value['design_name'] ) && (string) $value['design_name'] !== $new_title ) {
+					$value['design_name'] = $new_title;
+					$changed = true;
+				}
+				$preferred_raster = '' !== (string) $design_urls['mockup'] ? (string) $design_urls['mockup'] : ( '' !== (string) $design_urls['preview'] ? (string) $design_urls['preview'] : (string) $design_urls['svg'] );
+				$preferred_vector = '' !== (string) $design_urls['svg'] ? (string) $design_urls['svg'] : ( '' !== (string) $design_urls['preview'] ? (string) $design_urls['preview'] : (string) $design_urls['mockup'] );
+				$url_key_map = array(
+					'url' => $preferred_raster,
+					'baseUrl' => $preferred_raster,
+					'preview' => $preferred_raster,
+					'previewUrl' => $preferred_raster,
+					'mockupUrl' => '' !== (string) $design_urls['mockup'] ? (string) $design_urls['mockup'] : $preferred_raster,
+					'designUrl' => $preferred_vector,
+					'sourceUrl' => $preferred_vector,
+					'svgUrl' => $preferred_vector,
+				);
+				foreach ( $url_key_map as $url_key => $target_url ) {
+					if ( '' === $target_url || ! isset( $value[ $url_key ] ) ) {
+						continue;
+					}
+					if ( (string) $value[ $url_key ] !== $target_url ) {
+						$value[ $url_key ] = $target_url;
+						$changed = true;
+					}
+				}
+				if ( isset( $value['placementKey'] ) ) {
+					$current_key = (string) $value['placementKey'];
+					if ( '' !== $old_title && ( $current_key === $old_title || sanitize_key( $current_key ) === sanitize_key( $old_title ) ) ) {
+						$value['placementKey'] = sanitize_key( $new_title );
+						$changed = true;
+					}
+				}
+			}
+			foreach ( $value as &$item ) {
+				if ( $this->update_design_reference_in_value( $item, $design_id, $old_title, $new_title, $design_urls ) ) {
+					$changed = true;
+				}
+			}
+			unset( $item );
+			return $changed;
+		}
+		if ( is_object( $value ) ) {
+			$array_value = (array) $value;
+			if ( $this->update_design_reference_in_value( $array_value, $design_id, $old_title, $new_title, $design_urls ) ) {
+				$value = (object) $array_value;
+				return true;
+			}
+			return false;
+		}
+		if ( is_string( $value ) ) {
+			$trimmed = trim( $value );
+			if ( '' === $trimmed || ( '{' !== substr( $trimmed, 0, 1 ) && '[' !== substr( $trimmed, 0, 1 ) ) ) {
+				return false;
+			}
+			$decoded = json_decode( $trimmed, true );
+			if ( ! is_array( $decoded ) ) {
+				return false;
+			}
+			if ( $this->update_design_reference_in_value( $decoded, $design_id, $old_title, $new_title, $design_urls ) ) {
+				$value = wp_json_encode( $decoded );
+				return true;
+			}
+			return false;
+		}
+		return false;
+	}
+
+
 	public function handle_delete_design() {
 		check_admin_referer( 'tta_threaddesk_delete_design' );
 		$owner_context = $this->get_request_owner_context();
@@ -1685,6 +1938,7 @@ class TTA_ThreadDesk {
 			exit;
 		}
 
+		$this->remove_design_from_related_layouts( $design_id, (string) $design->post_title );
 		$this->maybe_delete_design_files_for_post( $design_id );
 		$this->log_user_activity( (int) $design->post_author, sprintf( __( 'Design deleted: %s', 'threaddesk' ), $design->post_title ), 'design' );
 		wp_delete_post( $design_id, true );
@@ -2360,7 +2614,6 @@ class TTA_ThreadDesk {
 						<div class="threaddesk-screenprint__right-column">
 							<div class="threaddesk-layout-viewer__design-panel">
 								<button type="button" class="threaddesk-layout-viewer__back-button" data-threaddesk-screenprint-back><?php echo esc_html__( 'Back to Saved Layouts', 'threaddesk' ); ?></button>
-								<h4><?php echo esc_html__( 'Applied Layout', 'threaddesk' ); ?></h4>
 								<p data-threaddesk-screenprint-selected><?php echo esc_html__( 'No layout selected yet.', 'threaddesk' ); ?></p>
 								<p class="threaddesk-screenprint__selected-color" data-threaddesk-screenprint-selected-color><?php echo esc_html__( 'Color: --', 'threaddesk' ); ?></p>
 								<div class="threaddesk-screenprint__selected-designs">
@@ -2653,13 +2906,31 @@ class TTA_ThreadDesk {
 				cartLayoutDesignIdsField.value=seenDesignIds.join(',');
 				cartLayoutSnapshotField.value=JSON.stringify(snapshot);
 			};
-			const setStep=(step)=>{
+			const getStepFocusable=(container)=>{
+				if(!container){return null;}
+				return container.querySelector('button:not([disabled]),[href],input:not([type="hidden"]):not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])');
+			};
+			const setStep=(step,shouldMoveFocus=true)=>{
 				const showChooser=step==='chooser';
 				const showViewer=step==='viewer';
 				const showQuantities=step==='quantities';
+				const activeElement=document.activeElement;
+				if(activeElement&&activeElement!==document.body){
+					const activeInChooser=!!(chooserStep&&chooserStep.contains(activeElement));
+					const activeInViewer=!!(viewerStep&&viewerStep.contains(activeElement));
+					const activeInQuantities=!!(quantitiesStep&&quantitiesStep.contains(activeElement));
+					if((activeInChooser&&!showChooser)||(activeInViewer&&!showViewer)||(activeInQuantities&&!showQuantities)){
+						if(typeof activeElement.blur==='function'){activeElement.blur();}
+					}
+				}
 				if(chooserStep){chooserStep.hidden=!showChooser;chooserStep.classList.toggle('is-active',showChooser);chooserStep.setAttribute('aria-hidden',showChooser?'false':'true');}
 				if(viewerStep){viewerStep.hidden=!showViewer;viewerStep.classList.toggle('is-active',showViewer);viewerStep.setAttribute('aria-hidden',showViewer?'false':'true');}
 				if(quantitiesStep){quantitiesStep.hidden=!showQuantities;quantitiesStep.classList.toggle('is-active',showQuantities);quantitiesStep.setAttribute('aria-hidden',showQuantities?'false':'true');}
+				const shownStep=showChooser?chooserStep:(showViewer?viewerStep:quantitiesStep);
+				if(shouldMoveFocus&&shownStep){
+					const nextFocus=getStepFocusable(shownStep);
+					if(nextFocus&&typeof nextFocus.focus==='function'){window.requestAnimationFrame(()=>{nextFocus.focus();});}
+				}
 			};
 			const openScreenprintChooserModal=()=>{
 				if(!modal){return;}
@@ -2670,10 +2941,12 @@ class TTA_ThreadDesk {
 			};
 			const closeScreenprintModal=()=>{
 				if(!modal){return;}
+				const activeElement=document.activeElement;
+				if(activeElement&&modal.contains(activeElement)&&typeof activeElement.blur==='function'){activeElement.blur();}
 				modal.classList.remove('is-active');
 				modal.setAttribute('aria-hidden','true');
 				document.body.classList.remove('threaddesk-modal-open');
-				setStep('chooser');
+				setStep('chooser',false);
 			};
 			const syncScreenprintPanelHeight=()=>{
 				if(!viewerStep||viewerStep.hidden||!stage){return;}
@@ -2746,10 +3019,22 @@ class TTA_ThreadDesk {
 				}
 				return '';
 			};
+			const createStrongPrefixLabel=(prefix,value)=>{
+				const fragment=document.createDocumentFragment();
+				const strong=document.createElement('strong');
+				strong.textContent=String(prefix||'').trim()+':';
+				fragment.appendChild(strong);
+				fragment.appendChild(document.createTextNode(' '+String(value||'').trim()));
+				return fragment;
+			};
 			const renderSelectedColorLabel=()=>{
 				if(!selectedColorLabel){return;}
 				const label=getSelectedColorLabel();
-				selectedColorLabel.textContent=(i18nSelectedColorPrefix||'Color')+': '+(label||'--');
+				selectedColorLabel.replaceChildren(createStrongPrefixLabel(i18nSelectedColorPrefix||'Color',label||'--'));
+			};
+			const renderSelectedLayoutLabel=(title)=>{
+				if(!selectedLabel){return;}
+				selectedLabel.replaceChildren(createStrongPrefixLabel(i18nSelectedPrefix||'LAYOUT',title||'--'));
 			};
 			const getEntrySource=(entry)=>String((entry&&entry.__recoloredSource) || (entry&&entry.url) || (entry&&entry.sourceUrl)|| (entry&&entry.designUrl) || (entry&&entry.previewUrl) || (entry&&entry.preview) || (entry&&entry.imageUrl) || (entry&&entry.mockupUrl) || (entry&&entry.svgUrl) || '').trim();
 			const normalizeHexColor=(value)=>{
@@ -2774,6 +3059,61 @@ class TTA_ThreadDesk {
 				return '';
 			};
 			const encodeSvgDataUrl=(svgMarkup)=>'data:image/svg+xml,'+encodeURIComponent(String(svgMarkup||''));
+			const parsePaletteColor=(value)=>{
+				const token=String(value||'').trim();
+				if(!token){return null;}
+				if(token.toLowerCase()==='transparent'){return {token:'transparent',rgb:[255,255,255],alpha:0};}
+				const hex=normalizeHexColor(token);
+				if(!hex){return null;}
+				return {token:hex,rgb:[parseInt(hex.substring(1,3),16),parseInt(hex.substring(3,5),16),parseInt(hex.substring(5,7),16)],alpha:255};
+			};
+			const recolorRasterEntry=(entry,originalSource,paletteBase,paletteCurrent)=>{
+				const sourceParsed=paletteBase.map(parsePaletteColor).filter(Boolean);
+				const targetParsed=paletteCurrent.map(parsePaletteColor).filter(Boolean);
+				if(!sourceParsed.length||sourceParsed.length!==targetParsed.length){return;}
+				let changed=false;
+				for(let i=0;i<sourceParsed.length;i++){if(sourceParsed[i].token!==targetParsed[i].token){changed=true;break;}}
+				if(!changed){entry.__recoloredSource=originalSource;entry.url=originalSource;return;}
+				const cacheKey=originalSource+'|'+sourceParsed.map((item)=>item.token).join(',')+'|'+targetParsed.map((item)=>item.token).join(',');
+				if(!entry.__recolorCache||typeof entry.__recolorCache!=='object'){entry.__recolorCache={};}
+				if(entry.__recolorCache[cacheKey]){entry.__recoloredSource=entry.__recolorCache[cacheKey];entry.url=entry.__recoloredSource;return;}
+				const img=new Image();
+				img.crossOrigin='anonymous';
+				img.addEventListener('load',()=>{
+					try{
+						const canvas=document.createElement('canvas');
+						canvas.width=img.naturalWidth||img.width;
+						canvas.height=img.naturalHeight||img.height;
+						const ctx=canvas.getContext('2d',{willReadFrequently:true});
+						if(!ctx){return;}
+						ctx.drawImage(img,0,0);
+						const imageData=ctx.getImageData(0,0,canvas.width,canvas.height);
+						const pixels=imageData.data;
+						for(let i=0;i<pixels.length;i+=4){
+							if(pixels[i+3]===0){continue;}
+							let bestIndex=0;
+							let bestScore=Number.POSITIVE_INFINITY;
+							for(let c=0;c<sourceParsed.length;c++){
+								const dr=pixels[i]-sourceParsed[c].rgb[0];
+								const dg=pixels[i+1]-sourceParsed[c].rgb[1];
+								const db=pixels[i+2]-sourceParsed[c].rgb[2];
+								const score=(dr*dr)+(dg*dg)+(db*db);
+								if(score<bestScore){bestScore=score;bestIndex=c;}
+							}
+							if(targetParsed[bestIndex].alpha===0){pixels[i]=255;pixels[i+1]=255;pixels[i+2]=255;pixels[i+3]=0;}
+							else{pixels[i]=targetParsed[bestIndex].rgb[0];pixels[i+1]=targetParsed[bestIndex].rgb[1];pixels[i+2]=targetParsed[bestIndex].rgb[2];pixels[i+3]=Math.max(pixels[i+3],targetParsed[bestIndex].alpha);}
+						}
+						ctx.putImageData(imageData,0,0);
+						const recolored=canvas.toDataURL('image/png');
+						entry.__recolorCache[cacheKey]=recolored;
+						entry.__recoloredSource=recolored;
+						entry.url=recolored;
+						render();
+					}catch(e){}
+				});
+				img.addEventListener('error',()=>{});
+				img.src=originalSource;
+			};
 			const applyEntryPalette=(entry)=>{
 				if(!entry||typeof entry!=='object'){return;}
 				const paletteBase=Array.isArray(entry.paletteBase)?entry.paletteBase:[];
@@ -2781,18 +3121,21 @@ class TTA_ThreadDesk {
 				if(!paletteBase.length||!paletteCurrent.length){return;}
 				const originalSource=String(entry.__paletteSource||entry.baseUrl||entry.url||entry.sourceUrl||entry.designUrl||entry.previewUrl||entry.preview||'').trim();
 				if(!originalSource){return;}
-				const svgMarkup=decodeSvgDataUrl(originalSource);
-				if(!svgMarkup){return;}
-				let nextMarkup=svgMarkup;
-				for(let i=0;i<Math.min(paletteBase.length,paletteCurrent.length);i++){
-					const from=normalizeHexColor(paletteBase[i]);
-					const to=normalizeHexColor(paletteCurrent[i]);
-					if(!from||!to||from===to){continue;}
-					nextMarkup=nextMarkup.replace(new RegExp(escapeRegex(from),'gi'),to);
-				}
 				entry.__paletteSource=originalSource;
-				entry.__recoloredSource=encodeSvgDataUrl(nextMarkup);
-				entry.url=entry.__recoloredSource;
+				const svgMarkup=decodeSvgDataUrl(originalSource);
+				if(svgMarkup){
+					let nextMarkup=svgMarkup;
+					for(let i=0;i<Math.min(paletteBase.length,paletteCurrent.length);i++){
+						const from=normalizeHexColor(paletteBase[i]);
+						const to=normalizeHexColor(paletteCurrent[i]);
+						if(!from||!to||from===to){continue;}
+						nextMarkup=nextMarkup.replace(new RegExp(escapeRegex(from),'gi'),to);
+					}
+					entry.__recoloredSource=encodeSvgDataUrl(nextMarkup);
+					entry.url=entry.__recoloredSource;
+					return;
+				}
+				recolorRasterEntry(entry,originalSource,paletteBase,paletteCurrent);
 			};
 			const setActivePlacement=(placementKey)=>{
 				activePlacementKey=String(placementKey||'').trim();
@@ -2842,7 +3185,7 @@ class TTA_ThreadDesk {
 						if(!entry||typeof entry!=='object'){return;}
 						const key=String(entry.placementKey||'').trim();
 						if(!key){return;}
-						if(!grouped[key]){grouped[key]=Object.assign({__angleKey:angleKey},entry);order.push(key);}
+						if(!grouped[key]){entry.__angleKey=angleKey;grouped[key]=entry;order.push(key);}
 					});
 				});
 				let count=0;
@@ -3068,7 +3411,8 @@ class TTA_ThreadDesk {
 					const existingKey=String(entry.placementKey||'').trim();
 					if(existingKey){return entry;}
 					const labelKey=String(entry.placementLabel||entry.designName||'').trim();
-					return Object.assign({},entry,{placementKey:labelKey||fallbackKey});
+					entry.placementKey=labelKey||fallbackKey;
+					return entry;
 				};
 				if(Array.isArray(raw)){
 					return raw.map((entry,index)=>{
@@ -3274,7 +3618,7 @@ class TTA_ThreadDesk {
 				btn.appendChild(preview);
 				btn.appendChild(titleWrap);
 				btn.appendChild(meta);
-				btn.addEventListener('click',()=>{selected=layout; if(selectedLabel){selectedLabel.textContent=i18nSelectedPrefix+': '+title;} setStep('viewer'); render(); window.requestAnimationFrame(syncScreenprintPanelHeight);});
+				btn.addEventListener('click',()=>{selected=layout; renderSelectedLayoutLabel(title); setStep('viewer'); render(); window.requestAnimationFrame(syncScreenprintPanelHeight);});
 					options.appendChild(btn);
 					});
 					if(emptyState){
@@ -4938,7 +5282,16 @@ class TTA_ThreadDesk {
 					continue;
 				}
 				$design_id = isset( $entry['designId'] ) ? absint( $entry['designId'] ) : 0;
-				$design_name = isset( $entry['designName'] ) ? sanitize_text_field( (string) $entry['designName'] ) : __( 'Design', 'threaddesk' );
+				$design_name = isset( $entry['designName'] ) ? sanitize_text_field( (string) $entry['designName'] ) : '';
+				if ( $design_id > 0 ) {
+					$resolved_title = get_the_title( $design_id );
+					if ( is_string( $resolved_title ) && '' !== trim( $resolved_title ) ) {
+						$design_name = sanitize_text_field( $resolved_title );
+					}
+				}
+				if ( '' === $design_name ) {
+					$design_name = __( 'Design', 'threaddesk' );
+				}
 				$placement_label = isset( $entry['placementLabel'] ) ? sanitize_text_field( (string) $entry['placementLabel'] ) : ucwords( str_replace( '_', ' ', (string) $placement_key ) );
 				$slider_value = isset( $entry['sliderValue'] ) ? (float) $entry['sliderValue'] : 100;
 				$design_ratio = isset( $entry['designRatio'] ) ? (float) $entry['designRatio'] : 1;
