@@ -875,6 +875,8 @@ class TTA_ThreadDesk {
 		$layout_title    = isset( $_POST['layoutTitle'] ) ? sanitize_text_field( wp_unslash( $_POST['layoutTitle'] ) ) : '';
 		$selected_color  = isset( $_POST['selectedColor'] ) ? sanitize_text_field( wp_unslash( $_POST['selectedColor'] ) ) : '';
 		$selected_color_key = isset( $_POST['selectedColorKey'] ) ? sanitize_key( wp_unslash( $_POST['selectedColorKey'] ) ) : '';
+		$quote_title_input = isset( $_POST['quoteTitle'] ) ? sanitize_text_field( wp_unslash( $_POST['quoteTitle'] ) ) : '';
+		$existing_quote_id = isset( $_POST['existingQuoteId'] ) ? absint( $_POST['existingQuoteId'] ) : 0;
 		$rows_raw        = isset( $_POST['rows'] ) ? wp_unslash( $_POST['rows'] ) : array();
 		$prints_raw      = isset( $_POST['prints'] ) ? wp_unslash( $_POST['prints'] ) : array();
 
@@ -950,28 +952,59 @@ class TTA_ThreadDesk {
 		$user_id = get_current_user_id();
 		$product = $product_id > 0 && function_exists( 'wc_get_product' ) ? wc_get_product( $product_id ) : false;
 		$product_name = $product && is_callable( array( $product, 'get_name' ) ) ? (string) $product->get_name() : __( 'Product', 'threaddesk' );
-		$quote_title = sprintf( __( 'Screenprint Quote - %1$s - %2$s', 'threaddesk' ), $product_name, current_time( 'Y-m-d H:i' ) );
-		$quote_id = wp_insert_post(
-			array(
-				'post_type'   => 'tta_quote',
-				'post_status' => 'private',
-				'post_title'  => $quote_title,
-				'post_author' => $user_id,
-			),
-			true
-		);
+		$quote_title_default = sprintf( __( 'Screenprint Quote - %1$s - %2$s', 'threaddesk' ), $product_name, current_time( 'Y-m-d H:i' ) );
+		$quote_title = '' !== trim( $quote_title_input ) ? trim( $quote_title_input ) : $quote_title_default;
 
-		if ( is_wp_error( $quote_id ) || ! $quote_id ) {
-			wp_send_json_error( array( 'message' => __( 'Unable to create quote right now.', 'threaddesk' ) ), 500 );
+		$quote_id = 0;
+		$is_update = false;
+		if ( $existing_quote_id > 0 ) {
+			$existing_quote = get_post( $existing_quote_id );
+			if ( $existing_quote && 'tta_quote' === $existing_quote->post_type && (int) $existing_quote->post_author === $user_id ) {
+				$quote_id = (int) $existing_quote_id;
+				$is_update = true;
+			}
 		}
+
+		$existing_rows = array();
+		$existing_prints = array();
+		$existing_total = 0;
+		if ( $is_update ) {
+			$existing_rows = json_decode( (string) get_post_meta( $quote_id, 'screenprint_quote_rows_json', true ), true );
+			$existing_rows = is_array( $existing_rows ) ? $existing_rows : array();
+			$existing_prints = json_decode( (string) get_post_meta( $quote_id, 'screenprint_quote_prints_json', true ), true );
+			$existing_prints = is_array( $existing_prints ) ? $existing_prints : array();
+			$existing_total = (float) get_post_meta( $quote_id, 'total', true );
+		} else {
+			$quote_id = wp_insert_post(
+				array(
+					'post_type'   => 'tta_quote',
+					'post_status' => 'private',
+					'post_title'  => $quote_title,
+					'post_author' => $user_id,
+				),
+				true
+			);
+
+			if ( is_wp_error( $quote_id ) || ! $quote_id ) {
+				wp_send_json_error( array( 'message' => __( 'Unable to create quote right now.', 'threaddesk' ) ), 500 );
+			}
+		}
+
+		if ( ! $is_update && '' !== $quote_title ) {
+			wp_update_post( array( 'ID' => $quote_id, 'post_title' => $quote_title ) );
+		}
+
+		$final_rows = array_merge( $existing_rows, $quote_rows );
+		$final_prints = array_merge( $existing_prints, $prints );
+		$final_total = round( $existing_total + $total, 2 );
 
 		update_post_meta( $quote_id, 'status', 'draft' );
 		update_post_meta( $quote_id, 'currency', function_exists( 'get_woocommerce_currency' ) ? get_woocommerce_currency() : 'USD' );
-		update_post_meta( $quote_id, 'total', round( $total, 2 ) );
+		update_post_meta( $quote_id, 'total', $final_total );
 		update_post_meta( $quote_id, 'created_at', current_time( 'mysql' ) );
-		update_post_meta( $quote_id, 'items_json', wp_json_encode( $quote_rows ) );
-		update_post_meta( $quote_id, 'screenprint_quote_rows_json', wp_json_encode( $quote_rows ) );
-		update_post_meta( $quote_id, 'screenprint_quote_prints_json', wp_json_encode( $prints ) );
+		update_post_meta( $quote_id, 'items_json', wp_json_encode( $final_rows ) );
+		update_post_meta( $quote_id, 'screenprint_quote_rows_json', wp_json_encode( $final_rows ) );
+		update_post_meta( $quote_id, 'screenprint_quote_prints_json', wp_json_encode( $final_prints ) );
 		update_post_meta( $quote_id, 'screenprint_quote_context', array(
 			'productId' => $product_id,
 			'layoutId'  => $layout_id,
@@ -980,12 +1013,13 @@ class TTA_ThreadDesk {
 			'selectedColorKey' => $selected_color_key,
 		) );
 
-		$this->log_user_activity( $user_id, sprintf( __( 'Screenprint quote created: %s', 'threaddesk' ), $quote_title ), 'quote' );
+		$this->log_user_activity( $user_id, sprintf( $is_update ? __( 'Screenprint quote updated: %s', 'threaddesk' ) : __( 'Screenprint quote created: %s', 'threaddesk' ), get_the_title( $quote_id ) ), 'quote' );
 
 		wp_send_json_success( array(
 			'quoteId'      => (int) $quote_id,
 			'adminEditUrl' => admin_url( 'post.php?post=' . absint( $quote_id ) . '&action=edit' ),
-			'message'      => __( 'Quote added successfully.', 'threaddesk' ),
+			'isUpdate'     => $is_update ? 1 : 0,
+			'message'      => $is_update ? __( 'Quote updated successfully.', 'threaddesk' ) : __( 'Quote added successfully.', 'threaddesk' ),
 		) );
 	}
 
@@ -2938,9 +2972,15 @@ class TTA_ThreadDesk {
 			const i18nAddToQuoteSuccess=<?php echo wp_json_encode( __( 'Quote added successfully.', 'threaddesk' ) ); ?>;
 			const i18nAddToQuoteError=<?php echo wp_json_encode( __( 'Unable to add quote right now.', 'threaddesk' ) ); ?>;
 			const i18nAddToQuoteRequiresQty=<?php echo wp_json_encode( __( 'Please add at least one quantity before creating a quote.', 'threaddesk' ) ); ?>;
+			const i18nQuoteTitlePrompt=<?php echo wp_json_encode( __( 'Enter a title for this quote', 'threaddesk' ) ); ?>;
+			const i18nQuoteTitleRequired=<?php echo wp_json_encode( __( 'A quote title is required.', 'threaddesk' ) ); ?>;
+			const i18nQuoteSavedContinue=<?php echo wp_json_encode( __( 'Quote saved. Continue adding articles to this quote?', 'threaddesk' ) ); ?>;
+			const i18nKeepShopping=<?php echo wp_json_encode( __( 'KEEP SHOPPING', 'threaddesk' ) ); ?>;
+			const i18nContinueHere=<?php echo wp_json_encode( __( 'Continue here', 'threaddesk' ) ); ?>;
 			const screenprintQuoteAjaxUrl=<?php echo wp_json_encode( admin_url( 'admin-ajax.php' ) ); ?>;
 			const screenprintQuoteNonce=<?php echo wp_json_encode( wp_create_nonce( 'tta_threaddesk_screenprint_quote' ) ); ?>;
 			const screenprintProductId=<?php echo (int) $product_id; ?>;
+			const screenprintProductsPageUrl=<?php echo wp_json_encode( function_exists( 'wc_get_page_permalink' ) ? wc_get_page_permalink( 'shop' ) : home_url( '/shop/' ) ); ?>;
 			const createLayoutCategory=String(root.getAttribute('data-threaddesk-screenprint-create-layout-category')||'').trim();
 			const createLayoutCategoryId=Number(root.getAttribute('data-threaddesk-screenprint-create-layout-category-id')||0);
 			const shouldOpenChooser=String(root.getAttribute('data-threaddesk-screenprint-open-chooser')||'0').trim()==='1';
@@ -3340,6 +3380,40 @@ class TTA_ThreadDesk {
 				});
 				return rows;
 			};
+			const requestQuoteTitle=()=>{
+				const entered=window.prompt(i18nQuoteTitlePrompt||'Enter a title for this quote','');
+				if(null===entered){return null;}
+				const cleaned=String(entered||'').trim();
+				if(!cleaned){window.alert(i18nQuoteTitleRequired||'A quote title is required.');return null;}
+				return cleaned;
+			};
+			const showQuoteSavedPopup=(message)=>{
+				const overlay=document.createElement('div');
+				overlay.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;z-index:99999;padding:20px;';
+				const panel=document.createElement('div');
+				panel.style.cssText='background:#fff;max-width:460px;width:100%;border-radius:8px;padding:20px;box-shadow:0 20px 60px rgba(0,0,0,.3);';
+				const text=document.createElement('p');
+				text.textContent=String(message||i18nQuoteSavedContinue||'Quote saved. Continue adding articles to this quote?');
+				text.style.margin='0 0 16px 0';
+				const actions=document.createElement('div');
+				actions.style.cssText='display:flex;gap:10px;justify-content:flex-end;';
+				const continueBtn=document.createElement('button');
+				continueBtn.type='button';
+				continueBtn.textContent=i18nContinueHere||'Continue here';
+				continueBtn.style.cssText='padding:10px 14px;border:1px solid #d0d0d0;background:#fff;border-radius:4px;cursor:pointer;';
+				const keepBtn=document.createElement('button');
+				keepBtn.type='button';
+				keepBtn.textContent=i18nKeepShopping||'KEEP SHOPPING';
+				keepBtn.style.cssText='padding:10px 14px;border:1px solid #2271b1;background:#2271b1;color:#fff;border-radius:4px;cursor:pointer;';
+				continueBtn.addEventListener('click',()=>{overlay.remove();});
+				keepBtn.addEventListener('click',()=>{if(screenprintProductsPageUrl){window.location.href=String(screenprintProductsPageUrl);return;}overlay.remove();});
+				actions.appendChild(continueBtn);
+				actions.appendChild(keepBtn);
+				panel.appendChild(text);
+				panel.appendChild(actions);
+				overlay.appendChild(panel);
+				document.body.appendChild(overlay);
+			};
 			const submitAddToQuote=async()=>{
 				const rows=getQuoteRowsForRequest();
 				if(!rows.length){window.alert(i18nAddToQuoteRequiresQty||'Please add at least one quantity before creating a quote.');return;}
@@ -3352,6 +3426,11 @@ class TTA_ThreadDesk {
 				payload.set('layoutTitle',String((selected&&selected.title)||''));
 				payload.set('selectedColor',String(getSelectedColorLabel()||''));
 				payload.set('selectedColorKey',String(selectedColor||''));
+				const quoteTitle=requestQuoteTitle();
+				if(null===quoteTitle){return;}
+				payload.set('quoteTitle',quoteTitle);
+				const activeQuoteId=window.localStorage?String(window.localStorage.getItem('tta_threaddesk_active_quote_id')||'').trim():'';
+				if(activeQuoteId){payload.set('existingQuoteId',activeQuoteId);}
 				rows.forEach((row,rowIndex)=>{
 					Object.keys(row).forEach((key)=>{
 						if(key==='placements'){
@@ -3377,8 +3456,8 @@ class TTA_ThreadDesk {
 					const response=await fetch(screenprintQuoteAjaxUrl,{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/x-www-form-urlencoded; charset=UTF-8'},body:payload.toString()});
 					const data=await response.json();
 					if(!response.ok||!data||!data.success){throw new Error((data&&data.data&&data.data.message)?data.data.message:(i18nAddToQuoteError||'Unable to add quote right now.'));}
-					window.alert((data&&data.data&&data.data.message)||i18nAddToQuoteSuccess||'Quote added successfully.');
-					if(data&&data.data&&data.data.adminEditUrl){window.open(String(data.data.adminEditUrl),'_blank','noopener');}
+					if(window.localStorage&&data&&data.data&&data.data.quoteId){window.localStorage.setItem('tta_threaddesk_active_quote_id',String(data.data.quoteId));}
+					showQuoteSavedPopup((data&&data.data&&data.data.message)||i18nAddToQuoteSuccess||'Quote added successfully.');
 				}catch(error){
 					window.alert((error&&error.message)?error.message:(i18nAddToQuoteError||'Unable to add quote right now.'));
 				}finally{
