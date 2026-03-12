@@ -3463,8 +3463,8 @@ class TTA_ThreadDesk {
 					addMoreBtn.type='button';
 					addMoreBtn.className='threaddesk-screenprint__quantities-button';
 					addMoreBtn.textContent=i18nKeepShopping||'ADD MORE TO QUOTE';
-					submitQuoteBtn.addEventListener('click',()=>{close();});
-					addMoreBtn.addEventListener('click',()=>{if(screenprintProductsPageUrl){window.location.href=String(screenprintProductsPageUrl);return;}close();});
+					submitQuoteBtn.addEventListener('click',()=>{if(window.localStorage){window.localStorage.removeItem('tta_threaddesk_continue_quote');window.localStorage.removeItem('tta_threaddesk_active_quote_id');}close();});
+					addMoreBtn.addEventListener('click',()=>{if(window.localStorage){window.localStorage.setItem('tta_threaddesk_continue_quote','1');}if(screenprintProductsPageUrl){window.location.href=String(screenprintProductsPageUrl);return;}close();});
 					actions.appendChild(submitQuoteBtn);
 					actions.appendChild(addMoreBtn);
 				};
@@ -3492,8 +3492,9 @@ class TTA_ThreadDesk {
 				const quoteTitle=await new Promise((resolve)=>{popup.showNameStep(resolve);});
 				if(null===quoteTitle){return;}
 				payload.set('quoteTitle',quoteTitle);
+				const shouldContinueExisting=window.localStorage&&String(window.localStorage.getItem('tta_threaddesk_continue_quote')||'').trim()==='1';
 				const activeQuoteId=window.localStorage?String(window.localStorage.getItem('tta_threaddesk_active_quote_id')||'').trim():'';
-				if(activeQuoteId){payload.set('existingQuoteId',activeQuoteId);}
+				if(shouldContinueExisting&&activeQuoteId){payload.set('existingQuoteId',activeQuoteId);}
 				rows.forEach((row,rowIndex)=>{
 					Object.keys(row).forEach((key)=>{
 						if(key==='placements'){
@@ -3519,7 +3520,7 @@ class TTA_ThreadDesk {
 					const response=await fetch(screenprintQuoteAjaxUrl,{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/x-www-form-urlencoded; charset=UTF-8'},body:payload.toString()});
 					const data=await response.json();
 					if(!response.ok||!data||!data.success){throw new Error((data&&data.data&&data.data.message)?data.data.message:(i18nAddToQuoteError||'Unable to add quote right now.'));}
-					if(window.localStorage&&data&&data.data&&data.data.quoteId){window.localStorage.setItem('tta_threaddesk_active_quote_id',String(data.data.quoteId));}
+					if(window.localStorage&&data&&data.data&&data.data.quoteId){window.localStorage.setItem('tta_threaddesk_active_quote_id',String(data.data.quoteId));if(!shouldContinueExisting){window.localStorage.removeItem('tta_threaddesk_continue_quote');}}
 					popup.showSuccessStep((data&&data.data&&data.data.message)||i18nQuoteSavedContinue||'Quote saved. Continue adding articles to this quote?');
 				}catch(error){
 					popup.close();
