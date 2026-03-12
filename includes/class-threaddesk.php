@@ -1874,6 +1874,21 @@ class TTA_ThreadDesk {
 			}
 			return false;
 		}
+		if ( is_string( $value ) ) {
+			$trimmed = trim( $value );
+			if ( '' === $trimmed || ( '{' !== substr( $trimmed, 0, 1 ) && '[' !== substr( $trimmed, 0, 1 ) ) ) {
+				return false;
+			}
+			$decoded = json_decode( $trimmed, true );
+			if ( ! is_array( $decoded ) ) {
+				return false;
+			}
+			if ( $this->update_design_reference_in_value( $decoded, $design_id, $old_title, $new_title, $design_urls ) ) {
+				$value = wp_json_encode( $decoded );
+				return true;
+			}
+			return false;
+		}
 		return false;
 	}
 
