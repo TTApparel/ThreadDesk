@@ -3010,41 +3010,46 @@ class TTA_ThreadDesk {
 			const getSelectedDesignSummaries=()=>{
 				if(!selected||!selected.placementsByAngle||typeof selected.placementsByAngle!=='object'){return [];}
 				const colorChangeCost=getPricingNumber('color_change_cost');
-				const designMap={};
+				const summaryMap={};
 				Object.keys(selected.placementsByAngle).forEach((angleKey)=>{
 					const entries=normalizePlacementEntries(selected.placementsByAngle[angleKey],angleKey);
 					entries.forEach((entry,index)=>{
-						const paletteCurrent=Array.isArray(entry&&entry.paletteCurrent)?entry.paletteCurrent:[];
-						const paletteOriginal=Array.isArray(entry&&entry.paletteOriginal)?entry.paletteOriginal:[];
+						if(!entry||typeof entry!=='object'){return;}
+						const designId=Number(entry.designId||0);
+						const designLabel=String((entry.designName)||(entry.placementLabel)||i18nDesignFallback).trim()||i18nDesignFallback;
+						const designSource=String((entry.baseUrl)||(entry.__paletteSource)||(entry.url)||'').trim();
+						const designIdentity=(designId>0?('id:'+String(designId)):('src:'+designSource+'|label:'+designLabel+'|idx:'+String(index)));
+						const approxSize=Math.round(Number(entry.sliderValue)||100);
+						const summaryKey=designIdentity+'|size:'+String(approxSize);
+						const paletteCurrent=Array.isArray(entry.paletteCurrent)?entry.paletteCurrent:[];
+						const paletteOriginal=Array.isArray(entry.paletteOriginal)?entry.paletteOriginal:[];
 						const palette=(paletteCurrent.length?paletteCurrent:paletteOriginal).filter((color)=>String(color||'').trim()!==''&&String(color||'').trim().toLowerCase()!=='transparent');
 						const normalizedPalette=palette.map((color)=>String(color||'').trim().toLowerCase()).filter((color)=>color!=='').sort();
 						const estimatedColorCount=palette.length>0?palette.length:1;
-						const designLabel=String((entry&&entry.designName)||(entry&&entry.placementLabel)||i18nDesignFallback).trim()||i18nDesignFallback;
-						const approxSize=Math.round(Number(entry&&entry.sliderValue)||100);
-						const designId=String(Number(entry&&entry.designId)||0);
-						const designKey=String((entry&&entry.url)||designId+'|'+designLabel).trim()||('design-'+String(index+1));
-						if(!designMap[designKey]){
-							designMap[designKey]={designLabel,estimatedColorCount,additionalSetupCost:0,totalPrintCostCount:0,sizeMap:{}};
-						}
-						const summary=designMap[designKey];
-						summary.estimatedColorCount=Math.max(Number(summary.estimatedColorCount)||1,estimatedColorCount);
-						if(!Object.prototype.hasOwnProperty.call(summary.sizeMap,approxSize)){
-							summary.sizeMap[approxSize]=normalizedPalette.join('|');
-							summary.totalPrintCostCount+=1;
+						if(!summaryMap[summaryKey]){
+							summaryMap[summaryKey]={
+								designLabel:designLabel,
+								estimatedColorCount:estimatedColorCount,
+								additionalSetupCost:0,
+								printCostCount:1,
+								paletteSignature:normalizedPalette.join('|')
+							};
 							return;
 						}
-						const existingPalette=String(summary.sizeMap[approxSize]||'');
+						const summary=summaryMap[summaryKey];
+						summary.estimatedColorCount=Math.max(Number(summary.estimatedColorCount)||1,estimatedColorCount);
+						const existingPalette=String(summary.paletteSignature||'');
 						const currentPalette=normalizedPalette.join('|');
 						if(existingPalette!==currentPalette){
 							summary.additionalSetupCost+=colorChangeCost;
 						}
 					});
 				});
-				return Object.values(designMap).map((summary)=>({
+				return Object.values(summaryMap).map((summary)=>({
 					designLabel:summary.designLabel,
 					estimatedColorCount:summary.estimatedColorCount,
 					additionalSetupCost:summary.additionalSetupCost,
-					totalPrintCostCount:summary.totalPrintCostCount
+					totalPrintCostCount:summary.printCostCount
 				}));
 			};
 			const renderQuoteDesignSummary=(rows)=>{
