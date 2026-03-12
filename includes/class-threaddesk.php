@@ -412,6 +412,7 @@ class TTA_ThreadDesk {
 		return array(
 			'setup_cost'       => 50,
 			'color_setup_cost' => 30,
+			'color_change_cost'=> 5,
 			'repeat_reduction' => 15,
 			'print_cost'       => 1.25,
 			'color_cost'       => 0.10,
@@ -436,7 +437,7 @@ class TTA_ThreadDesk {
 			if ( in_array( $key, array( 'garment_cost', 'total_margins' ), true ) && $number > 99.99 ) {
 				$number = 99.99;
 			}
-			$sanitized[ $key ] = in_array( $key, array( 'setup_cost', 'color_setup_cost', 'repeat_reduction', 'garment_cost', 'total_margins' ), true ) ? round( $number, 2 ) : round( $number, 4 );
+			$sanitized[ $key ] = in_array( $key, array( 'setup_cost', 'color_setup_cost', 'color_change_cost', 'repeat_reduction', 'garment_cost', 'total_margins' ), true ) ? round( $number, 2 ) : round( $number, 4 );
 		}
 
 		return $sanitized;
@@ -592,6 +593,10 @@ class TTA_ThreadDesk {
 								<label>
 									<span><?php echo esc_html__( 'Color Setup Cost', 'threaddesk' ); ?></span><br />
 									<input type="number" min="0" step="0.01" name="tta_threaddesk_print_pricing[color_setup_cost]" value="<?php echo esc_attr( (string) $print_pricing['color_setup_cost'] ); ?>" />
+								</label>
+								<label>
+									<span><?php echo esc_html__( 'Color Change Cost', 'threaddesk' ); ?></span><br />
+									<input type="number" min="0" step="0.01" name="tta_threaddesk_print_pricing[color_change_cost]" value="<?php echo esc_attr( (string) $print_pricing['color_change_cost'] ); ?>" />
 								</label>
 								<label>
 									<span><?php echo esc_html__( 'Repeat Reduction', 'threaddesk' ); ?></span><br />
@@ -2935,7 +2940,7 @@ class TTA_ThreadDesk {
 				if(stageHeight>0){viewerStep.style.setProperty('--threaddesk-screenprint-stage-rendered-height',stageHeight+'px');}
 			};
 			const normalizeColorValue=(value)=>String(value||'').trim().toLowerCase().replace(/\s+/g,'-');
-			const defaultPricing={setup_cost:50,color_setup_cost:30,repeat_reduction:15,print_cost:1.25,color_cost:0.10,garment_cost:50,total_margins:30};
+			const defaultPricing={setup_cost:50,color_setup_cost:30,color_change_cost:5,repeat_reduction:15,print_cost:1.25,color_cost:0.10,garment_cost:50,total_margins:30};
 			const getPricingNumber=(key)=>{
 				const fallback=Object.prototype.hasOwnProperty.call(defaultPricing,key)?defaultPricing[key]:0;
 				const raw=Object.prototype.hasOwnProperty.call(pricingSettings,key)?pricingSettings[key]:fallback;
@@ -2990,31 +2995,56 @@ class TTA_ThreadDesk {
 				const summaries=Array.isArray(designSummaries)?designSummaries:[];
 				const totalUnitPrintCost=summaries.reduce((sum,summary)=>{
 					const count=Math.max(1,Number(summary&&summary.estimatedColorCount)||1);
-					return sum+(((setup+(colorSetup*count))/qty)+(colorCost*count)+printCost);
+					const setupUnitCost=((setup+(colorSetup*count)+(Math.max(0,Number(summary&&summary.additionalSetupCost)||0)))/qty);
+					const placementPrintCost=Math.max(1,Number(summary&&summary.totalPrintCostCount)||1)*printCost;
+					return sum+setupUnitCost+(colorCost*count)+placementPrintCost;
 				},0);
 				const fallbackCount=Math.max(1,summaries.length||0);
-				const baseUnitCost=garmentValue+(totalUnitPrintCost>0?totalUnitPrintCost:((((setup+(colorSetup*1))/qty)+(colorCost*1)+printCost)*fallbackCount));
+				const fallbackPrintCost=fallbackCount*printCost;
+				const baseUnitCost=garmentValue+(totalUnitPrintCost>0?totalUnitPrintCost:((((setup+(colorSetup*1))/qty)+(colorCost*1)+fallbackPrintCost)));
 				const marginDivisor=1-(totalMarginsPct/100);
 				if(!Number.isFinite(marginDivisor)||marginDivisor<=0){return baseUnitCost;}
 				return baseUnitCost/marginDivisor;
 			};
 			const getSelectedDesignSummaries=()=>{
 				if(!selected||!selected.placementsByAngle||typeof selected.placementsByAngle!=='object'){return [];}
+				const colorChangeCost=getPricingNumber('color_change_cost');
 				const designMap={};
 				Object.keys(selected.placementsByAngle).forEach((angleKey)=>{
 					const entries=normalizePlacementEntries(selected.placementsByAngle[angleKey],angleKey);
-					entries.forEach((entry)=>{
+					entries.forEach((entry,index)=>{
 						const paletteCurrent=Array.isArray(entry&&entry.paletteCurrent)?entry.paletteCurrent:[];
 						const paletteOriginal=Array.isArray(entry&&entry.paletteOriginal)?entry.paletteOriginal:[];
 						const palette=(paletteCurrent.length?paletteCurrent:paletteOriginal).filter((color)=>String(color||'').trim()!==''&&String(color||'').trim().toLowerCase()!=='transparent');
+						const normalizedPalette=palette.map((color)=>String(color||'').trim().toLowerCase()).filter((color)=>color!=='').sort();
 						const estimatedColorCount=palette.length>0?palette.length:1;
-						const designLabel=String((entry&&entry.designName)|| (entry&&entry.placementLabel) || i18nDesignFallback).trim()||i18nDesignFallback;
-						const key=String((entry&&entry.url)||designLabel+'|'+angleKey).trim();
-						if(!designMap[key]){designMap[key]={designLabel,estimatedColorCount};return;}
-						designMap[key].estimatedColorCount=Math.max(Number(designMap[key].estimatedColorCount)||1,estimatedColorCount);
+						const designLabel=String((entry&&entry.designName)||(entry&&entry.placementLabel)||i18nDesignFallback).trim()||i18nDesignFallback;
+						const approxSize=Math.round(Number(entry&&entry.sliderValue)||100);
+						const designId=String(Number(entry&&entry.designId)||0);
+						const designKey=String((entry&&entry.url)||designId+'|'+designLabel).trim()||('design-'+String(index+1));
+						if(!designMap[designKey]){
+							designMap[designKey]={designLabel,estimatedColorCount,additionalSetupCost:0,totalPrintCostCount:0,sizeMap:{}};
+						}
+						const summary=designMap[designKey];
+						summary.estimatedColorCount=Math.max(Number(summary.estimatedColorCount)||1,estimatedColorCount);
+						if(!Object.prototype.hasOwnProperty.call(summary.sizeMap,approxSize)){
+							summary.sizeMap[approxSize]=normalizedPalette.join('|');
+							summary.totalPrintCostCount+=1;
+							return;
+						}
+						const existingPalette=String(summary.sizeMap[approxSize]||'');
+						const currentPalette=normalizedPalette.join('|');
+						if(existingPalette!==currentPalette){
+							summary.additionalSetupCost+=colorChangeCost;
+						}
 					});
 				});
-				return Object.values(designMap);
+				return Object.values(designMap).map((summary)=>({
+					designLabel:summary.designLabel,
+					estimatedColorCount:summary.estimatedColorCount,
+					additionalSetupCost:summary.additionalSetupCost,
+					totalPrintCostCount:summary.totalPrintCostCount
+				}));
 			};
 			const renderQuoteDesignSummary=(rows)=>{
 				if(!quoteDesigns){return;}
