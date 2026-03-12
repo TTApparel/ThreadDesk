@@ -2677,6 +2677,7 @@ class TTA_ThreadDesk {
 			const angleThumbs=root.querySelectorAll('[data-threaddesk-screenprint-angle-image]');
 				if(!colorPicker||!options||!chooserStep||!viewerStep||!quantitiesStep){return;}
 			let selected=null; let angle='front'; let selectedColor=initialColorKey; let stageRatioLocked=false; let colorsExpanded=false; let activePlacementKey=''; let activePaletteEditor=null; let dragState=null;
+			const screenprintPaletteOptionSet=['transparent','#FFFFFF','#000000','#FEDB00','#FED141','#FFB81C','#FF6A39','#E38331','#BE531C','#C8102E','#D22730','#BE3A34','#A6192E','#A50034','#FF85BD','#BA9CC5','#512D6D','#833177','#351F65','#10069F','#131F29','#28334A','#002D72','#004C97','#0076A8','#8BBEE8','#0092CB','#00AFD7','#007C80','#007A53','#00AD50','#249E6B','#00664F','#304F42','#4E3629','#7B4D35','#D3BC8D','#D5CB9F','#B1B3B3','#A7A8AA','#F2E9DB'];
 			if(!selectedColor||!imageMap[selectedColor]){const keys=Object.keys(imageMap||{}); selectedColor=keys.length?keys[0]:'';}
 			let images=(imageMap&&imageMap[selectedColor])?imageMap[selectedColor]:{};
 			const cartForm=(root.closest('form.cart'))||(root.closest('.product')?root.closest('.product').querySelector('form.cart'):null)||document.querySelector('form.cart');
@@ -2733,7 +2734,11 @@ class TTA_ThreadDesk {
 				cartLayoutDesignIdsField.value=seenDesignIds.join(',');
 				cartLayoutSnapshotField.value=JSON.stringify(snapshot);
 			};
-			const setStep=(step)=>{
+			const getStepFocusable=(container)=>{
+				if(!container){return null;}
+				return container.querySelector('button:not([disabled]),[href],input:not([type="hidden"]):not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])');
+			};
+			const setStep=(step,shouldMoveFocus=true)=>{
 				const showChooser=step==='chooser';
 				const showViewer=step==='viewer';
 				const showQuantities=step==='quantities';
@@ -2750,10 +2755,12 @@ class TTA_ThreadDesk {
 			};
 			const closeScreenprintModal=()=>{
 				if(!modal){return;}
+				const activeElement=document.activeElement;
+				if(activeElement&&modal.contains(activeElement)&&typeof activeElement.blur==='function'){activeElement.blur();}
 				modal.classList.remove('is-active');
 				modal.setAttribute('aria-hidden','true');
 				document.body.classList.remove('threaddesk-modal-open');
-				setStep('chooser');
+				setStep('chooser',false);
 			};
 			const syncScreenprintPanelHeight=()=>{
 				if(!viewerStep||viewerStep.hidden||!stage){return;}
@@ -2875,12 +2882,124 @@ class TTA_ThreadDesk {
 				}
 				return '';
 			};
+			const createStrongPrefixLabel=(prefix,value)=>{
+				const fragment=document.createDocumentFragment();
+				const strong=document.createElement('strong');
+				strong.textContent=String(prefix||'').trim()+':';
+				fragment.appendChild(strong);
+				fragment.appendChild(document.createTextNode(' '+String(value||'').trim()));
+				return fragment;
+			};
 			const renderSelectedColorLabel=()=>{
 				if(!selectedColorLabel){return;}
 				const label=getSelectedColorLabel();
-				selectedColorLabel.textContent=(i18nSelectedColorPrefix||'Color')+': '+(label||'--');
+				selectedColorLabel.replaceChildren(createStrongPrefixLabel(i18nSelectedColorPrefix||'Color',label||'--'));
 			};
-			const getEntrySource=(entry)=>String((entry&&entry.sourceUrl)|| (entry&&entry.designUrl) || (entry&&entry.previewUrl) || (entry&&entry.preview) || (entry&&entry.url) || (entry&&entry.imageUrl) || (entry&&entry.mockupUrl) || (entry&&entry.svgUrl) || '').trim();
+			const renderSelectedLayoutLabel=(title)=>{
+				if(!selectedLabel){return;}
+				selectedLabel.replaceChildren(createStrongPrefixLabel(i18nSelectedPrefix||'LAYOUT',title||'--'));
+			};
+			const getEntrySource=(entry)=>String((entry&&entry.__recoloredSource) || (entry&&entry.url) || (entry&&entry.sourceUrl)|| (entry&&entry.designUrl) || (entry&&entry.previewUrl) || (entry&&entry.preview) || (entry&&entry.imageUrl) || (entry&&entry.mockupUrl) || (entry&&entry.svgUrl) || '').trim();
+			const normalizeHexColor=(value)=>{
+				const raw=String(value||'').trim();
+				if(raw.toLowerCase()==='transparent'){return 'transparent';}
+				if(!raw){return '';}
+				const hex=raw.charAt(0)==='#'?raw:('#'+raw);
+				return /^#[0-9a-fA-F]{6}$/.test(hex)?hex.toUpperCase():'';
+			};
+			const escapeRegex=(value)=>String(value||'').replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+			const decodeSvgDataUrl=(source)=>{
+				const raw=String(source||'').trim();
+				const marker='data:image/svg+xml,';
+				const markerBase64='data:image/svg+xml;base64,';
+				if(raw.indexOf(markerBase64)===0){
+					try{return atob(raw.substring(markerBase64.length));}catch(e){return ''; }
+				}
+				if(raw.indexOf(marker)===0){
+					try{return decodeURIComponent(raw.substring(marker.length));}catch(e){return raw.substring(marker.length);}
+				}
+				if(raw.indexOf('<svg')!==-1){return raw;}
+				return '';
+			};
+			const encodeSvgDataUrl=(svgMarkup)=>'data:image/svg+xml,'+encodeURIComponent(String(svgMarkup||''));
+			const parsePaletteColor=(value)=>{
+				const token=String(value||'').trim();
+				if(!token){return null;}
+				if(token.toLowerCase()==='transparent'){return {token:'transparent',rgb:[255,255,255],alpha:0};}
+				const hex=normalizeHexColor(token);
+				if(!hex){return null;}
+				return {token:hex,rgb:[parseInt(hex.substring(1,3),16),parseInt(hex.substring(3,5),16),parseInt(hex.substring(5,7),16)],alpha:255};
+			};
+			const recolorRasterEntry=(entry,originalSource,paletteBase,paletteCurrent)=>{
+				const sourceParsed=paletteBase.map(parsePaletteColor).filter(Boolean);
+				const targetParsed=paletteCurrent.map(parsePaletteColor).filter(Boolean);
+				if(!sourceParsed.length||sourceParsed.length!==targetParsed.length){return;}
+				let changed=false;
+				for(let i=0;i<sourceParsed.length;i++){if(sourceParsed[i].token!==targetParsed[i].token){changed=true;break;}}
+				if(!changed){entry.__recoloredSource=originalSource;entry.url=originalSource;return;}
+				const cacheKey=originalSource+'|'+sourceParsed.map((item)=>item.token).join(',')+'|'+targetParsed.map((item)=>item.token).join(',');
+				if(!entry.__recolorCache||typeof entry.__recolorCache!=='object'){entry.__recolorCache={};}
+				if(entry.__recolorCache[cacheKey]){entry.__recoloredSource=entry.__recolorCache[cacheKey];entry.url=entry.__recoloredSource;return;}
+				const img=new Image();
+				img.crossOrigin='anonymous';
+				img.addEventListener('load',()=>{
+					try{
+						const canvas=document.createElement('canvas');
+						canvas.width=img.naturalWidth||img.width;
+						canvas.height=img.naturalHeight||img.height;
+						const ctx=canvas.getContext('2d',{willReadFrequently:true});
+						if(!ctx){return;}
+						ctx.drawImage(img,0,0);
+						const imageData=ctx.getImageData(0,0,canvas.width,canvas.height);
+						const pixels=imageData.data;
+						for(let i=0;i<pixels.length;i+=4){
+							if(pixels[i+3]===0){continue;}
+							let bestIndex=0;
+							let bestScore=Number.POSITIVE_INFINITY;
+							for(let c=0;c<sourceParsed.length;c++){
+								const dr=pixels[i]-sourceParsed[c].rgb[0];
+								const dg=pixels[i+1]-sourceParsed[c].rgb[1];
+								const db=pixels[i+2]-sourceParsed[c].rgb[2];
+								const score=(dr*dr)+(dg*dg)+(db*db);
+								if(score<bestScore){bestScore=score;bestIndex=c;}
+							}
+							if(targetParsed[bestIndex].alpha===0){pixels[i]=255;pixels[i+1]=255;pixels[i+2]=255;pixels[i+3]=0;}
+							else{pixels[i]=targetParsed[bestIndex].rgb[0];pixels[i+1]=targetParsed[bestIndex].rgb[1];pixels[i+2]=targetParsed[bestIndex].rgb[2];pixels[i+3]=Math.max(pixels[i+3],targetParsed[bestIndex].alpha);}
+						}
+						ctx.putImageData(imageData,0,0);
+						const recolored=canvas.toDataURL('image/png');
+						entry.__recolorCache[cacheKey]=recolored;
+						entry.__recoloredSource=recolored;
+						entry.url=recolored;
+						render();
+					}catch(e){}
+				});
+				img.addEventListener('error',()=>{});
+				img.src=originalSource;
+			};
+			const applyEntryPalette=(entry)=>{
+				if(!entry||typeof entry!=='object'){return;}
+				const paletteBase=Array.isArray(entry.paletteBase)?entry.paletteBase:[];
+				const paletteCurrent=Array.isArray(entry.paletteCurrent)?entry.paletteCurrent:[];
+				if(!paletteBase.length||!paletteCurrent.length){return;}
+				const originalSource=String(entry.__paletteSource||entry.baseUrl||entry.url||entry.sourceUrl||entry.designUrl||entry.previewUrl||entry.preview||'').trim();
+				if(!originalSource){return;}
+				entry.__paletteSource=originalSource;
+				const svgMarkup=decodeSvgDataUrl(originalSource);
+				if(svgMarkup){
+					let nextMarkup=svgMarkup;
+					for(let i=0;i<Math.min(paletteBase.length,paletteCurrent.length);i++){
+						const from=normalizeHexColor(paletteBase[i]);
+						const to=normalizeHexColor(paletteCurrent[i]);
+						if(!from||!to||from===to){continue;}
+						nextMarkup=nextMarkup.replace(new RegExp(escapeRegex(from),'gi'),to);
+					}
+					entry.__recoloredSource=encodeSvgDataUrl(nextMarkup);
+					entry.url=entry.__recoloredSource;
+					return;
+				}
+				recolorRasterEntry(entry,originalSource,paletteBase,paletteCurrent);
+			};
 			const setActivePlacement=(placementKey)=>{
 				activePlacementKey=String(placementKey||'').trim();
 				if(!selectedDesignList){
@@ -2961,13 +3080,11 @@ class TTA_ThreadDesk {
 					placement.textContent=placementLabel;
 					const adjustPalette=document.createElement('div');
 					adjustPalette.className='threaddesk-layout-viewer__adjust-palette threaddesk-screenprint__active-adjust-palette';
-					adjustPalette.setAttribute('aria-hidden','true');
 					const paletteCurrent=Array.isArray(entry.paletteCurrent)?entry.paletteCurrent:[];
 					const paletteBase=Array.isArray(entry.paletteBase)?entry.paletteBase:[];
 					const placementKeyValue=String(entry.placementKey||'').trim();
 					const adjustPaletteOptions=document.createElement('div');
 					adjustPaletteOptions.className='threaddesk-layout-viewer__adjust-palette-options threaddesk-screenprint__active-adjust-palette-options';
-					adjustPaletteOptions.setAttribute('aria-hidden','true');
 					paletteCurrent.forEach((rawColor,colorIndex)=>{
 						const color=String(rawColor||'').trim();
 						if(!color){return;}
@@ -2993,6 +3110,7 @@ class TTA_ThreadDesk {
 					const activeEditor=activePaletteEditor&&activePaletteEditor.placementKey===placementKeyValue?Number(activePaletteEditor.colorIndex):-1;
 					if(activeEditor>=0&&paletteCurrent[activeEditor]!==undefined){
 						const optionPool=[];
+						screenprintPaletteOptionSet.forEach((raw)=>{const value=String(raw||'').trim();if(value&&!optionPool.includes(value)){optionPool.push(value);}});
 						paletteBase.forEach((raw)=>{const value=String(raw||'').trim();if(value&&!optionPool.includes(value)){optionPool.push(value);}});
 						paletteCurrent.forEach((raw)=>{const value=String(raw||'').trim();if(value&&!optionPool.includes(value)){optionPool.push(value);}});
 						if(!optionPool.includes('transparent')){optionPool.push('transparent');}
@@ -3009,6 +3127,8 @@ class TTA_ThreadDesk {
 								event.stopPropagation();
 								if(!Array.isArray(entry.paletteCurrent)){entry.paletteCurrent=[];}
 								entry.paletteCurrent[activeEditor]=choice;
+								applyEntryPalette(entry);
+								activePaletteEditor=null;
 								render();
 							});
 							adjustPaletteOptions.appendChild(choiceBtn);
@@ -3154,7 +3274,8 @@ class TTA_ThreadDesk {
 					const existingKey=String(entry.placementKey||'').trim();
 					if(existingKey){return entry;}
 					const labelKey=String(entry.placementLabel||entry.designName||'').trim();
-					return Object.assign({},entry,{placementKey:labelKey||fallbackKey});
+					entry.placementKey=labelKey||fallbackKey;
+					return entry;
 				};
 				if(Array.isArray(raw)){
 					return raw.map((entry,index)=>{
@@ -3360,7 +3481,7 @@ class TTA_ThreadDesk {
 				btn.appendChild(preview);
 				btn.appendChild(titleWrap);
 				btn.appendChild(meta);
-				btn.addEventListener('click',()=>{selected=layout; if(selectedLabel){selectedLabel.textContent=i18nSelectedPrefix+': '+title;} setStep('viewer'); render(); window.requestAnimationFrame(syncScreenprintPanelHeight);});
+				btn.addEventListener('click',()=>{selected=layout; renderSelectedLayoutLabel(title); setStep('viewer'); render(); window.requestAnimationFrame(syncScreenprintPanelHeight);});
 					options.appendChild(btn);
 					});
 					if(emptyState){
