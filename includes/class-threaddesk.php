@@ -2798,6 +2798,7 @@ class TTA_ThreadDesk {
 			const i18nQuantityLabel=<?php echo wp_json_encode( __( 'Quantity', 'threaddesk' ) ); ?>;
 			const i18nEstimatedUnitCostLabel=<?php echo wp_json_encode( __( 'Est. Cost/Unit', 'threaddesk' ) ); ?>;
 			const i18nQuoteDesignsTitle=<?php echo wp_json_encode( __( 'Designs in this quote', 'threaddesk' ) ); ?>;
+			const i18nQuoteGarmentsTitle=<?php echo wp_json_encode( __( 'Garment in this quote', 'threaddesk' ) ); ?>;
 			const i18nEstimatedColorCountLabel=<?php echo wp_json_encode( __( 'Estimated color count', 'threaddesk' ) ); ?>;
 			const i18nGarmentsLabel=<?php echo wp_json_encode( __( 'Garments', 'threaddesk' ) ); ?>;
 			const createLayoutCategory=String(root.getAttribute('data-threaddesk-screenprint-create-layout-category')||'').trim();
@@ -3028,6 +3029,9 @@ class TTA_ThreadDesk {
 				const title=document.createElement('p');
 				title.className='threaddesk-screenprint__quote-designs-title';
 				title.textContent=i18nQuoteDesignsTitle||'Designs in this quote';
+				const garmentTitle=document.createElement('p');
+				garmentTitle.className='threaddesk-screenprint__quote-designs-title';
+				garmentTitle.textContent=i18nQuoteGarmentsTitle||'Garment in this quote';
 				const list=document.createElement('ul');
 				list.className='threaddesk-screenprint__quote-designs-list';
 				designSummaries.forEach((summary)=>{
@@ -3037,6 +3041,7 @@ class TTA_ThreadDesk {
 					item.textContent=String(summary.designLabel||i18nDesignFallback)+' • '+(i18nEstimatedColorCountLabel||'Estimated color count')+': '+String(summary.estimatedColorCount||1)+' • '+(i18nGarmentsLabel||'Garments')+': '+garmentText;
 					list.appendChild(item);
 				});
+				quoteDesigns.appendChild(garmentTitle);
 				quoteDesigns.appendChild(title);
 				quoteDesigns.appendChild(list);
 				quoteDesigns.hidden=false;
