@@ -2601,7 +2601,6 @@ class TTA_ThreadDesk {
 						<div class="threaddesk-screenprint__quote-designs" data-threaddesk-screenprint-quote-designs></div>
 						<div class="threaddesk-screenprint__quantities-list" data-threaddesk-screenprint-quantities-list></div>
 						<p class="threaddesk-layout-viewer__placement-empty" data-threaddesk-screenprint-quantities-empty hidden><?php echo esc_html__( 'No size/color variations are available for this product.', 'threaddesk' ); ?></p>
-						<button type="button" class="threaddesk-screenprint__quantities-button" data-threaddesk-screenprint-add-to-quote><?php echo esc_html__( 'ADD TO QUOTE', 'threaddesk' ); ?></button>
 						<button type="button" class="threaddesk-layout-viewer__back-button" data-threaddesk-screenprint-back-to-viewer><?php echo esc_html__( '← Back to applied layout', 'threaddesk' ); ?></button>
 					</div>
 				</div>
@@ -2823,7 +2822,6 @@ class TTA_ThreadDesk {
 			const openQuantitiesButton=root.querySelector('[data-threaddesk-screenprint-open-quantities]');
 			const quantitiesList=root.querySelector('[data-threaddesk-screenprint-quantities-list]');
 			const quoteDesigns=root.querySelector('[data-threaddesk-screenprint-quote-designs]');
-			const addToQuoteButton=root.querySelector('[data-threaddesk-screenprint-add-to-quote]');
 			const quantitiesEmpty=root.querySelector('[data-threaddesk-screenprint-quantities-empty]');
 			const selectedDesignEmpty=root.querySelector('[data-threaddesk-screenprint-selected-design-empty]');
 			const main=root.querySelector('[data-threaddesk-screenprint-main]');
@@ -2978,11 +2976,7 @@ class TTA_ThreadDesk {
 					return sum+value;
 				},0);
 			};
-			const syncAddToQuoteButtonState=()=>{
-				if(!addToQuoteButton){return;}
-				addToQuoteButton.disabled=getTotalRequestedQuantity()<=0;
-			};
-			const calculateEstimatedUnitCost=(totalQuantity,colorCount,printCount,variationPrice)=>{
+			const calculateEstimatedUnitCost=(totalQuantity,designSummaries,variationPrice)=>{
 				const qty=Number(totalQuantity);
 				if(!Number.isFinite(qty)||qty<=0){return null;}
 				const setup=getPricingNumber('setup_cost');
@@ -3068,7 +3062,6 @@ class TTA_ThreadDesk {
 					return normalizeColorValue(row&&row.color)===normalizeColorValue(getSelectedColorLabel());
 				});
 				if(quantitiesEmpty){quantitiesEmpty.hidden=rows.length>0;}
-				if(addToQuoteButton){addToQuoteButton.hidden=rows.length===0;}
 				renderQuoteDesignSummary(rows);
 				const estimateRows=[];
 				const refreshAllEstimates=()=>{
@@ -3112,7 +3105,6 @@ class TTA_ThreadDesk {
 						const value=Number(input.value);
 						if(Number.isFinite(limit)&&Number.isFinite(value)&&value>limit){input.value=String(limit);}
 						refreshAllEstimates();
-						syncAddToQuoteButtonState();
 					});
 					inputWrap.appendChild(input);
 					item.appendChild(details);
@@ -3122,7 +3114,6 @@ class TTA_ThreadDesk {
 					quantitiesList.appendChild(item);
 				});
 				refreshAllEstimates();
-				syncAddToQuoteButtonState();
 			};
 			const getSideLabel=()=>String((images&&images.sideLabel)||'left').toLowerCase()==='right'?'right':'left';
 			const getAngleTransform=(targetAngle)=>{
@@ -3522,18 +3513,6 @@ class TTA_ThreadDesk {
 			root.querySelectorAll('[data-threaddesk-screenprint-back-to-viewer]').forEach((el)=>{
 				el.addEventListener('click',()=>{setStep('viewer');});
 			});
-			if(addToQuoteButton){
-				addToQuoteButton.addEventListener('click',(event)=>{
-					event.preventDefault();
-					if(getTotalRequestedQuantity()<=0||!cartForm){return;}
-					if(typeof cartForm.requestSubmit==='function'){
-						cartForm.requestSubmit();
-						return;
-					}
-					cartForm.submit();
-				});
-				syncAddToQuoteButtonState();
-			}
 			console.debug('[ThreadDesk] screenprint listeners bound');
 			const lockStageRatio=(src)=>{
 				if(stageRatioLocked||!stage||!src){return;}
