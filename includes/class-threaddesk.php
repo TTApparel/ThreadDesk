@@ -1425,6 +1425,7 @@ class TTA_ThreadDesk {
 		$old_original_path = $design_id ? (string) get_post_meta( $design_id, 'design_original_file_path', true ) : '';
 		$old_svg_path      = $design_id ? (string) get_post_meta( $design_id, 'design_svg_file_path', true ) : '';
 		$old_mockup_path   = $design_id ? (string) get_post_meta( $design_id, 'design_mockup_file_path', true ) : '';
+		$old_design_title  = $design_id ? (string) get_the_title( $design_id ) : '';
 
 		$design_file        = isset( $_FILES['threaddesk_design_file'] ) && is_array( $_FILES['threaddesk_design_file'] ) ? $_FILES['threaddesk_design_file'] : null;
 		$design_upload_name = isset( $design_file['name'] ) ? trim( (string) $design_file['name'] ) : '';
@@ -1656,6 +1657,11 @@ class TTA_ThreadDesk {
 			delete_post_meta( $design_id, '_tta_guest_token' );
 		}
 
+		$current_design_title = (string) get_the_title( $design_id );
+		if ( $design_id > 0 && '' !== $current_design_title && $current_design_title !== $old_design_title ) {
+			$this->sync_design_references_after_title_change( $design_id, $old_design_title, $current_design_title );
+		}
+
 		$this->log_user_activity( $current_user_id, $existing_design_id > 0 ? sprintf( __( 'Design updated: %s', 'threaddesk' ), get_the_title( $design_id ) ) : sprintf( __( 'Design uploaded: %s', 'threaddesk' ), get_the_title( $design_id ) ), 'design' );
 		if ( function_exists( 'wc_add_notice' ) ) {
 			wc_add_notice( __( 'Design saved successfully.', 'threaddesk' ), 'success' );
@@ -1674,6 +1680,7 @@ class TTA_ThreadDesk {
 		$title     = isset( $_POST['design_title'] ) ? sanitize_text_field( wp_unslash( $_POST['design_title'] ) ) : '';
 		$title     = trim( (string) $title );
 		$design    = get_post( $design_id );
+		$old_title = $design instanceof WP_Post ? (string) $design->post_title : '';
 
 		if ( ! $design || 'tta_design' !== $design->post_type || ! $this->can_manage_owned_post( $design, $owner_context ) ) {
 			if ( function_exists( 'wc_add_notice' ) ) {
@@ -1701,6 +1708,9 @@ class TTA_ThreadDesk {
 		}
 
 		wp_update_post( array( 'ID' => $design_id, 'post_title' => $title ) );
+		if ( '' !== $old_title && $old_title !== $title ) {
+			$this->sync_design_references_after_title_change( $design_id, $old_title, $title );
+		}
 		$this->log_user_activity( (int) $design->post_author, sprintf( __( 'Design renamed: %s', 'threaddesk' ), $title ), 'design' );
 		$current_file_name     = (string) get_post_meta( $design_id, 'design_file_name', true );
 		$current_original_path = (string) get_post_meta( $design_id, 'design_original_file_path', true );
@@ -1742,6 +1752,129 @@ class TTA_ThreadDesk {
 
 		wp_safe_redirect( $this->get_designs_redirect_url() );
 		exit;
+	}
+
+	private function sync_design_references_after_title_change( $design_id, $old_title, $new_title ) {
+		$design_id = absint( $design_id );
+		$new_title = sanitize_text_field( (string) $new_title );
+		$old_title = sanitize_text_field( (string) $old_title );
+		if ( $design_id <= 0 || '' === $new_title || $new_title === $old_title ) {
+			return;
+		}
+
+		$design_urls = array(
+			'mockup'  => esc_url_raw( (string) get_post_meta( $design_id, 'design_mockup_file_url', true ) ),
+			'preview' => esc_url_raw( (string) get_post_meta( $design_id, 'design_preview_url', true ) ),
+			'svg'     => esc_url_raw( (string) get_post_meta( $design_id, 'design_svg_file_url', true ) ),
+		);
+
+		$related_layouts  = $this->find_related_posts_by_id_in_meta( $design_id, 'tta_layout' );
+		$related_quotes   = $this->find_related_posts_by_id_in_meta( $design_id, 'tta_quote' );
+		$related_invoices = $this->find_related_posts_by_id_in_meta( $design_id, 'shop_order' );
+		$related_posts    = array_merge( $related_layouts, $related_quotes, $related_invoices );
+		$related_posts    = array_values( array_filter( $related_posts, function( $post ) { return $post instanceof WP_Post; } ) );
+
+		$processed_post_ids = array();
+		foreach ( $related_posts as $related_post ) {
+			$post_id = (int) $related_post->ID;
+			if ( $post_id <= 0 || in_array( $post_id, $processed_post_ids, true ) ) {
+				continue;
+			}
+			$processed_post_ids[] = $post_id;
+			$this->update_design_references_in_post_meta( $post_id, $design_id, $old_title, $new_title, $design_urls );
+		}
+	}
+
+	private function update_design_references_in_post_meta( $post_id, $design_id, $old_title, $new_title, $design_urls ) {
+		global $wpdb;
+		$post_id = absint( $post_id );
+		$design_id = absint( $design_id );
+		if ( $post_id <= 0 || $design_id <= 0 ) {
+			return;
+		}
+		$meta_rows = $wpdb->get_results( $wpdb->prepare( "SELECT meta_id, meta_value FROM {$wpdb->postmeta} WHERE post_id = %d", $post_id ) );
+		if ( empty( $meta_rows ) ) {
+			return;
+		}
+		foreach ( $meta_rows as $row ) {
+			$meta_id = isset( $row->meta_id ) ? absint( $row->meta_id ) : 0;
+			if ( $meta_id <= 0 ) {
+				continue;
+			}
+			$raw_value = isset( $row->meta_value ) ? (string) $row->meta_value : '';
+			$value = maybe_unserialize( $raw_value );
+			$changed = $this->update_design_reference_in_value( $value, $design_id, $old_title, $new_title, $design_urls );
+			if ( ! $changed ) {
+				continue;
+			}
+			update_metadata_by_mid( 'post', $meta_id, $value );
+		}
+	}
+
+	private function update_design_reference_in_value( &$value, $design_id, $old_title, $new_title, $design_urls ) {
+		$changed = false;
+		if ( is_array( $value ) ) {
+			$entry_design_id = 0;
+			if ( isset( $value['designId'] ) ) {
+				$entry_design_id = absint( $value['designId'] );
+			} elseif ( isset( $value['design_id'] ) ) {
+				$entry_design_id = absint( $value['design_id'] );
+			}
+			if ( $entry_design_id === (int) $design_id ) {
+				if ( isset( $value['designName'] ) && (string) $value['designName'] !== $new_title ) {
+					$value['designName'] = $new_title;
+					$changed = true;
+				}
+				if ( isset( $value['design_name'] ) && (string) $value['design_name'] !== $new_title ) {
+					$value['design_name'] = $new_title;
+					$changed = true;
+				}
+				$preferred_raster = '' !== (string) $design_urls['mockup'] ? (string) $design_urls['mockup'] : ( '' !== (string) $design_urls['preview'] ? (string) $design_urls['preview'] : (string) $design_urls['svg'] );
+				$preferred_vector = '' !== (string) $design_urls['svg'] ? (string) $design_urls['svg'] : ( '' !== (string) $design_urls['preview'] ? (string) $design_urls['preview'] : (string) $design_urls['mockup'] );
+				$url_key_map = array(
+					'url' => $preferred_raster,
+					'baseUrl' => $preferred_raster,
+					'preview' => $preferred_raster,
+					'previewUrl' => $preferred_raster,
+					'mockupUrl' => '' !== (string) $design_urls['mockup'] ? (string) $design_urls['mockup'] : $preferred_raster,
+					'designUrl' => $preferred_vector,
+					'sourceUrl' => $preferred_vector,
+					'svgUrl' => $preferred_vector,
+				);
+				foreach ( $url_key_map as $url_key => $target_url ) {
+					if ( '' === $target_url || ! isset( $value[ $url_key ] ) ) {
+						continue;
+					}
+					if ( (string) $value[ $url_key ] !== $target_url ) {
+						$value[ $url_key ] = $target_url;
+						$changed = true;
+					}
+				}
+				if ( isset( $value['placementKey'] ) ) {
+					$current_key = (string) $value['placementKey'];
+					if ( '' !== $old_title && ( $current_key === $old_title || sanitize_key( $current_key ) === sanitize_key( $old_title ) ) ) {
+						$value['placementKey'] = sanitize_key( $new_title );
+						$changed = true;
+					}
+				}
+			}
+			foreach ( $value as &$item ) {
+				if ( $this->update_design_reference_in_value( $item, $design_id, $old_title, $new_title, $design_urls ) ) {
+					$changed = true;
+				}
+			}
+			unset( $item );
+			return $changed;
+		}
+		if ( is_object( $value ) ) {
+			$array_value = (array) $value;
+			if ( $this->update_design_reference_in_value( $array_value, $design_id, $old_title, $new_title, $design_urls ) ) {
+				$value = (object) $array_value;
+				return true;
+			}
+			return false;
+		}
+		return false;
 	}
 
 
@@ -2438,7 +2571,6 @@ class TTA_ThreadDesk {
 						<div class="threaddesk-screenprint__right-column">
 							<div class="threaddesk-layout-viewer__design-panel">
 								<button type="button" class="threaddesk-layout-viewer__back-button" data-threaddesk-screenprint-back><?php echo esc_html__( 'Back to Saved Layouts', 'threaddesk' ); ?></button>
-								<h4><?php echo esc_html__( 'Applied Layout', 'threaddesk' ); ?></h4>
 								<p data-threaddesk-screenprint-selected><?php echo esc_html__( 'No layout selected yet.', 'threaddesk' ); ?></p>
 								<p class="threaddesk-screenprint__selected-color" data-threaddesk-screenprint-selected-color><?php echo esc_html__( 'Color: --', 'threaddesk' ); ?></p>
 								<div class="threaddesk-screenprint__selected-designs">
@@ -2748,9 +2880,23 @@ class TTA_ThreadDesk {
 				const showChooser=step==='chooser';
 				const showViewer=step==='viewer';
 				const showQuantities=step==='quantities';
+				const activeElement=document.activeElement;
+				if(activeElement&&activeElement!==document.body){
+					const activeInChooser=!!(chooserStep&&chooserStep.contains(activeElement));
+					const activeInViewer=!!(viewerStep&&viewerStep.contains(activeElement));
+					const activeInQuantities=!!(quantitiesStep&&quantitiesStep.contains(activeElement));
+					if((activeInChooser&&!showChooser)||(activeInViewer&&!showViewer)||(activeInQuantities&&!showQuantities)){
+						if(typeof activeElement.blur==='function'){activeElement.blur();}
+					}
+				}
 				if(chooserStep){chooserStep.hidden=!showChooser;chooserStep.classList.toggle('is-active',showChooser);chooserStep.setAttribute('aria-hidden',showChooser?'false':'true');}
 				if(viewerStep){viewerStep.hidden=!showViewer;viewerStep.classList.toggle('is-active',showViewer);viewerStep.setAttribute('aria-hidden',showViewer?'false':'true');}
 				if(quantitiesStep){quantitiesStep.hidden=!showQuantities;quantitiesStep.classList.toggle('is-active',showQuantities);quantitiesStep.setAttribute('aria-hidden',showQuantities?'false':'true');}
+				const shownStep=showChooser?chooserStep:(showViewer?viewerStep:quantitiesStep);
+				if(shouldMoveFocus&&shownStep){
+					const nextFocus=getStepFocusable(shownStep);
+					if(nextFocus&&typeof nextFocus.focus==='function'){window.requestAnimationFrame(()=>{nextFocus.focus();});}
+				}
 			};
 			const openScreenprintChooserModal=()=>{
 				if(!modal){return;}
@@ -5232,7 +5378,16 @@ class TTA_ThreadDesk {
 					continue;
 				}
 				$design_id = isset( $entry['designId'] ) ? absint( $entry['designId'] ) : 0;
-				$design_name = isset( $entry['designName'] ) ? sanitize_text_field( (string) $entry['designName'] ) : __( 'Design', 'threaddesk' );
+				$design_name = isset( $entry['designName'] ) ? sanitize_text_field( (string) $entry['designName'] ) : '';
+				if ( $design_id > 0 ) {
+					$resolved_title = get_the_title( $design_id );
+					if ( is_string( $resolved_title ) && '' !== trim( $resolved_title ) ) {
+						$design_name = sanitize_text_field( $resolved_title );
+					}
+				}
+				if ( '' === $design_name ) {
+					$design_name = __( 'Design', 'threaddesk' );
+				}
 				$placement_label = isset( $entry['placementLabel'] ) ? sanitize_text_field( (string) $entry['placementLabel'] ) : ucwords( str_replace( '_', ' ', (string) $placement_key ) );
 				$slider_value = isset( $entry['sliderValue'] ) ? (float) $entry['sliderValue'] : 100;
 				$design_ratio = isset( $entry['designRatio'] ) ? (float) $entry['designRatio'] : 1;
