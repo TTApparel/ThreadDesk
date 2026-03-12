@@ -2606,6 +2606,7 @@ class TTA_ThreadDesk {
 						<div class="threaddesk-screenprint__quote-designs" data-threaddesk-screenprint-quote-designs></div>
 						<div class="threaddesk-screenprint__quantities-list" data-threaddesk-screenprint-quantities-list></div>
 						<p class="threaddesk-layout-viewer__placement-empty" data-threaddesk-screenprint-quantities-empty hidden><?php echo esc_html__( 'No size/color variations are available for this product.', 'threaddesk' ); ?></p>
+						<button type="button" class="threaddesk-screenprint__quantities-button" data-threaddesk-screenprint-add-to-quote><?php echo esc_html__( 'ADD TO QUOTE', 'threaddesk' ); ?></button>
 						<button type="button" class="threaddesk-layout-viewer__back-button" data-threaddesk-screenprint-back-to-viewer><?php echo esc_html__( '← Back to applied layout', 'threaddesk' ); ?></button>
 					</div>
 				</div>
