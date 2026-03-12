@@ -3410,6 +3410,22 @@ class TTA_ThreadDesk {
 				});
 				return rows;
 			};
+
+			const openAuthLoginPanel=()=>{
+				const loginTrigger=document.querySelector('[data-threaddesk-auth="login"]');
+				if(loginTrigger&&typeof loginTrigger.click==='function'){loginTrigger.click();return;}
+				const authModal=document.querySelector('.threaddesk-auth-modal');
+				if(!authModal){return;}
+				authModal.classList.add('is-active');
+				authModal.setAttribute('aria-hidden','false');
+				document.body.classList.add('threaddesk-modal-open');
+				authModal.querySelectorAll('[data-threaddesk-auth-panel]').forEach((panel)=>{panel.classList.remove('is-active');panel.setAttribute('aria-hidden','true');});
+				authModal.querySelectorAll('[data-threaddesk-auth-tab]').forEach((tab)=>{tab.classList.remove('is-active');tab.setAttribute('aria-selected','false');});
+				const loginPanel=authModal.querySelector('[data-threaddesk-auth-panel="login"]');
+				if(loginPanel){loginPanel.classList.add('is-active');loginPanel.setAttribute('aria-hidden','false');}
+				const loginTab=authModal.querySelector('[data-threaddesk-auth-tab="login"]');
+				if(loginTab){loginTab.classList.add('is-active');loginTab.setAttribute('aria-selected','true');}
+			};
 			const openQuoteFlowPopup=()=>{
 				const overlay=document.createElement('div');
 				overlay.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;z-index:99999;padding:20px;';
@@ -3477,6 +3493,7 @@ class TTA_ThreadDesk {
 				return {showNameStep,showSuccessStep,close};
 			};
 			const submitAddToQuote=async()=>{
+				if(!isAuthenticated){openAuthLoginPanel();return;}
 				const rows=getQuoteRowsForRequest();
 				if(!rows.length){window.alert(i18nAddToQuoteRequiresQty||'Please add at least one quantity before creating a quote.');return;}
 				const prints=getSelectedPlacementEntries();
