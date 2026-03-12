@@ -2360,7 +2360,6 @@ class TTA_ThreadDesk {
 						<div class="threaddesk-screenprint__right-column">
 							<div class="threaddesk-layout-viewer__design-panel">
 								<button type="button" class="threaddesk-layout-viewer__back-button" data-threaddesk-screenprint-back><?php echo esc_html__( 'Back to Saved Layouts', 'threaddesk' ); ?></button>
-								<h4><?php echo esc_html__( 'Applied Layout', 'threaddesk' ); ?></h4>
 								<p data-threaddesk-screenprint-selected><?php echo esc_html__( 'No layout selected yet.', 'threaddesk' ); ?></p>
 								<p class="threaddesk-screenprint__selected-color" data-threaddesk-screenprint-selected-color><?php echo esc_html__( 'Color: --', 'threaddesk' ); ?></p>
 								<div class="threaddesk-screenprint__selected-designs">
@@ -2653,13 +2652,31 @@ class TTA_ThreadDesk {
 				cartLayoutDesignIdsField.value=seenDesignIds.join(',');
 				cartLayoutSnapshotField.value=JSON.stringify(snapshot);
 			};
-			const setStep=(step)=>{
+			const getStepFocusable=(container)=>{
+				if(!container){return null;}
+				return container.querySelector('button:not([disabled]),[href],input:not([type="hidden"]):not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])');
+			};
+			const setStep=(step,shouldMoveFocus=true)=>{
 				const showChooser=step==='chooser';
 				const showViewer=step==='viewer';
 				const showQuantities=step==='quantities';
+				const activeElement=document.activeElement;
+				if(activeElement&&activeElement!==document.body){
+					const activeInChooser=!!(chooserStep&&chooserStep.contains(activeElement));
+					const activeInViewer=!!(viewerStep&&viewerStep.contains(activeElement));
+					const activeInQuantities=!!(quantitiesStep&&quantitiesStep.contains(activeElement));
+					if((activeInChooser&&!showChooser)||(activeInViewer&&!showViewer)||(activeInQuantities&&!showQuantities)){
+						if(typeof activeElement.blur==='function'){activeElement.blur();}
+					}
+				}
 				if(chooserStep){chooserStep.hidden=!showChooser;chooserStep.classList.toggle('is-active',showChooser);chooserStep.setAttribute('aria-hidden',showChooser?'false':'true');}
 				if(viewerStep){viewerStep.hidden=!showViewer;viewerStep.classList.toggle('is-active',showViewer);viewerStep.setAttribute('aria-hidden',showViewer?'false':'true');}
 				if(quantitiesStep){quantitiesStep.hidden=!showQuantities;quantitiesStep.classList.toggle('is-active',showQuantities);quantitiesStep.setAttribute('aria-hidden',showQuantities?'false':'true');}
+				const shownStep=showChooser?chooserStep:(showViewer?viewerStep:quantitiesStep);
+				if(shouldMoveFocus&&shownStep){
+					const nextFocus=getStepFocusable(shownStep);
+					if(nextFocus&&typeof nextFocus.focus==='function'){window.requestAnimationFrame(()=>{nextFocus.focus();});}
+				}
 			};
 			const openScreenprintChooserModal=()=>{
 				if(!modal){return;}
@@ -2670,10 +2687,12 @@ class TTA_ThreadDesk {
 			};
 			const closeScreenprintModal=()=>{
 				if(!modal){return;}
+				const activeElement=document.activeElement;
+				if(activeElement&&modal.contains(activeElement)&&typeof activeElement.blur==='function'){activeElement.blur();}
 				modal.classList.remove('is-active');
 				modal.setAttribute('aria-hidden','true');
 				document.body.classList.remove('threaddesk-modal-open');
-				setStep('chooser');
+				setStep('chooser',false);
 			};
 			const syncScreenprintPanelHeight=()=>{
 				if(!viewerStep||viewerStep.hidden||!stage){return;}
@@ -2746,10 +2765,22 @@ class TTA_ThreadDesk {
 				}
 				return '';
 			};
+			const createStrongPrefixLabel=(prefix,value)=>{
+				const fragment=document.createDocumentFragment();
+				const strong=document.createElement('strong');
+				strong.textContent=String(prefix||'').trim()+':';
+				fragment.appendChild(strong);
+				fragment.appendChild(document.createTextNode(' '+String(value||'').trim()));
+				return fragment;
+			};
 			const renderSelectedColorLabel=()=>{
 				if(!selectedColorLabel){return;}
 				const label=getSelectedColorLabel();
-				selectedColorLabel.textContent=(i18nSelectedColorPrefix||'Color')+': '+(label||'--');
+				selectedColorLabel.replaceChildren(createStrongPrefixLabel(i18nSelectedColorPrefix||'Color',label||'--'));
+			};
+			const renderSelectedLayoutLabel=(title)=>{
+				if(!selectedLabel){return;}
+				selectedLabel.replaceChildren(createStrongPrefixLabel(i18nSelectedPrefix||'LAYOUT',title||'--'));
 			};
 			const getEntrySource=(entry)=>String((entry&&entry.__recoloredSource) || (entry&&entry.url) || (entry&&entry.sourceUrl)|| (entry&&entry.designUrl) || (entry&&entry.previewUrl) || (entry&&entry.preview) || (entry&&entry.imageUrl) || (entry&&entry.mockupUrl) || (entry&&entry.svgUrl) || '').trim();
 			const normalizeHexColor=(value)=>{
@@ -2774,6 +2805,61 @@ class TTA_ThreadDesk {
 				return '';
 			};
 			const encodeSvgDataUrl=(svgMarkup)=>'data:image/svg+xml,'+encodeURIComponent(String(svgMarkup||''));
+			const parsePaletteColor=(value)=>{
+				const token=String(value||'').trim();
+				if(!token){return null;}
+				if(token.toLowerCase()==='transparent'){return {token:'transparent',rgb:[255,255,255],alpha:0};}
+				const hex=normalizeHexColor(token);
+				if(!hex){return null;}
+				return {token:hex,rgb:[parseInt(hex.substring(1,3),16),parseInt(hex.substring(3,5),16),parseInt(hex.substring(5,7),16)],alpha:255};
+			};
+			const recolorRasterEntry=(entry,originalSource,paletteBase,paletteCurrent)=>{
+				const sourceParsed=paletteBase.map(parsePaletteColor).filter(Boolean);
+				const targetParsed=paletteCurrent.map(parsePaletteColor).filter(Boolean);
+				if(!sourceParsed.length||sourceParsed.length!==targetParsed.length){return;}
+				let changed=false;
+				for(let i=0;i<sourceParsed.length;i++){if(sourceParsed[i].token!==targetParsed[i].token){changed=true;break;}}
+				if(!changed){entry.__recoloredSource=originalSource;entry.url=originalSource;return;}
+				const cacheKey=originalSource+'|'+sourceParsed.map((item)=>item.token).join(',')+'|'+targetParsed.map((item)=>item.token).join(',');
+				if(!entry.__recolorCache||typeof entry.__recolorCache!=='object'){entry.__recolorCache={};}
+				if(entry.__recolorCache[cacheKey]){entry.__recoloredSource=entry.__recolorCache[cacheKey];entry.url=entry.__recoloredSource;return;}
+				const img=new Image();
+				img.crossOrigin='anonymous';
+				img.addEventListener('load',()=>{
+					try{
+						const canvas=document.createElement('canvas');
+						canvas.width=img.naturalWidth||img.width;
+						canvas.height=img.naturalHeight||img.height;
+						const ctx=canvas.getContext('2d',{willReadFrequently:true});
+						if(!ctx){return;}
+						ctx.drawImage(img,0,0);
+						const imageData=ctx.getImageData(0,0,canvas.width,canvas.height);
+						const pixels=imageData.data;
+						for(let i=0;i<pixels.length;i+=4){
+							if(pixels[i+3]===0){continue;}
+							let bestIndex=0;
+							let bestScore=Number.POSITIVE_INFINITY;
+							for(let c=0;c<sourceParsed.length;c++){
+								const dr=pixels[i]-sourceParsed[c].rgb[0];
+								const dg=pixels[i+1]-sourceParsed[c].rgb[1];
+								const db=pixels[i+2]-sourceParsed[c].rgb[2];
+								const score=(dr*dr)+(dg*dg)+(db*db);
+								if(score<bestScore){bestScore=score;bestIndex=c;}
+							}
+							if(targetParsed[bestIndex].alpha===0){pixels[i]=255;pixels[i+1]=255;pixels[i+2]=255;pixels[i+3]=0;}
+							else{pixels[i]=targetParsed[bestIndex].rgb[0];pixels[i+1]=targetParsed[bestIndex].rgb[1];pixels[i+2]=targetParsed[bestIndex].rgb[2];pixels[i+3]=Math.max(pixels[i+3],targetParsed[bestIndex].alpha);}
+						}
+						ctx.putImageData(imageData,0,0);
+						const recolored=canvas.toDataURL('image/png');
+						entry.__recolorCache[cacheKey]=recolored;
+						entry.__recoloredSource=recolored;
+						entry.url=recolored;
+						render();
+					}catch(e){}
+				});
+				img.addEventListener('error',()=>{});
+				img.src=originalSource;
+			};
 			const applyEntryPalette=(entry)=>{
 				if(!entry||typeof entry!=='object'){return;}
 				const paletteBase=Array.isArray(entry.paletteBase)?entry.paletteBase:[];
@@ -2781,18 +2867,21 @@ class TTA_ThreadDesk {
 				if(!paletteBase.length||!paletteCurrent.length){return;}
 				const originalSource=String(entry.__paletteSource||entry.baseUrl||entry.url||entry.sourceUrl||entry.designUrl||entry.previewUrl||entry.preview||'').trim();
 				if(!originalSource){return;}
-				const svgMarkup=decodeSvgDataUrl(originalSource);
-				if(!svgMarkup){return;}
-				let nextMarkup=svgMarkup;
-				for(let i=0;i<Math.min(paletteBase.length,paletteCurrent.length);i++){
-					const from=normalizeHexColor(paletteBase[i]);
-					const to=normalizeHexColor(paletteCurrent[i]);
-					if(!from||!to||from===to){continue;}
-					nextMarkup=nextMarkup.replace(new RegExp(escapeRegex(from),'gi'),to);
-				}
 				entry.__paletteSource=originalSource;
-				entry.__recoloredSource=encodeSvgDataUrl(nextMarkup);
-				entry.url=entry.__recoloredSource;
+				const svgMarkup=decodeSvgDataUrl(originalSource);
+				if(svgMarkup){
+					let nextMarkup=svgMarkup;
+					for(let i=0;i<Math.min(paletteBase.length,paletteCurrent.length);i++){
+						const from=normalizeHexColor(paletteBase[i]);
+						const to=normalizeHexColor(paletteCurrent[i]);
+						if(!from||!to||from===to){continue;}
+						nextMarkup=nextMarkup.replace(new RegExp(escapeRegex(from),'gi'),to);
+					}
+					entry.__recoloredSource=encodeSvgDataUrl(nextMarkup);
+					entry.url=entry.__recoloredSource;
+					return;
+				}
+				recolorRasterEntry(entry,originalSource,paletteBase,paletteCurrent);
 			};
 			const setActivePlacement=(placementKey)=>{
 				activePlacementKey=String(placementKey||'').trim();
@@ -3068,7 +3157,8 @@ class TTA_ThreadDesk {
 					const existingKey=String(entry.placementKey||'').trim();
 					if(existingKey){return entry;}
 					const labelKey=String(entry.placementLabel||entry.designName||'').trim();
-					return Object.assign({},entry,{placementKey:labelKey||fallbackKey});
+					entry.placementKey=labelKey||fallbackKey;
+					return entry;
 				};
 				if(Array.isArray(raw)){
 					return raw.map((entry,index)=>{
@@ -3274,7 +3364,7 @@ class TTA_ThreadDesk {
 				btn.appendChild(preview);
 				btn.appendChild(titleWrap);
 				btn.appendChild(meta);
-				btn.addEventListener('click',()=>{selected=layout; if(selectedLabel){selectedLabel.textContent=i18nSelectedPrefix+': '+title;} setStep('viewer'); render(); window.requestAnimationFrame(syncScreenprintPanelHeight);});
+				btn.addEventListener('click',()=>{selected=layout; renderSelectedLayoutLabel(title); setStep('viewer'); render(); window.requestAnimationFrame(syncScreenprintPanelHeight);});
 					options.appendChild(btn);
 					});
 					if(emptyState){
