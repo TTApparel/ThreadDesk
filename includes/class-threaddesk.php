@@ -3281,7 +3281,7 @@ class TTA_ThreadDesk {
 						if(!entry||typeof entry!=='object'){return;}
 						const key=String(entry.placementKey||'').trim();
 						if(!key){return;}
-						if(!grouped[key]){grouped[key]=Object.assign({__angleKey:angleKey},entry);order.push(key);}
+						if(!grouped[key]){entry.__angleKey=angleKey;grouped[key]=entry;order.push(key);}
 					});
 				});
 				let count=0;
