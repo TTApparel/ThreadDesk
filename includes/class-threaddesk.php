@@ -3117,6 +3117,36 @@ class TTA_ThreadDesk {
 				if(stageHeight>0){viewerStep.style.setProperty('--threaddesk-screenprint-stage-rendered-height',stageHeight+'px');}
 			};
 			const normalizeColorValue=(value)=>String(value||'').trim().toLowerCase().replace(/\s+/g,'-');
+			const getApproxSizeLabel=(placementKey,sliderValue,designRatio)=>{
+				const key=String(placementKey||'').trim().toLowerCase();
+				const slider=Number(sliderValue);
+				const ratioRaw=Number(designRatio);
+				const ratio=(Number.isFinite(ratioRaw)&&ratioRaw>0)?ratioRaw:1;
+				const sliderMin=60;
+				const sliderMax=140;
+				const ranges={
+					full_chest:{min:4.5,max:12.5},
+					back:{min:4.5,max:12.5},
+					left_chest:{approx:4.0},
+					right_chest:{approx:4.0},
+					left_sleeve:{approx:4.0},
+					right_sleeve:{approx:4.0}
+				};
+				const range=Object.prototype.hasOwnProperty.call(ranges,key)?ranges[key]:{approx:4.0};
+				let maxDimension=4.0;
+				if(Object.prototype.hasOwnProperty.call(range,'min')&&Object.prototype.hasOwnProperty.call(range,'max')){
+					const clamped=Math.max(sliderMin,Math.min(sliderMax,Number.isFinite(slider)?slider:100));
+					const normalized=(clamped-sliderMin)/(sliderMax-sliderMin);
+					maxDimension=Number(range.min)+((Number(range.max)-Number(range.min))*normalized);
+				}else{
+					maxDimension=Number(range.approx||4.0)*((Number.isFinite(slider)?slider:100)/100);
+				}
+				let width=maxDimension;
+				let height=maxDimension;
+				if(ratio>1){height=maxDimension/ratio;}
+				else if(ratio>0&&ratio<1){width=maxDimension*ratio;}
+				return i18nApproxSizePrefix+': '+String(width.toFixed(1))+'" W × '+String(height.toFixed(1))+'" H';
+			};
 			const defaultPricing={setup_cost:50,color_setup_cost:30,color_change_cost:5,repeat_reduction:15,print_cost:1.25,color_cost:0.10,garment_cost:50,total_margins:30};
 			const getPricingNumber=(key)=>{
 				const fallback=Object.prototype.hasOwnProperty.call(defaultPricing,key)?defaultPricing[key]:0;
@@ -3186,41 +3216,46 @@ class TTA_ThreadDesk {
 			const getSelectedDesignSummaries=()=>{
 				if(!selected||!selected.placementsByAngle||typeof selected.placementsByAngle!=='object'){return [];}
 				const colorChangeCost=getPricingNumber('color_change_cost');
-				const designMap={};
+				const summaryMap={};
 				Object.keys(selected.placementsByAngle).forEach((angleKey)=>{
 					const entries=normalizePlacementEntries(selected.placementsByAngle[angleKey],angleKey);
 					entries.forEach((entry,index)=>{
-						const paletteCurrent=Array.isArray(entry&&entry.paletteCurrent)?entry.paletteCurrent:[];
-						const paletteOriginal=Array.isArray(entry&&entry.paletteOriginal)?entry.paletteOriginal:[];
+						if(!entry||typeof entry!=='object'){return;}
+						const designId=Number(entry.designId||0);
+						const designLabel=String((entry.designName)||(entry.placementLabel)||i18nDesignFallback).trim()||i18nDesignFallback;
+						const designSource=String((entry.baseUrl)||(entry.__paletteSource)||(entry.url)||'').trim();
+						const designIdentity=(designId>0?('id:'+String(designId)):('src:'+designSource+'|label:'+designLabel+'|idx:'+String(index)));
+						const approxSize=Math.round(Number(entry.sliderValue)||100);
+						const summaryKey=designIdentity+'|size:'+String(approxSize);
+						const paletteCurrent=Array.isArray(entry.paletteCurrent)?entry.paletteCurrent:[];
+						const paletteOriginal=Array.isArray(entry.paletteOriginal)?entry.paletteOriginal:[];
 						const palette=(paletteCurrent.length?paletteCurrent:paletteOriginal).filter((color)=>String(color||'').trim()!==''&&String(color||'').trim().toLowerCase()!=='transparent');
 						const normalizedPalette=palette.map((color)=>String(color||'').trim().toLowerCase()).filter((color)=>color!=='').sort();
 						const estimatedColorCount=palette.length>0?palette.length:1;
-						const designLabel=String((entry&&entry.designName)||(entry&&entry.placementLabel)||i18nDesignFallback).trim()||i18nDesignFallback;
-						const approxSize=Math.round(Number(entry&&entry.sliderValue)||100);
-						const designId=String(Number(entry&&entry.designId)||0);
-						const designKey=String((entry&&entry.url)||designId+'|'+designLabel).trim()||('design-'+String(index+1));
-						if(!designMap[designKey]){
-							designMap[designKey]={designLabel,estimatedColorCount,additionalSetupCost:0,totalPrintCostCount:0,sizeMap:{}};
-						}
-						const summary=designMap[designKey];
-						summary.estimatedColorCount=Math.max(Number(summary.estimatedColorCount)||1,estimatedColorCount);
-						if(!Object.prototype.hasOwnProperty.call(summary.sizeMap,approxSize)){
-							summary.sizeMap[approxSize]=normalizedPalette.join('|');
-							summary.totalPrintCostCount+=1;
+						if(!summaryMap[summaryKey]){
+							summaryMap[summaryKey]={
+								designLabel:designLabel,
+								estimatedColorCount:estimatedColorCount,
+								additionalSetupCost:0,
+								printCostCount:1,
+								paletteSignature:normalizedPalette.join('|')
+							};
 							return;
 						}
-						const existingPalette=String(summary.sizeMap[approxSize]||'');
+						const summary=summaryMap[summaryKey];
+						summary.estimatedColorCount=Math.max(Number(summary.estimatedColorCount)||1,estimatedColorCount);
+						const existingPalette=String(summary.paletteSignature||'');
 						const currentPalette=normalizedPalette.join('|');
 						if(existingPalette!==currentPalette){
 							summary.additionalSetupCost+=colorChangeCost;
 						}
 					});
 				});
-				return Object.values(designMap).map((summary)=>({
+				return Object.values(summaryMap).map((summary)=>({
 					designLabel:summary.designLabel,
 					estimatedColorCount:summary.estimatedColorCount,
 					additionalSetupCost:summary.additionalSetupCost,
-					totalPrintCostCount:summary.totalPrintCostCount
+					totalPrintCostCount:summary.printCostCount
 				}));
 			};
 			const renderQuoteDesignSummary=(rows)=>{
@@ -3796,7 +3831,7 @@ class TTA_ThreadDesk {
 					sizeReading.className='threaddesk-layout-viewer__size-reading threaddesk-screenprint__active-size-reading';
 					sizeReading.setAttribute('aria-hidden','true');
 					const sliderValue=Number(entry.sliderValue||100);
-					sizeReading.textContent=i18nApproxSizePrefix+': '+String(Math.round(Number.isFinite(sliderValue)?sliderValue:100))+'%';
+					sizeReading.textContent=getApproxSizeLabel(entry.placementKey,sliderValue,entry.designRatio);
 					item.appendChild(img);
 					item.appendChild(name);
 					itemWrap.appendChild(item);
