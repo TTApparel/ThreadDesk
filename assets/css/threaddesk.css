@@ -2402,6 +2402,13 @@ body.threaddesk-modal-open {
 	font-weight: 700;
 }
 
+.threaddesk-screenprint__quote-designs-garments {
+	margin: 0 0 8px;
+	font-size: 12px;
+	line-height: 1.4;
+	color: #666;
+}
+
 .threaddesk-screenprint__quote-designs-list {
 	margin: 0;
 	padding-left: 18px;
