@@ -412,6 +412,7 @@ class TTA_ThreadDesk {
 		return array(
 			'setup_cost'       => 50,
 			'color_setup_cost' => 30,
+			'color_change_cost' => 5,
 			'repeat_reduction' => 15,
 			'print_cost'       => 1.25,
 			'color_cost'       => 0.10,
@@ -436,7 +437,7 @@ class TTA_ThreadDesk {
 			if ( in_array( $key, array( 'garment_cost', 'total_margins' ), true ) && $number > 99.99 ) {
 				$number = 99.99;
 			}
-			$sanitized[ $key ] = in_array( $key, array( 'setup_cost', 'color_setup_cost', 'repeat_reduction', 'garment_cost', 'total_margins' ), true ) ? round( $number, 2 ) : round( $number, 4 );
+			$sanitized[ $key ] = in_array( $key, array( 'setup_cost', 'color_setup_cost', 'color_change_cost', 'repeat_reduction', 'garment_cost', 'total_margins' ), true ) ? round( $number, 2 ) : round( $number, 4 );
 		}
 
 		return $sanitized;
@@ -592,6 +593,10 @@ class TTA_ThreadDesk {
 								<label>
 									<span><?php echo esc_html__( 'Color Setup Cost', 'threaddesk' ); ?></span><br />
 									<input type="number" min="0" step="0.01" name="tta_threaddesk_print_pricing[color_setup_cost]" value="<?php echo esc_attr( (string) $print_pricing['color_setup_cost'] ); ?>" />
+								</label>
+								<label>
+									<span><?php echo esc_html__( 'Color Change Cost', 'threaddesk' ); ?></span><br />
+									<input type="number" min="0" step="0.01" name="tta_threaddesk_print_pricing[color_change_cost]" value="<?php echo esc_attr( (string) $print_pricing['color_change_cost'] ); ?>" />
 								</label>
 								<label>
 									<span><?php echo esc_html__( 'Repeat Reduction', 'threaddesk' ); ?></span><br />
@@ -2937,7 +2942,7 @@ class TTA_ThreadDesk {
 				if(stageHeight>0){viewerStep.style.setProperty('--threaddesk-screenprint-stage-rendered-height',stageHeight+'px');}
 			};
 			const normalizeColorValue=(value)=>String(value||'').trim().toLowerCase().replace(/\s+/g,'-');
-			const defaultPricing={setup_cost:50,color_setup_cost:30,repeat_reduction:15,print_cost:1.25,color_cost:0.10,garment_cost:50,total_margins:30};
+			const defaultPricing={setup_cost:50,color_setup_cost:30,color_change_cost:5,repeat_reduction:15,print_cost:1.25,color_cost:0.10,garment_cost:50,total_margins:30};
 			const getPricingNumber=(key)=>{
 				const fallback=Object.prototype.hasOwnProperty.call(defaultPricing,key)?defaultPricing[key]:0;
 				const raw=Object.prototype.hasOwnProperty.call(pricingSettings,key)?pricingSettings[key]:fallback;
@@ -2978,31 +2983,71 @@ class TTA_ThreadDesk {
 					return sum+value;
 				},0);
 			};
-			const syncAddToQuoteButtonState=()=>{
-				if(!addToQuoteButton){return;}
-				addToQuoteButton.disabled=getTotalRequestedQuantity()<=0;
-			};
-			const calculateEstimatedUnitCost=(totalQuantity,colorCount,printCount,variationPrice)=>{
+			const calculateEstimatedUnitCost=(totalQuantity,designCostEntries,variationPrice)=>{
 				const qty=Number(totalQuantity);
 				if(!Number.isFinite(qty)||qty<=0){return null;}
 				const setup=getPricingNumber('setup_cost');
 				const colorSetup=getPricingNumber('color_setup_cost');
+				const colorChangeCost=getPricingNumber('color_change_cost');
 				const printCost=getPricingNumber('print_cost');
 				const colorCost=getPricingNumber('color_cost');
 				const garmentCostPct=getPricingNumber('garment_cost');
 				const totalMarginsPct=getPricingNumber('total_margins');
 				const garmentBase=Math.max(0,Number(variationPrice)||0);
 				const garmentValue=garmentBase*(garmentCostPct/100);
-				const summaries=Array.isArray(designSummaries)?designSummaries:[];
-				const totalUnitPrintCost=summaries.reduce((sum,summary)=>{
-					const count=Math.max(1,Number(summary&&summary.estimatedColorCount)||1);
-					return sum+(((setup+(colorSetup*count))/qty)+(colorCost*count)+printCost);
-				},0);
-				const fallbackCount=Math.max(1,summaries.length||0);
-				const baseUnitCost=garmentValue+(totalUnitPrintCost>0?totalUnitPrintCost:((((setup+(colorSetup*1))/qty)+(colorCost*1)+printCost)*fallbackCount));
+				const entries=Array.isArray(designCostEntries)?designCostEntries:[];
+				let totalUnitPrintCost=0;
+				const seenByDesignSize={};
+				const getUnitPrintCost=(count,setupExtra=0)=>(((setup+setupExtra+(colorSetup*count))/qty)+(colorCost*count)+printCost);
+				entries.forEach((entry)=>{
+					const count=Math.max(1,Number(entry&&entry.estimatedColorCount)||1);
+					const designKey=String(entry&&entry.designKey||'').trim()||'design';
+					const sizeKey=String(entry&&entry.approxSizeKey||'').trim()||'100';
+					const colorKey=String(entry&&entry.colorSignature||'').trim()||'NO_COLOR';
+					const designSizeKey=designKey+'::'+sizeKey;
+					if(!seenByDesignSize[designSizeKey]){
+						seenByDesignSize[designSizeKey]={colors:{}};
+					}
+					if(seenByDesignSize[designSizeKey].colors[colorKey]){
+						totalUnitPrintCost+=printCost;
+						return;
+					}
+					const isColorChange=Object.keys(seenByDesignSize[designSizeKey].colors).length>0;
+					totalUnitPrintCost+=getUnitPrintCost(count,isColorChange?colorChangeCost:0);
+					seenByDesignSize[designSizeKey].colors[colorKey]=true;
+				});
+				if(totalUnitPrintCost<=0){
+					totalUnitPrintCost=getUnitPrintCost(1,0);
+				}
+				const baseUnitCost=garmentValue+totalUnitPrintCost;
 				const marginDivisor=1-(totalMarginsPct/100);
 				if(!Number.isFinite(marginDivisor)||marginDivisor<=0){return baseUnitCost;}
 				return baseUnitCost/marginDivisor;
+			};
+			const getSelectedDesignCostEntries=()=>{
+				if(!selected||!selected.placementsByAngle||typeof selected.placementsByAngle!=='object'){return [];}
+				const entriesForCost=[];
+				const normalizePaletteSignature=(palette)=>palette.map((raw)=>normalizeHexColor(raw)||String(raw||'').trim().toUpperCase()).filter((value)=>value&&value!=='TRANSPARENT').join('|')||'NO_COLOR';
+				Object.keys(selected.placementsByAngle).forEach((angleKey)=>{
+					const entries=normalizePlacementEntries(selected.placementsByAngle[angleKey],angleKey);
+					entries.forEach((entry,index)=>{
+						const source=getEntrySource(entry);
+						if(!source){return;}
+						const paletteCurrent=Array.isArray(entry&&entry.paletteCurrent)?entry.paletteCurrent:[];
+						const paletteOriginal=Array.isArray(entry&&entry.paletteOriginal)?entry.paletteOriginal:[];
+						const palette=(paletteCurrent.length?paletteCurrent:paletteOriginal).filter((color)=>String(color||'').trim()!==''&&String(color||'').trim().toLowerCase()!=='transparent');
+						const estimatedColorCount=palette.length>0?palette.length:1;
+						const rawSlider=Number(entry&&entry.sliderValue);
+						const approxSizeKey=String(Math.round(Number.isFinite(rawSlider)?rawSlider:100));
+						entriesForCost.push({
+							designKey:String(source||'').trim()||('placement-'+angleKey+'-'+String(index+1)),
+							approxSizeKey:approxSizeKey,
+							colorSignature:normalizePaletteSignature(palette),
+							estimatedColorCount:estimatedColorCount
+						});
+					});
+				});
+				return entriesForCost;
 			};
 			const getSelectedDesignSummaries=()=>{
 				if(!selected||!selected.placementsByAngle||typeof selected.placementsByAngle!=='object'){return [];}
@@ -3060,7 +3105,7 @@ class TTA_ThreadDesk {
 			const renderVariationQuantities=()=>{
 				if(!quantitiesList){return;}
 				quantitiesList.innerHTML='';
-				const designSummaries=getSelectedDesignSummaries();
+				const designCostEntries=getSelectedDesignCostEntries();
 				const rows=(Array.isArray(variationRows)?variationRows:[]).filter((row)=>{
 					const rowColorKey=normalizeColorValue(row&&row.colorKey);
 					const selectedColorKey=normalizeColorValue(selectedColor);
@@ -3074,7 +3119,7 @@ class TTA_ThreadDesk {
 				const refreshAllEstimates=()=>{
 					const totalQuantity=getTotalRequestedQuantity();
 					estimateRows.forEach((entry)=>{
-						const unitCost=calculateEstimatedUnitCost(totalQuantity,designSummaries,entry&&entry.row&&entry.row.price);
+						const unitCost=calculateEstimatedUnitCost(totalQuantity,designCostEntries,entry&&entry.row&&entry.row.price);
 						entry.estimate.textContent=(i18nEstimatedUnitCostLabel||'Est. Cost/Unit')+': '+(null===unitCost?'--':formatCurrency(unitCost));
 					});
 				};
