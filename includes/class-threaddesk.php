@@ -416,6 +416,7 @@ class TTA_ThreadDesk {
 			'print_cost'       => 1.25,
 			'color_cost'       => 0.10,
 			'garment_cost'     => 50,
+			'total_margins'    => 30,
 		);
 	}
 
@@ -432,7 +433,10 @@ class TTA_ThreadDesk {
 			if ( $number < 0 ) {
 				$number = 0;
 			}
-			$sanitized[ $key ] = in_array( $key, array( 'setup_cost', 'color_setup_cost', 'repeat_reduction', 'garment_cost' ), true ) ? round( $number, 2 ) : round( $number, 4 );
+			if ( in_array( $key, array( 'garment_cost', 'total_margins' ), true ) && $number > 99.99 ) {
+				$number = 99.99;
+			}
+			$sanitized[ $key ] = in_array( $key, array( 'setup_cost', 'color_setup_cost', 'repeat_reduction', 'garment_cost', 'total_margins' ), true ) ? round( $number, 2 ) : round( $number, 4 );
 		}
 
 		return $sanitized;
@@ -604,6 +608,10 @@ class TTA_ThreadDesk {
 								<label>
 									<span><?php echo esc_html__( 'Garment Cost (%)', 'threaddesk' ); ?></span><br />
 									<input type="number" min="0" step="0.01" name="tta_threaddesk_print_pricing[garment_cost]" value="<?php echo esc_attr( (string) $print_pricing['garment_cost'] ); ?>" />
+								</label>
+								<label>
+									<span><?php echo esc_html__( 'Total Margins (%)', 'threaddesk' ); ?></span><br />
+									<input type="number" min="0" max="99.99" step="0.01" name="tta_threaddesk_print_pricing[total_margins]" value="<?php echo esc_attr( (string) $print_pricing['total_margins'] ); ?>" />
 								</label>
 							</div>
 						</td>
@@ -2309,12 +2317,14 @@ class TTA_ThreadDesk {
 
 				$stock_quantity = $variation_product->managing_stock() ? $variation_product->get_stock_quantity() : null;
 				$in_stock = $variation_product->is_in_stock();
+				$variation_price = is_callable( array( $variation_product, 'get_price' ) ) ? (float) $variation_product->get_price() : 0;
 				$screenprint_variations[] = array(
 					'variationId' => $variation_id,
 					'size'        => '' !== $size_label ? $size_label : __( 'N/A', 'threaddesk' ),
 					'color'       => '' !== $color_label ? $color_label : __( 'N/A', 'threaddesk' ),
 					'colorKey'    => '' !== $color_key ? $color_key : '',
 					'inventory'   => null !== $stock_quantity ? (int) $stock_quantity : ( $in_stock ? __( 'In stock', 'threaddesk' ) : __( 'Out of stock', 'threaddesk' ) ),
+					'price'       => $variation_price > 0 ? round( $variation_price, 4 ) : 0,
 					'inStock'     => (bool) $in_stock,
 				);
 			}
@@ -2427,6 +2437,7 @@ class TTA_ThreadDesk {
 						<div class="threaddesk-screenprint__right-column">
 							<div class="threaddesk-layout-viewer__design-panel">
 								<button type="button" class="threaddesk-layout-viewer__back-button" data-threaddesk-screenprint-back><?php echo esc_html__( 'Back to Saved Layouts', 'threaddesk' ); ?></button>
+								<h4><?php echo esc_html__( 'Applied Layout', 'threaddesk' ); ?></h4>
 								<p data-threaddesk-screenprint-selected><?php echo esc_html__( 'No layout selected yet.', 'threaddesk' ); ?></p>
 								<p class="threaddesk-screenprint__selected-color" data-threaddesk-screenprint-selected-color><?php echo esc_html__( 'Color: --', 'threaddesk' ); ?></p>
 								<div class="threaddesk-screenprint__selected-designs">
@@ -2731,23 +2742,9 @@ class TTA_ThreadDesk {
 				const showChooser=step==='chooser';
 				const showViewer=step==='viewer';
 				const showQuantities=step==='quantities';
-				const activeElement=document.activeElement;
-				if(activeElement&&activeElement!==document.body){
-					const activeInChooser=!!(chooserStep&&chooserStep.contains(activeElement));
-					const activeInViewer=!!(viewerStep&&viewerStep.contains(activeElement));
-					const activeInQuantities=!!(quantitiesStep&&quantitiesStep.contains(activeElement));
-					if((activeInChooser&&!showChooser)||(activeInViewer&&!showViewer)||(activeInQuantities&&!showQuantities)){
-						if(typeof activeElement.blur==='function'){activeElement.blur();}
-					}
-				}
 				if(chooserStep){chooserStep.hidden=!showChooser;chooserStep.classList.toggle('is-active',showChooser);chooserStep.setAttribute('aria-hidden',showChooser?'false':'true');}
 				if(viewerStep){viewerStep.hidden=!showViewer;viewerStep.classList.toggle('is-active',showViewer);viewerStep.setAttribute('aria-hidden',showViewer?'false':'true');}
 				if(quantitiesStep){quantitiesStep.hidden=!showQuantities;quantitiesStep.classList.toggle('is-active',showQuantities);quantitiesStep.setAttribute('aria-hidden',showQuantities?'false':'true');}
-				const shownStep=showChooser?chooserStep:(showViewer?viewerStep:quantitiesStep);
-				if(shouldMoveFocus&&shownStep){
-					const nextFocus=getStepFocusable(shownStep);
-					if(nextFocus&&typeof nextFocus.focus==='function'){window.requestAnimationFrame(()=>{nextFocus.focus();});}
-				}
 			};
 			const openScreenprintChooserModal=()=>{
 				if(!modal){return;}
@@ -2771,7 +2768,7 @@ class TTA_ThreadDesk {
 				if(stageHeight>0){viewerStep.style.setProperty('--threaddesk-screenprint-stage-rendered-height',stageHeight+'px');}
 			};
 			const normalizeColorValue=(value)=>String(value||'').trim().toLowerCase().replace(/\s+/g,'-');
-			const defaultPricing={setup_cost:50,color_setup_cost:30,repeat_reduction:15,print_cost:1.25,color_cost:0.10,garment_cost:50};
+			const defaultPricing={setup_cost:50,color_setup_cost:30,repeat_reduction:15,print_cost:1.25,color_cost:0.10,garment_cost:50,total_margins:30};
 			const getPricingNumber=(key)=>{
 				const fallback=Object.prototype.hasOwnProperty.call(defaultPricing,key)?defaultPricing[key]:0;
 				const raw=Object.prototype.hasOwnProperty.call(pricingSettings,key)?pricingSettings[key]:fallback;
@@ -2793,7 +2790,7 @@ class TTA_ThreadDesk {
 				return maxColorCount>0?maxColorCount:1;
 			};
 			const formatCurrency=(value)=>'$'+String(Number(value).toFixed(2));
-			const calculateEstimatedUnitCost=(quantity,colorCount)=>{
+			const calculateEstimatedUnitCost=(quantity,colorCount,variationPrice)=>{
 				const qty=Number(quantity);
 				if(!Number.isFinite(qty)||qty<=0){return null;}
 				const count=Math.max(1,Number(colorCount)||1);
@@ -2801,7 +2798,14 @@ class TTA_ThreadDesk {
 				const colorSetup=getPricingNumber('color_setup_cost');
 				const printCost=getPricingNumber('print_cost');
 				const colorCost=getPricingNumber('color_cost');
-				return ((setup+(colorSetup*count))/qty)+(colorCost*count)+printCost;
+				const garmentCostPct=getPricingNumber('garment_cost');
+				const totalMarginsPct=getPricingNumber('total_margins');
+				const garmentBase=Math.max(0,Number(variationPrice)||0);
+				const garmentValue=garmentBase*(garmentCostPct/100);
+				const baseUnitCost=((setup+(colorSetup*count))/qty)+(colorCost*count)+printCost+garmentValue;
+				const marginDivisor=1-(totalMarginsPct/100);
+				if(!Number.isFinite(marginDivisor)||marginDivisor<=0){return baseUnitCost;}
+				return baseUnitCost/marginDivisor;
 			};
 			const renderVariationQuantities=()=>{
 				if(!quantitiesList){return;}
@@ -2841,7 +2845,7 @@ class TTA_ThreadDesk {
 					const estimate=document.createElement('div');
 					estimate.className='threaddesk-screenprint__quantity-estimate';
 					const updateEstimate=()=>{
-						const unitCost=calculateEstimatedUnitCost(input.value,selectedColorCount);
+						const unitCost=calculateEstimatedUnitCost(input.value,selectedColorCount,row&&row.price);
 						estimate.textContent=(i18nEstimatedUnitCostLabel||'Est. Cost/Unit')+': '+(null===unitCost?'--':formatCurrency(unitCost));
 					};
 					input.addEventListener('input',updateEstimate);
