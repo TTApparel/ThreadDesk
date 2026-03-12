@@ -2798,8 +2798,8 @@ class TTA_ThreadDesk {
 			const i18nQuantityLabel=<?php echo wp_json_encode( __( 'Quantity', 'threaddesk' ) ); ?>;
 			const i18nEstimatedUnitCostLabel=<?php echo wp_json_encode( __( 'Est. Cost/Unit', 'threaddesk' ) ); ?>;
 			const i18nQuoteDesignsTitle=<?php echo wp_json_encode( __( 'Designs in this quote', 'threaddesk' ) ); ?>;
+			const i18nQuoteGarmentsTitle=<?php echo wp_json_encode( __( 'Garment in this quote', 'threaddesk' ) ); ?>;
 			const i18nEstimatedColorCountLabel=<?php echo wp_json_encode( __( 'Estimated color count', 'threaddesk' ) ); ?>;
-			const i18nGarmentsLabel=<?php echo wp_json_encode( __( 'Garments', 'threaddesk' ) ); ?>;
 			const createLayoutCategory=String(root.getAttribute('data-threaddesk-screenprint-create-layout-category')||'').trim();
 			const createLayoutCategoryId=Number(root.getAttribute('data-threaddesk-screenprint-create-layout-category-id')||0);
 			const shouldOpenChooser=String(root.getAttribute('data-threaddesk-screenprint-open-chooser')||'0').trim()==='1';
@@ -3028,15 +3028,22 @@ class TTA_ThreadDesk {
 				const title=document.createElement('p');
 				title.className='threaddesk-screenprint__quote-designs-title';
 				title.textContent=i18nQuoteDesignsTitle||'Designs in this quote';
+				const garmentTitle=document.createElement('p');
+				garmentTitle.className='threaddesk-screenprint__quote-designs-title';
+				garmentTitle.textContent=i18nQuoteGarmentsTitle||'Garment in this quote';
+				const garmentText=document.createElement('p');
+				garmentText.className='threaddesk-screenprint__quote-designs-garments';
+				garmentText.textContent=garments.length?garments.join(', '):'--';
 				const list=document.createElement('ul');
 				list.className='threaddesk-screenprint__quote-designs-list';
 				designSummaries.forEach((summary)=>{
 					const item=document.createElement('li');
 					item.className='threaddesk-screenprint__quote-designs-item';
-					const garmentText=garments.length?garments.join(', '):'--';
-					item.textContent=String(summary.designLabel||i18nDesignFallback)+' • '+(i18nEstimatedColorCountLabel||'Estimated color count')+': '+String(summary.estimatedColorCount||1)+' • '+(i18nGarmentsLabel||'Garments')+': '+garmentText;
+					item.textContent=String(summary.designLabel||i18nDesignFallback)+' • '+(i18nEstimatedColorCountLabel||'Estimated color count')+': '+String(summary.estimatedColorCount||1);
 					list.appendChild(item);
 				});
+				quoteDesigns.appendChild(garmentTitle);
+				quoteDesigns.appendChild(garmentText);
 				quoteDesigns.appendChild(title);
 				quoteDesigns.appendChild(list);
 				quoteDesigns.hidden=false;

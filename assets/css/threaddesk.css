@@ -2375,6 +2375,10 @@ body.threaddesk-modal-open {
 	margin: 6px 0 0;
 }
 
+.threaddesk-screenprint__quantities-step h4 {
+	margin: 0 0 4px;
+}
+
 .threaddesk-screenprint__quantities-list {
 	display: flex;
 	flex-direction: column;
@@ -2385,7 +2389,7 @@ body.threaddesk-modal-open {
 }
 
 .threaddesk-screenprint__quote-designs {
-	margin: 10px 0 12px;
+	margin: 4px 0 12px;
 	padding: 10px;
 	border: 1px solid #dcdcde;
 	border-radius: 8px;
@@ -2396,6 +2400,13 @@ body.threaddesk-modal-open {
 	margin: 0 0 8px;
 	font-size: 12px;
 	font-weight: 700;
+}
+
+.threaddesk-screenprint__quote-designs-garments {
+	margin: 0 0 8px;
+	font-size: 12px;
+	line-height: 1.4;
+	color: #666;
 }
 
 .threaddesk-screenprint__quote-designs-list {
