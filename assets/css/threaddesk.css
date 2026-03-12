@@ -2389,7 +2389,7 @@ body.threaddesk-modal-open {
 	border-radius: 8px;
 	padding: 0 10px;
 	display: grid;
-	grid-template-columns: minmax(0, 1fr) auto auto;
+	grid-template-columns: minmax(0, 1fr) auto auto auto;
 	align-items: center;
 	gap: 12px;
 }
@@ -2417,4 +2417,11 @@ body.threaddesk-modal-open {
 	padding: 6px 8px;
 	border: 1px solid #c3c4c7;
 	border-radius: 4px;
+}
+
+.threaddesk-screenprint__quantity-estimate {
+	font-size: 12px;
+	font-weight: 600;
+	white-space: nowrap;
+	text-align: right;
 }
