@@ -2652,13 +2652,31 @@ class TTA_ThreadDesk {
 				cartLayoutDesignIdsField.value=seenDesignIds.join(',');
 				cartLayoutSnapshotField.value=JSON.stringify(snapshot);
 			};
-			const setStep=(step)=>{
+			const getStepFocusable=(container)=>{
+				if(!container){return null;}
+				return container.querySelector('button:not([disabled]),[href],input:not([type="hidden"]):not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])');
+			};
+			const setStep=(step,shouldMoveFocus=true)=>{
 				const showChooser=step==='chooser';
 				const showViewer=step==='viewer';
 				const showQuantities=step==='quantities';
+				const activeElement=document.activeElement;
+				if(activeElement&&activeElement!==document.body){
+					const activeInChooser=!!(chooserStep&&chooserStep.contains(activeElement));
+					const activeInViewer=!!(viewerStep&&viewerStep.contains(activeElement));
+					const activeInQuantities=!!(quantitiesStep&&quantitiesStep.contains(activeElement));
+					if((activeInChooser&&!showChooser)||(activeInViewer&&!showViewer)||(activeInQuantities&&!showQuantities)){
+						if(typeof activeElement.blur==='function'){activeElement.blur();}
+					}
+				}
 				if(chooserStep){chooserStep.hidden=!showChooser;chooserStep.classList.toggle('is-active',showChooser);chooserStep.setAttribute('aria-hidden',showChooser?'false':'true');}
 				if(viewerStep){viewerStep.hidden=!showViewer;viewerStep.classList.toggle('is-active',showViewer);viewerStep.setAttribute('aria-hidden',showViewer?'false':'true');}
 				if(quantitiesStep){quantitiesStep.hidden=!showQuantities;quantitiesStep.classList.toggle('is-active',showQuantities);quantitiesStep.setAttribute('aria-hidden',showQuantities?'false':'true');}
+				const shownStep=showChooser?chooserStep:(showViewer?viewerStep:quantitiesStep);
+				if(shouldMoveFocus&&shownStep){
+					const nextFocus=getStepFocusable(shownStep);
+					if(nextFocus&&typeof nextFocus.focus==='function'){window.requestAnimationFrame(()=>{nextFocus.focus();});}
+				}
 			};
 			const openScreenprintChooserModal=()=>{
 				if(!modal){return;}
@@ -2669,10 +2687,12 @@ class TTA_ThreadDesk {
 			};
 			const closeScreenprintModal=()=>{
 				if(!modal){return;}
+				const activeElement=document.activeElement;
+				if(activeElement&&modal.contains(activeElement)&&typeof activeElement.blur==='function'){activeElement.blur();}
 				modal.classList.remove('is-active');
 				modal.setAttribute('aria-hidden','true');
 				document.body.classList.remove('threaddesk-modal-open');
-				setStep('chooser');
+				setStep('chooser',false);
 			};
 			const syncScreenprintPanelHeight=()=>{
 				if(!viewerStep||viewerStep.hidden||!stage){return;}
