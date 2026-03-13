@@ -908,6 +908,13 @@ class TTA_ThreadDesk {
 				}
 			}
 
+			$mockups = array();
+			if ( isset( $row['mockups'] ) && is_array( $row['mockups'] ) ) {
+				$mockup_views = array( 'front', 'left', 'side', 'back' );
+				foreach ( $mockup_views as $view_key ) {
+					$mockups[ $view_key ] = isset( $row['mockups'][ $view_key ] ) ? esc_url_raw( (string) $row['mockups'][ $view_key ] ) : '';
+				}
+			}
 			$quote_rows[] = array(
 				'variationId'                => isset( $row['variationId'] ) ? absint( $row['variationId'] ) : 0,
 				'productSku'                 => isset( $row['productSku'] ) ? sanitize_text_field( (string) $row['productSku'] ) : '',
@@ -916,6 +923,7 @@ class TTA_ThreadDesk {
 				'estimatedUnitCost'          => round( $estimated_unit_cost, 4 ),
 				'estimatedVariationCostTotal'=> round( $line_total, 4 ),
 				'placements'                 => $placement_items,
+				'mockups'                    => $mockups,
 			);
 		}
 
@@ -944,6 +952,7 @@ class TTA_ThreadDesk {
 					'designName'      => isset( $print['designName'] ) ? sanitize_text_field( (string) $print['designName'] ) : '',
 					'placementLabel'  => isset( $print['placementLabel'] ) ? sanitize_text_field( (string) $print['placementLabel'] ) : '',
 					'approxSize'      => isset( $print['approxSize'] ) ? absint( $print['approxSize'] ) : 0,
+					'approxSizeLabel' => isset( $print['approxSizeLabel'] ) ? sanitize_text_field( (string) $print['approxSizeLabel'] ) : '',
 					'selectedColors'  => $colors,
 				);
 			}
@@ -3376,6 +3385,7 @@ class TTA_ThreadDesk {
 							designName:String(entry.designName||entry.placementLabel||i18nDesignFallback).trim()||i18nDesignFallback,
 							placementLabel:String(entry.placementLabel||angleKey||'Placement').trim()||'Placement',
 							approxSize:Math.round(Number(entry.sliderValue)||100),
+							approxSizeLabel:String(Math.round(Number(entry.sliderValue)||100))+'%',
 							selectedColors:selectedColors
 						});
 					});
@@ -3399,13 +3409,17 @@ class TTA_ThreadDesk {
 					const garmentName=String((row&&row.garmentName)||'').trim();
 					const shortDescription=[garmentName,color,size].filter((part)=>String(part||'').trim()!=='').join(' - ');
 					const unitCost=calculateEstimatedUnitCost(getTotalRequestedQuantity(),getSelectedDesignSummaries(),row&&row.price);
+					const leftView=String((images&&images.left)||'').trim();
+					const rightView=String((images&&images.right)||'').trim();
+					const sideView=String((images&&images.side)||leftView||rightView||'').trim();
 					rows.push({
 						variationId:Number(variationId||0),
 						productSku:String((row&&row.productSku)||'').trim(),
 						productShortDescription:shortDescription,
 						qty:qty,
 						estimatedUnitCost:null===unitCost?0:Number(unitCost),
-						placements:Object.values(groupedPlacementEntries).map((entry)=>({placementLabel:entry.placementLabel,designName:entry.designName,designId:entry.designId}))
+						placements:Object.values(groupedPlacementEntries).map((entry)=>({placementLabel:entry.placementLabel,designName:entry.designName,designId:entry.designId,approxSizeLabel:entry.approxSizeLabel||String(entry.approxSize||100)+'%'})),
+						mockups:{front:String((images&&images.front)||'').trim(),left:leftView||rightView,side:sideView,back:String((images&&images.back)||'').trim()}
 					});
 				});
 				return rows;
@@ -3518,6 +3532,10 @@ class TTA_ThreadDesk {
 							row.placements.forEach((placement,pIndex)=>{
 								Object.keys(placement).forEach((placementKey)=>payload.set('rows['+rowIndex+'][placements]['+pIndex+']['+placementKey+']',String(placement[placementKey]||'')));
 							});
+							return;
+						}
+						if(key==='mockups'){
+							Object.keys(row.mockups||{}).forEach((mockupKey)=>payload.set('rows['+rowIndex+'][mockups]['+mockupKey+']',String((row.mockups&&row.mockups[mockupKey])||'')));
 							return;
 						}
 						payload.set('rows['+rowIndex+']['+key+']',String(row[key]));
@@ -5700,6 +5718,7 @@ class TTA_ThreadDesk {
 		echo '<th>' . esc_html__( 'Qty', 'threaddesk' ) . '</th>';
 		echo '<th>' . esc_html__( 'Estimated Cost', 'threaddesk' ) . '</th>';
 		echo '<th>' . esc_html__( 'Placements & Prints', 'threaddesk' ) . '</th>';
+		echo '<th>' . esc_html__( 'Mockups', 'threaddesk' ) . '</th>';
 		echo '</tr></thead><tbody>';
 		foreach ( $rows as $row ) {
 			if ( ! is_array( $row ) ) {
@@ -5720,7 +5739,8 @@ class TTA_ThreadDesk {
 				if ( '' === $placement_label && '' === $design_name ) {
 					continue;
 				}
-				$placement_text[] = trim( $placement_label . ( '' !== $design_name ? ': ' . $design_name : '' ) );
+				$size_label = isset( $placement['approxSizeLabel'] ) ? sanitize_text_field( (string) $placement['approxSizeLabel'] ) : '';
+				$placement_text[] = trim( $placement_label . ( '' !== $design_name ? ': ' . $design_name : '' ) . ( '' !== $size_label ? ' (' . $size_label . ')' : '' ) );
 			}
 			echo '<tr>';
 			echo '<td>' . esc_html( '' !== $sku ? $sku : '—' ) . '</td>';
@@ -5728,9 +5748,25 @@ class TTA_ThreadDesk {
 			echo '<td>' . esc_html( (string) $qty ) . '</td>';
 			echo '<td>' . esc_html( function_exists( 'wc_price' ) ? wp_strip_all_tags( wc_price( $estimated ) ) : number_format_i18n( $estimated, 2 ) ) . '</td>';
 			echo '<td>' . esc_html( ! empty( $placement_text ) ? implode( ', ', $placement_text ) : '—' ) . '</td>';
+			$mockups = isset( $row['mockups'] ) && is_array( $row['mockups'] ) ? $row['mockups'] : array();
+			$mockup_payload = array(
+				'front' => isset( $mockups['front'] ) ? esc_url_raw( (string) $mockups['front'] ) : '',
+				'left'  => isset( $mockups['left'] ) ? esc_url_raw( (string) $mockups['left'] ) : '',
+				'side'  => isset( $mockups['side'] ) ? esc_url_raw( (string) $mockups['side'] ) : '',
+				'back'  => isset( $mockups['back'] ) ? esc_url_raw( (string) $mockups['back'] ) : '',
+			);
+			$has_mockup = ( '' !== $mockup_payload['front'] ) || ( '' !== $mockup_payload['left'] ) || ( '' !== $mockup_payload['side'] ) || ( '' !== $mockup_payload['back'] );
+			echo '<td>';
+			if ( $has_mockup ) {
+				echo '<button type="button" class="button" data-threaddesk-quote-mockup="' . esc_attr( wp_json_encode( $mockup_payload ) ) . '">' . esc_html__( 'SHOW', 'threaddesk' ) . '</button>';
+			} else {
+				echo esc_html__( '—', 'threaddesk' );
+			}
+			echo '</td>';
 			echo '</tr>';
 		}
 		echo '</tbody></table></div>';
+		echo '<script>(function(){if(window.__tdQuoteMockupBound){return;}window.__tdQuoteMockupBound=true;document.addEventListener(\"click\",function(event){var trigger=event.target&&event.target.closest?event.target.closest(\"[data-threaddesk-quote-mockup]\"):null;if(!trigger){return;}event.preventDefault();var raw=trigger.getAttribute(\"data-threaddesk-quote-mockup\")||\"{}\";var payload={};try{payload=JSON.parse(raw);}catch(e){payload={};}var overlay=document.createElement(\"div\");overlay.style.cssText=\"position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:99999;display:flex;align-items:center;justify-content:center;padding:20px;\";var panel=document.createElement(\"div\");panel.style.cssText=\"background:#fff;max-width:980px;width:100%;max-height:90vh;overflow:auto;border-radius:8px;padding:16px;\";var title=document.createElement(\"h3\");title.textContent=\"Mockups\";title.style.margin=\"0 0 12px 0\";var grid=document.createElement(\"div\");grid.style.cssText=\"display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;\";[\"front\",\"left\",\"side\",\"back\"].forEach(function(view){var card=document.createElement(\"div\");card.style.cssText=\"border:1px solid #dcdcde;border-radius:6px;padding:8px;background:#f9f9f9;\";var label=document.createElement(\"p\");label.style.cssText=\"margin:0 0 8px 0;font-weight:600;text-transform:capitalize;\";label.textContent=view;card.appendChild(label);var src=String((payload&&payload[view])||\"\").trim();if(src){var img=document.createElement(\"img\");img.src=src;img.alt=view+\" mockup\";img.style.cssText=\"width:100%;height:auto;display:block;border-radius:4px;background:#fff;\";card.appendChild(img);}else{var empty=document.createElement(\"p\");empty.textContent=\"No image\";empty.style.margin=\"0\";card.appendChild(empty);}grid.appendChild(card);});var closeBtn=document.createElement(\"button\");closeBtn.type=\"button\";closeBtn.className=\"button button-primary\";closeBtn.textContent=\"Close\";closeBtn.style.marginTop=\"12px\";closeBtn.addEventListener(\"click\",function(){overlay.remove();});overlay.addEventListener(\"click\",function(e){if(e.target===overlay){overlay.remove();}});panel.appendChild(title);panel.appendChild(grid);panel.appendChild(closeBtn);overlay.appendChild(panel);document.body.appendChild(overlay);});})();</script>';
 	}
 
 	public function render_quote_prints_admin_meta_box( $post ) {
@@ -5752,12 +5788,15 @@ class TTA_ThreadDesk {
 			$design_name = isset( $print['designName'] ) ? sanitize_text_field( (string) $print['designName'] ) : __( 'Design', 'threaddesk' );
 			$placement_label = isset( $print['placementLabel'] ) ? sanitize_text_field( (string) $print['placementLabel'] ) : '';
 			$size = isset( $print['approxSize'] ) ? absint( $print['approxSize'] ) : 0;
+			$size_label = isset( $print['approxSizeLabel'] ) ? sanitize_text_field( (string) $print['approxSizeLabel'] ) : '';
 			$colors = isset( $print['selectedColors'] ) && is_array( $print['selectedColors'] ) ? array_map( 'sanitize_text_field', $print['selectedColors'] ) : array();
 			$parts = array( $design_name );
 			if ( '' !== $placement_label ) {
 				$parts[] = sprintf( __( 'Placement: %s', 'threaddesk' ), $placement_label );
 			}
-			if ( $size > 0 ) {
+			if ( '' !== $size_label ) {
+				$parts[] = sprintf( __( 'Size: %s', 'threaddesk' ), $size_label );
+			} elseif ( $size > 0 ) {
 				$parts[] = sprintf( __( 'Size: %s%%', 'threaddesk' ), (string) $size );
 			}
 			$parts[] = sprintf( __( 'Colors: %s', 'threaddesk' ), ! empty( $colors ) ? implode( ', ', $colors ) : '—' );
