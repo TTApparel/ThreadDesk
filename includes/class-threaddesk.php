@@ -900,10 +900,22 @@ class TTA_ThreadDesk {
 					if ( ! is_array( $placement ) ) {
 						continue;
 					}
+					$placement_colors = array();
+					if ( isset( $placement['selectedColors'] ) && is_array( $placement['selectedColors'] ) ) {
+						foreach ( $placement['selectedColors'] as $placement_color ) {
+							$clean_color = sanitize_text_field( (string) $placement_color );
+							if ( '' !== $clean_color ) {
+								$placement_colors[] = $clean_color;
+							}
+						}
+					}
 					$placement_items[] = array(
 						'placementLabel' => isset( $placement['placementLabel'] ) ? sanitize_text_field( (string) $placement['placementLabel'] ) : '',
 						'designName'     => isset( $placement['designName'] ) ? sanitize_text_field( (string) $placement['designName'] ) : '',
 						'designId'       => isset( $placement['designId'] ) ? absint( $placement['designId'] ) : 0,
+						'approxSize'     => isset( $placement['approxSize'] ) ? absint( $placement['approxSize'] ) : 0,
+						'approxSizeLabel'=> isset( $placement['approxSizeLabel'] ) ? sanitize_text_field( (string) $placement['approxSizeLabel'] ) : '',
+						'selectedColors' => $placement_colors,
 					);
 				}
 			}
@@ -3451,7 +3463,7 @@ class TTA_ThreadDesk {
 						productShortDescription:shortDescription,
 						qty:qty,
 						estimatedUnitCost:null===unitCost?0:Number(unitCost),
-						placements:Object.values(groupedPlacementEntries).map((entry)=>({placementLabel:entry.placementLabel,designName:entry.designName,designId:entry.designId,approxSizeLabel:entry.approxSizeLabel||String(entry.approxSize||100)+'%'})),
+						placements:Object.values(groupedPlacementEntries).map((entry)=>({placementLabel:entry.placementLabel,designName:entry.designName,designId:entry.designId,approxSize:Number(entry.approxSize||100),approxSizeLabel:entry.approxSizeLabel||String(entry.approxSize||100)+'%',selectedColors:Array.isArray(entry.selectedColors)?entry.selectedColors:[]})),
 						mockups:{front:String((images&&images.front)||'').trim(),left:leftView||rightView,side:sideView,back:String((images&&images.back)||'').trim()}
 					});
 				});
@@ -5970,7 +5982,7 @@ class TTA_ThreadDesk {
 		}
 
 		$extract_colors = static function ( $print ) {
-			$color_keys = array( 'selectedColors', 'colors', 'paletteCurrent', 'paletteOriginal', 'palette' );
+			$color_keys = array( 'selectedColors', 'colors', 'paletteCurrent', 'paletteOriginal', 'palette', 'inkColors', 'selectedPantones' );
 			foreach ( $color_keys as $color_key ) {
 				if ( ! isset( $print[ $color_key ] ) ) {
 					continue;
@@ -5993,11 +6005,35 @@ class TTA_ThreadDesk {
 					return array_values( array_unique( $colors ) );
 				}
 			}
+			if ( isset( $print['placement'] ) && is_array( $print['placement'] ) ) {
+				foreach ( $color_keys as $color_key ) {
+					if ( ! isset( $print['placement'][ $color_key ] ) ) {
+						continue;
+					}
+					$raw_colors = $print['placement'][ $color_key ];
+					if ( is_string( $raw_colors ) ) {
+						$raw_colors = array_map( 'trim', explode( ',', $raw_colors ) );
+					}
+					if ( ! is_array( $raw_colors ) ) {
+						continue;
+					}
+					$colors = array();
+					foreach ( $raw_colors as $color ) {
+						$clean_color = sanitize_text_field( (string) $color );
+						if ( '' !== $clean_color ) {
+							$colors[] = $clean_color;
+						}
+					}
+					if ( ! empty( $colors ) ) {
+						return array_values( array_unique( $colors ) );
+					}
+				}
+			}
 			return array();
 		};
 
 		$extract_size_label = static function ( $print ) {
-			$size_label_keys = array( 'approxSizeLabel', 'sizeLabel' );
+			$size_label_keys = array( 'approxSizeLabel', 'sizeLabel', 'sizeText' );
 			foreach ( $size_label_keys as $size_label_key ) {
 				if ( ! isset( $print[ $size_label_key ] ) ) {
 					continue;
@@ -6007,7 +6043,7 @@ class TTA_ThreadDesk {
 					return $candidate;
 				}
 			}
-			$size_keys = array( 'approxSize', 'size' );
+			$size_keys = array( 'approxSize', 'size', 'sliderValue', 'sizePercent' );
 			foreach ( $size_keys as $size_key ) {
 				if ( ! isset( $print[ $size_key ] ) ) {
 					continue;
@@ -6015,6 +6051,26 @@ class TTA_ThreadDesk {
 				$size_value = absint( $print[ $size_key ] );
 				if ( $size_value > 0 ) {
 					return sprintf( '%s%%', (string) $size_value );
+				}
+			}
+			if ( isset( $print['placement'] ) && is_array( $print['placement'] ) ) {
+				foreach ( $size_label_keys as $size_label_key ) {
+					if ( ! isset( $print['placement'][ $size_label_key ] ) ) {
+						continue;
+					}
+					$candidate = sanitize_text_field( (string) $print['placement'][ $size_label_key ] );
+					if ( '' !== $candidate ) {
+						return $candidate;
+					}
+				}
+				foreach ( $size_keys as $size_key ) {
+					if ( ! isset( $print['placement'][ $size_key ] ) ) {
+						continue;
+					}
+					$size_value = absint( $print['placement'][ $size_key ] );
+					if ( $size_value > 0 ) {
+						return sprintf( '%s%%', (string) $size_value );
+					}
 				}
 			}
 			return '';
@@ -6046,6 +6102,38 @@ class TTA_ThreadDesk {
 				}
 			}
 		}
+		if ( ! is_array( $prints ) || empty( $prints ) ) {
+			$rows_raw = get_post_meta( $post->ID, 'screenprint_quote_rows_json', true );
+			if ( '' === (string) $rows_raw ) {
+				$rows_raw = get_post_meta( $post->ID, 'items_json', true );
+			}
+			$rows = json_decode( (string) $rows_raw, true );
+			$prints = array();
+			if ( is_array( $rows ) ) {
+				foreach ( $rows as $row ) {
+					if ( ! is_array( $row ) ) {
+						continue;
+					}
+					if ( isset( $row['prints'] ) && is_array( $row['prints'] ) ) {
+						foreach ( $row['prints'] as $print_row_entry ) {
+							if ( is_array( $print_row_entry ) ) {
+								$prints[] = $print_row_entry;
+							}
+						}
+					}
+					if ( ! isset( $row['placements'] ) || ! is_array( $row['placements'] ) ) {
+						continue;
+					}
+					foreach ( $row['placements'] as $placement ) {
+						if ( ! is_array( $placement ) ) {
+							continue;
+						}
+						$prints[] = $placement;
+					}
+				}
+			}
+		}
+
 		if ( ! is_array( $prints ) || empty( $prints ) ) {
 			$rows_raw = get_post_meta( $post->ID, 'screenprint_quote_rows_json', true );
 			if ( '' === (string) $rows_raw ) {
