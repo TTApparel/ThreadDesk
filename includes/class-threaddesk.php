@@ -5788,10 +5788,88 @@ class TTA_ThreadDesk {
 				'side'  => isset( $mockups['side'] ) ? esc_url_raw( (string) $mockups['side'] ) : '',
 				'back'  => isset( $mockups['back'] ) ? esc_url_raw( (string) $mockups['back'] ) : '',
 			);
+			$overlay_payload = array(
+				'front' => array(),
+				'left'  => array(),
+				'side'  => array(),
+				'back'  => array(),
+			);
+
+			$overlay_groups = array();
+			if ( isset( $row['placementsByAngle'] ) && is_array( $row['placementsByAngle'] ) ) {
+				$overlay_groups = $row['placementsByAngle'];
+			} elseif ( isset( $row['placementOverlays'] ) && is_array( $row['placementOverlays'] ) ) {
+				$overlay_groups = $row['placementOverlays'];
+			}
+
+			$normalized_angle_map = array(
+				'front' => 'front',
+				'back'  => 'back',
+				'left'  => 'left',
+				'right' => 'side',
+				'side'  => 'side',
+			);
+
+			foreach ( $overlay_groups as $angle_key => $entries ) {
+				if ( ! is_array( $entries ) ) {
+					continue;
+				}
+				$angle = strtolower( (string) $angle_key );
+				$target_view = isset( $normalized_angle_map[ $angle ] ) ? $normalized_angle_map[ $angle ] : '';
+				if ( '' === $target_view ) {
+					continue;
+				}
+				foreach ( $entries as $entry ) {
+					if ( ! is_array( $entry ) ) {
+						continue;
+					}
+					$url_raw = isset( $entry['url'] ) ? (string) $entry['url'] : '';
+					$url = esc_url_raw( $url_raw );
+					if ( '' === $url && preg_match( '#^data:image\/(png|jpe?g|webp);base64,#i', $url_raw ) ) {
+						$url = $url_raw;
+					}
+					if ( '' === $url ) {
+						continue;
+					}
+					$overlay_payload[ $target_view ][] = array(
+						'url'   => $url,
+						'top'   => isset( $entry['top'] ) ? (float) $entry['top'] : 50.0,
+						'left'  => isset( $entry['left'] ) ? (float) $entry['left'] : 50.0,
+						'width' => isset( $entry['width'] ) ? (float) $entry['width'] : 25.0,
+					);
+				}
+			}
+
+			if ( isset( $row['placements'] ) && is_array( $row['placements'] ) ) {
+				foreach ( $row['placements'] as $entry ) {
+					if ( ! is_array( $entry ) ) {
+						continue;
+					}
+					$angle = strtolower( (string) ( $entry['angle'] ?? $entry['view'] ?? '' ) );
+					$target_view = isset( $normalized_angle_map[ $angle ] ) ? $normalized_angle_map[ $angle ] : '';
+					if ( '' === $target_view ) {
+						continue;
+					}
+					$url_raw = isset( $entry['url'] ) ? (string) $entry['url'] : '';
+					$url = esc_url_raw( $url_raw );
+					if ( '' === $url && preg_match( '#^data:image\/(png|jpe?g|webp);base64,#i', $url_raw ) ) {
+						$url = $url_raw;
+					}
+					if ( '' === $url ) {
+						continue;
+					}
+					$overlay_payload[ $target_view ][] = array(
+						'url'   => $url,
+						'top'   => isset( $entry['top'] ) ? (float) $entry['top'] : 50.0,
+						'left'  => isset( $entry['left'] ) ? (float) $entry['left'] : 50.0,
+						'width' => isset( $entry['width'] ) ? (float) $entry['width'] : 25.0,
+					);
+				}
+			}
 			$has_mockup = ( '' !== $mockup_payload['front'] ) || ( '' !== $mockup_payload['left'] ) || ( '' !== $mockup_payload['side'] ) || ( '' !== $mockup_payload['back'] );
 			echo '<td>';
 			if ( $has_mockup ) {
-				echo '<button type="button" class="button" data-threaddesk-quote-mockup="' . esc_attr( wp_json_encode( $mockup_payload ) ) . '">' . esc_html__( 'SHOW', 'threaddesk' ) . '</button>';
+				echo '<button type="button" class="button" data-threaddesk-quote-mockup="' . esc_attr( wp_json_encode( $mockup_payload ) ) . '" data-threaddesk-quote-mockup-overlays="' . esc_attr( wp_json_encode( $overlay_payload ) ) . '">' . esc_html__( 'SHOW', 'threaddesk' ) . '</button>';
 			} else {
 				echo esc_html__( '—', 'threaddesk' );
 			}
@@ -5812,6 +5890,9 @@ class TTA_ThreadDesk {
 				var raw=trigger.getAttribute('data-threaddesk-quote-mockup')||'{}';
 				var payload={};
 				try{payload=JSON.parse(raw);}catch(e){payload={};}
+				var overlaysRaw=trigger.getAttribute('data-threaddesk-quote-mockup-overlays')||'{}';
+				var overlaysPayload={};
+				try{overlaysPayload=JSON.parse(overlaysRaw);}catch(e){overlaysPayload={};}
 				var overlay=document.createElement('div');
 				overlay.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:99999;display:flex;align-items:center;justify-content:center;padding:20px;';
 				var panel=document.createElement('div');
@@ -5830,11 +5911,31 @@ class TTA_ThreadDesk {
 					card.appendChild(label);
 					var src=String((payload&&payload[view])||'').trim();
 					if(src){
+						var frame=document.createElement('div');
+						frame.style.cssText='position:relative;width:100%;aspect-ratio:1/1;border-radius:4px;background:#fff;overflow:hidden;';
 						var img=document.createElement('img');
 						img.src=src;
 						img.alt=view+' mockup';
-						img.style.cssText='width:100%;height:auto;display:block;border-radius:4px;background:#fff;';
-						card.appendChild(img);
+						img.style.cssText='position:absolute;inset:0;width:100%;height:100%;display:block;object-fit:contain;';
+						frame.appendChild(img);
+						var viewOverlays=Array.isArray(overlaysPayload&&overlaysPayload[view])?overlaysPayload[view]:[];
+						viewOverlays.forEach(function(placement){
+							var placementUrl=String((placement&&placement.url)||'').trim();
+							if(!placementUrl){return;}
+							var placementImg=document.createElement('img');
+							placementImg.src=placementUrl;
+							placementImg.alt='';
+							placementImg.setAttribute('aria-hidden','true');
+							var topPct=Number(placement&&placement.top);
+							var leftPct=Number(placement&&placement.left);
+							var widthPct=Number(placement&&placement.width);
+							if(!Number.isFinite(topPct)){topPct=50;}
+							if(!Number.isFinite(leftPct)){leftPct=50;}
+							if(!Number.isFinite(widthPct)){widthPct=25;}
+							placementImg.style.cssText='position:absolute;top:'+topPct.toFixed(2)+'%;left:'+leftPct.toFixed(2)+'%;width:'+widthPct.toFixed(2)+'%;height:auto;transform:translate(-50%,-50%);object-fit:contain;pointer-events:none;';
+							frame.appendChild(placementImg);
+						});
+						card.appendChild(frame);
 					}else{
 						var empty=document.createElement('p');
 						empty.textContent='No image';
@@ -5868,7 +5969,31 @@ class TTA_ThreadDesk {
 			return;
 		}
 		$prints_raw = get_post_meta( $post->ID, 'screenprint_quote_prints_json', true );
+		if ( '' === (string) $prints_raw ) {
+			$prints_raw = get_post_meta( $post->ID, 'prints_json', true );
+		}
 		$prints = json_decode( (string) $prints_raw, true );
+		if ( ( ! is_array( $prints ) || empty( $prints ) ) ) {
+			$rows_raw = get_post_meta( $post->ID, 'screenprint_quote_rows_json', true );
+			if ( '' === (string) $rows_raw ) {
+				$rows_raw = get_post_meta( $post->ID, 'items_json', true );
+			}
+			$rows = json_decode( (string) $rows_raw, true );
+			$prints = array();
+			if ( is_array( $rows ) ) {
+				foreach ( $rows as $row ) {
+					if ( ! is_array( $row ) || ! isset( $row['placements'] ) || ! is_array( $row['placements'] ) ) {
+						continue;
+					}
+					foreach ( $row['placements'] as $placement ) {
+						if ( ! is_array( $placement ) ) {
+							continue;
+						}
+						$prints[] = $placement;
+					}
+				}
+			}
+		}
 		if ( ! is_array( $prints ) || empty( $prints ) ) {
 			echo '<p>' . esc_html__( 'No prints recorded for this quote.', 'threaddesk' ) . '</p>';
 			return;
