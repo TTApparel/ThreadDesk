@@ -6081,6 +6081,59 @@ class TTA_ThreadDesk {
 			$prints_raw = get_post_meta( $post->ID, 'prints_json', true );
 		}
 		$prints = json_decode( (string) $prints_raw, true );
+		if ( ( ! is_array( $prints ) || empty( $prints ) ) ) {
+			$rows_raw = get_post_meta( $post->ID, 'screenprint_quote_rows_json', true );
+			if ( '' === (string) $rows_raw ) {
+				$rows_raw = get_post_meta( $post->ID, 'items_json', true );
+			}
+			$rows = json_decode( (string) $rows_raw, true );
+			$prints = array();
+			if ( is_array( $rows ) ) {
+				foreach ( $rows as $row ) {
+					if ( ! is_array( $row ) || ! isset( $row['placements'] ) || ! is_array( $row['placements'] ) ) {
+						continue;
+					}
+					foreach ( $row['placements'] as $placement ) {
+						if ( ! is_array( $placement ) ) {
+							continue;
+						}
+						$prints[] = $placement;
+					}
+				}
+			}
+		}
+		if ( ! is_array( $prints ) || empty( $prints ) ) {
+			$rows_raw = get_post_meta( $post->ID, 'screenprint_quote_rows_json', true );
+			if ( '' === (string) $rows_raw ) {
+				$rows_raw = get_post_meta( $post->ID, 'items_json', true );
+			}
+			$rows = json_decode( (string) $rows_raw, true );
+			$prints = array();
+			if ( is_array( $rows ) ) {
+				foreach ( $rows as $row ) {
+					if ( ! is_array( $row ) ) {
+						continue;
+					}
+					if ( isset( $row['prints'] ) && is_array( $row['prints'] ) ) {
+						foreach ( $row['prints'] as $print_row_entry ) {
+							if ( is_array( $print_row_entry ) ) {
+								$prints[] = $print_row_entry;
+							}
+						}
+					}
+					if ( ! isset( $row['placements'] ) || ! is_array( $row['placements'] ) ) {
+						continue;
+					}
+					foreach ( $row['placements'] as $placement ) {
+						if ( ! is_array( $placement ) ) {
+							continue;
+						}
+						$prints[] = $placement;
+					}
+				}
+			}
+		}
+
 		if ( ! is_array( $prints ) || empty( $prints ) ) {
 			$rows_raw = get_post_meta( $post->ID, 'screenprint_quote_rows_json', true );
 			if ( '' === (string) $rows_raw ) {
