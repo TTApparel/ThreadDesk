@@ -5749,7 +5749,20 @@ class TTA_ThreadDesk {
 		if ( '' === (string) $rows_raw ) {
 			$rows_raw = get_post_meta( $post->ID, 'items_json', true );
 		}
-		$rows = json_decode( (string) $rows_raw, true );
+		if ( is_array( $rows_raw ) ) {
+			$rows = $rows_raw;
+		} else {
+			$rows = json_decode( (string) $rows_raw, true );
+		}
+		if ( is_array( $rows ) && isset( $rows['rows'] ) && is_array( $rows['rows'] ) ) {
+			$rows = $rows['rows'];
+		}
+		if ( is_array( $rows ) && isset( $rows['items'] ) && is_array( $rows['items'] ) ) {
+			$rows = $rows['items'];
+		}
+		if ( is_array( $rows ) && ! empty( $rows ) && array_keys( $rows ) !== range( 0, count( $rows ) - 1 ) ) {
+			$rows = array_values( array_filter( $rows, 'is_array' ) );
+		}
 		if ( ! is_array( $rows ) || empty( $rows ) ) {
 			echo '<p>' . esc_html__( 'No line items recorded for this quote.', 'threaddesk' ) . '</p>';
 			return;
@@ -6080,66 +6093,33 @@ class TTA_ThreadDesk {
 		if ( '' === (string) $prints_raw ) {
 			$prints_raw = get_post_meta( $post->ID, 'prints_json', true );
 		}
-		$prints = json_decode( (string) $prints_raw, true );
-		if ( ( ! is_array( $prints ) || empty( $prints ) ) ) {
-			$rows_raw = get_post_meta( $post->ID, 'screenprint_quote_rows_json', true );
-			if ( '' === (string) $rows_raw ) {
-				$rows_raw = get_post_meta( $post->ID, 'items_json', true );
-			}
-			$rows = json_decode( (string) $rows_raw, true );
-			$prints = array();
-			if ( is_array( $rows ) ) {
-				foreach ( $rows as $row ) {
-					if ( ! is_array( $row ) || ! isset( $row['placements'] ) || ! is_array( $row['placements'] ) ) {
-						continue;
-					}
-					foreach ( $row['placements'] as $placement ) {
-						if ( ! is_array( $placement ) ) {
-							continue;
-						}
-						$prints[] = $placement;
-					}
-				}
-			}
+		if ( is_array( $prints_raw ) ) {
+			$prints = $prints_raw;
+		} else {
+			$prints = json_decode( (string) $prints_raw, true );
+		}
+		if ( is_array( $prints ) && isset( $prints['prints'] ) && is_array( $prints['prints'] ) ) {
+			$prints = $prints['prints'];
 		}
 		if ( ! is_array( $prints ) || empty( $prints ) ) {
 			$rows_raw = get_post_meta( $post->ID, 'screenprint_quote_rows_json', true );
 			if ( '' === (string) $rows_raw ) {
 				$rows_raw = get_post_meta( $post->ID, 'items_json', true );
 			}
-			$rows = json_decode( (string) $rows_raw, true );
-			$prints = array();
-			if ( is_array( $rows ) ) {
-				foreach ( $rows as $row ) {
-					if ( ! is_array( $row ) ) {
-						continue;
-					}
-					if ( isset( $row['prints'] ) && is_array( $row['prints'] ) ) {
-						foreach ( $row['prints'] as $print_row_entry ) {
-							if ( is_array( $print_row_entry ) ) {
-								$prints[] = $print_row_entry;
-							}
-						}
-					}
-					if ( ! isset( $row['placements'] ) || ! is_array( $row['placements'] ) ) {
-						continue;
-					}
-					foreach ( $row['placements'] as $placement ) {
-						if ( ! is_array( $placement ) ) {
-							continue;
-						}
-						$prints[] = $placement;
-					}
-				}
+			if ( is_array( $rows_raw ) ) {
+				$rows = $rows_raw;
+			} else {
+				$rows = json_decode( (string) $rows_raw, true );
 			}
-		}
-
-		if ( ! is_array( $prints ) || empty( $prints ) ) {
-			$rows_raw = get_post_meta( $post->ID, 'screenprint_quote_rows_json', true );
-			if ( '' === (string) $rows_raw ) {
-				$rows_raw = get_post_meta( $post->ID, 'items_json', true );
+			if ( is_array( $rows ) && isset( $rows['rows'] ) && is_array( $rows['rows'] ) ) {
+				$rows = $rows['rows'];
 			}
-			$rows = json_decode( (string) $rows_raw, true );
+			if ( is_array( $rows ) && isset( $rows['items'] ) && is_array( $rows['items'] ) ) {
+				$rows = $rows['items'];
+			}
+			if ( is_array( $rows ) && ! empty( $rows ) && array_keys( $rows ) !== range( 0, count( $rows ) - 1 ) ) {
+				$rows = array_values( array_filter( $rows, 'is_array' ) );
+			}
 			$prints = array();
 			if ( is_array( $rows ) ) {
 				foreach ( $rows as $row ) {
