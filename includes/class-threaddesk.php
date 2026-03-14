@@ -900,10 +900,22 @@ class TTA_ThreadDesk {
 					if ( ! is_array( $placement ) ) {
 						continue;
 					}
+					$placement_colors = array();
+					if ( isset( $placement['selectedColors'] ) && is_array( $placement['selectedColors'] ) ) {
+						foreach ( $placement['selectedColors'] as $placement_color ) {
+							$clean_color = sanitize_text_field( (string) $placement_color );
+							if ( '' !== $clean_color ) {
+								$placement_colors[] = $clean_color;
+							}
+						}
+					}
 					$placement_items[] = array(
 						'placementLabel' => isset( $placement['placementLabel'] ) ? sanitize_text_field( (string) $placement['placementLabel'] ) : '',
 						'designName'     => isset( $placement['designName'] ) ? sanitize_text_field( (string) $placement['designName'] ) : '',
 						'designId'       => isset( $placement['designId'] ) ? absint( $placement['designId'] ) : 0,
+						'approxSize'     => isset( $placement['approxSize'] ) ? absint( $placement['approxSize'] ) : 0,
+						'approxSizeLabel'=> isset( $placement['approxSizeLabel'] ) ? sanitize_text_field( (string) $placement['approxSizeLabel'] ) : '',
+						'selectedColors' => $placement_colors,
 					);
 				}
 			}
@@ -3451,7 +3463,7 @@ class TTA_ThreadDesk {
 						productShortDescription:shortDescription,
 						qty:qty,
 						estimatedUnitCost:null===unitCost?0:Number(unitCost),
-						placements:Object.values(groupedPlacementEntries).map((entry)=>({placementLabel:entry.placementLabel,designName:entry.designName,designId:entry.designId,approxSizeLabel:entry.approxSizeLabel||String(entry.approxSize||100)+'%'})),
+						placements:Object.values(groupedPlacementEntries).map((entry)=>({placementLabel:entry.placementLabel,designName:entry.designName,designId:entry.designId,approxSize:Number(entry.approxSize||100),approxSizeLabel:entry.approxSizeLabel||String(entry.approxSize||100)+'%',selectedColors:Array.isArray(entry.selectedColors)?entry.selectedColors:[]})),
 						mockups:{front:String((images&&images.front)||'').trim(),left:leftView||rightView,side:sideView,back:String((images&&images.back)||'').trim()}
 					});
 				});
@@ -5737,7 +5749,20 @@ class TTA_ThreadDesk {
 		if ( '' === (string) $rows_raw ) {
 			$rows_raw = get_post_meta( $post->ID, 'items_json', true );
 		}
-		$rows = json_decode( (string) $rows_raw, true );
+		if ( is_array( $rows_raw ) ) {
+			$rows = $rows_raw;
+		} else {
+			$rows = json_decode( (string) $rows_raw, true );
+		}
+		if ( is_array( $rows ) && isset( $rows['rows'] ) && is_array( $rows['rows'] ) ) {
+			$rows = $rows['rows'];
+		}
+		if ( is_array( $rows ) && isset( $rows['items'] ) && is_array( $rows['items'] ) ) {
+			$rows = $rows['items'];
+		}
+		if ( is_array( $rows ) && ! empty( $rows ) && array_keys( $rows ) !== range( 0, count( $rows ) - 1 ) ) {
+			$rows = array_values( array_filter( $rows, 'is_array' ) );
+		}
 		if ( ! is_array( $rows ) || empty( $rows ) ) {
 			echo '<p>' . esc_html__( 'No line items recorded for this quote.', 'threaddesk' ) . '</p>';
 			return;
@@ -5788,10 +5813,88 @@ class TTA_ThreadDesk {
 				'side'  => isset( $mockups['side'] ) ? esc_url_raw( (string) $mockups['side'] ) : '',
 				'back'  => isset( $mockups['back'] ) ? esc_url_raw( (string) $mockups['back'] ) : '',
 			);
+			$overlay_payload = array(
+				'front' => array(),
+				'left'  => array(),
+				'side'  => array(),
+				'back'  => array(),
+			);
+
+			$overlay_groups = array();
+			if ( isset( $row['placementsByAngle'] ) && is_array( $row['placementsByAngle'] ) ) {
+				$overlay_groups = $row['placementsByAngle'];
+			} elseif ( isset( $row['placementOverlays'] ) && is_array( $row['placementOverlays'] ) ) {
+				$overlay_groups = $row['placementOverlays'];
+			}
+
+			$normalized_angle_map = array(
+				'front' => 'front',
+				'back'  => 'back',
+				'left'  => 'left',
+				'right' => 'side',
+				'side'  => 'side',
+			);
+
+			foreach ( $overlay_groups as $angle_key => $entries ) {
+				if ( ! is_array( $entries ) ) {
+					continue;
+				}
+				$angle = strtolower( (string) $angle_key );
+				$target_view = isset( $normalized_angle_map[ $angle ] ) ? $normalized_angle_map[ $angle ] : '';
+				if ( '' === $target_view ) {
+					continue;
+				}
+				foreach ( $entries as $entry ) {
+					if ( ! is_array( $entry ) ) {
+						continue;
+					}
+					$url_raw = isset( $entry['url'] ) ? (string) $entry['url'] : '';
+					$url = esc_url_raw( $url_raw );
+					if ( '' === $url && preg_match( '#^data:image\/(png|jpe?g|webp);base64,#i', $url_raw ) ) {
+						$url = $url_raw;
+					}
+					if ( '' === $url ) {
+						continue;
+					}
+					$overlay_payload[ $target_view ][] = array(
+						'url'   => $url,
+						'top'   => isset( $entry['top'] ) ? (float) $entry['top'] : 50.0,
+						'left'  => isset( $entry['left'] ) ? (float) $entry['left'] : 50.0,
+						'width' => isset( $entry['width'] ) ? (float) $entry['width'] : 25.0,
+					);
+				}
+			}
+
+			if ( isset( $row['placements'] ) && is_array( $row['placements'] ) ) {
+				foreach ( $row['placements'] as $entry ) {
+					if ( ! is_array( $entry ) ) {
+						continue;
+					}
+					$angle = strtolower( (string) ( $entry['angle'] ?? $entry['view'] ?? '' ) );
+					$target_view = isset( $normalized_angle_map[ $angle ] ) ? $normalized_angle_map[ $angle ] : '';
+					if ( '' === $target_view ) {
+						continue;
+					}
+					$url_raw = isset( $entry['url'] ) ? (string) $entry['url'] : '';
+					$url = esc_url_raw( $url_raw );
+					if ( '' === $url && preg_match( '#^data:image\/(png|jpe?g|webp);base64,#i', $url_raw ) ) {
+						$url = $url_raw;
+					}
+					if ( '' === $url ) {
+						continue;
+					}
+					$overlay_payload[ $target_view ][] = array(
+						'url'   => $url,
+						'top'   => isset( $entry['top'] ) ? (float) $entry['top'] : 50.0,
+						'left'  => isset( $entry['left'] ) ? (float) $entry['left'] : 50.0,
+						'width' => isset( $entry['width'] ) ? (float) $entry['width'] : 25.0,
+					);
+				}
+			}
 			$has_mockup = ( '' !== $mockup_payload['front'] ) || ( '' !== $mockup_payload['left'] ) || ( '' !== $mockup_payload['side'] ) || ( '' !== $mockup_payload['back'] );
 			echo '<td>';
 			if ( $has_mockup ) {
-				echo '<button type="button" class="button" data-threaddesk-quote-mockup="' . esc_attr( wp_json_encode( $mockup_payload ) ) . '">' . esc_html__( 'SHOW', 'threaddesk' ) . '</button>';
+				echo '<button type="button" class="button" data-threaddesk-quote-mockup="' . esc_attr( wp_json_encode( $mockup_payload ) ) . '" data-threaddesk-quote-mockup-overlays="' . esc_attr( wp_json_encode( $overlay_payload ) ) . '">' . esc_html__( 'SHOW', 'threaddesk' ) . '</button>';
 			} else {
 				echo esc_html__( '—', 'threaddesk' );
 			}
@@ -5812,6 +5915,9 @@ class TTA_ThreadDesk {
 				var raw=trigger.getAttribute('data-threaddesk-quote-mockup')||'{}';
 				var payload={};
 				try{payload=JSON.parse(raw);}catch(e){payload={};}
+				var overlaysRaw=trigger.getAttribute('data-threaddesk-quote-mockup-overlays')||'{}';
+				var overlaysPayload={};
+				try{overlaysPayload=JSON.parse(overlaysRaw);}catch(e){overlaysPayload={};}
 				var overlay=document.createElement('div');
 				overlay.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:99999;display:flex;align-items:center;justify-content:center;padding:20px;';
 				var panel=document.createElement('div');
@@ -5830,11 +5936,31 @@ class TTA_ThreadDesk {
 					card.appendChild(label);
 					var src=String((payload&&payload[view])||'').trim();
 					if(src){
+						var frame=document.createElement('div');
+						frame.style.cssText='position:relative;width:100%;aspect-ratio:1/1;border-radius:4px;background:#fff;overflow:hidden;';
 						var img=document.createElement('img');
 						img.src=src;
 						img.alt=view+' mockup';
-						img.style.cssText='width:100%;height:auto;display:block;border-radius:4px;background:#fff;';
-						card.appendChild(img);
+						img.style.cssText='position:absolute;inset:0;width:100%;height:100%;display:block;object-fit:contain;';
+						frame.appendChild(img);
+						var viewOverlays=Array.isArray(overlaysPayload&&overlaysPayload[view])?overlaysPayload[view]:[];
+						viewOverlays.forEach(function(placement){
+							var placementUrl=String((placement&&placement.url)||'').trim();
+							if(!placementUrl){return;}
+							var placementImg=document.createElement('img');
+							placementImg.src=placementUrl;
+							placementImg.alt='';
+							placementImg.setAttribute('aria-hidden','true');
+							var topPct=Number(placement&&placement.top);
+							var leftPct=Number(placement&&placement.left);
+							var widthPct=Number(placement&&placement.width);
+							if(!Number.isFinite(topPct)){topPct=50;}
+							if(!Number.isFinite(leftPct)){leftPct=50;}
+							if(!Number.isFinite(widthPct)){widthPct=25;}
+							placementImg.style.cssText='position:absolute;top:'+topPct.toFixed(2)+'%;left:'+leftPct.toFixed(2)+'%;width:'+widthPct.toFixed(2)+'%;height:auto;transform:translate(-50%,-50%);object-fit:contain;pointer-events:none;';
+							frame.appendChild(placementImg);
+						});
+						card.appendChild(frame);
 					}else{
 						var empty=document.createElement('p');
 						empty.textContent='No image';
@@ -5867,12 +5993,164 @@ class TTA_ThreadDesk {
 			echo '<p>' . esc_html__( 'No print details available.', 'threaddesk' ) . '</p>';
 			return;
 		}
+
+		$extract_colors = static function ( $print ) {
+			$color_keys = array( 'selectedColors', 'colors', 'paletteCurrent', 'paletteOriginal', 'palette', 'inkColors', 'selectedPantones' );
+			foreach ( $color_keys as $color_key ) {
+				if ( ! isset( $print[ $color_key ] ) ) {
+					continue;
+				}
+				$raw_colors = $print[ $color_key ];
+				if ( is_string( $raw_colors ) ) {
+					$raw_colors = array_map( 'trim', explode( ',', $raw_colors ) );
+				}
+				if ( ! is_array( $raw_colors ) ) {
+					continue;
+				}
+				$colors = array();
+				foreach ( $raw_colors as $color ) {
+					$clean_color = sanitize_text_field( (string) $color );
+					if ( '' !== $clean_color ) {
+						$colors[] = $clean_color;
+					}
+				}
+				if ( ! empty( $colors ) ) {
+					return array_values( array_unique( $colors ) );
+				}
+			}
+			if ( isset( $print['placement'] ) && is_array( $print['placement'] ) ) {
+				foreach ( $color_keys as $color_key ) {
+					if ( ! isset( $print['placement'][ $color_key ] ) ) {
+						continue;
+					}
+					$raw_colors = $print['placement'][ $color_key ];
+					if ( is_string( $raw_colors ) ) {
+						$raw_colors = array_map( 'trim', explode( ',', $raw_colors ) );
+					}
+					if ( ! is_array( $raw_colors ) ) {
+						continue;
+					}
+					$colors = array();
+					foreach ( $raw_colors as $color ) {
+						$clean_color = sanitize_text_field( (string) $color );
+						if ( '' !== $clean_color ) {
+							$colors[] = $clean_color;
+						}
+					}
+					if ( ! empty( $colors ) ) {
+						return array_values( array_unique( $colors ) );
+					}
+				}
+			}
+			return array();
+		};
+
+		$extract_size_label = static function ( $print ) {
+			$size_label_keys = array( 'approxSizeLabel', 'sizeLabel', 'sizeText' );
+			foreach ( $size_label_keys as $size_label_key ) {
+				if ( ! isset( $print[ $size_label_key ] ) ) {
+					continue;
+				}
+				$candidate = sanitize_text_field( (string) $print[ $size_label_key ] );
+				if ( '' !== $candidate ) {
+					return $candidate;
+				}
+			}
+			$size_keys = array( 'approxSize', 'size', 'sliderValue', 'sizePercent' );
+			foreach ( $size_keys as $size_key ) {
+				if ( ! isset( $print[ $size_key ] ) ) {
+					continue;
+				}
+				$size_value = absint( $print[ $size_key ] );
+				if ( $size_value > 0 ) {
+					return sprintf( '%s%%', (string) $size_value );
+				}
+			}
+			if ( isset( $print['placement'] ) && is_array( $print['placement'] ) ) {
+				foreach ( $size_label_keys as $size_label_key ) {
+					if ( ! isset( $print['placement'][ $size_label_key ] ) ) {
+						continue;
+					}
+					$candidate = sanitize_text_field( (string) $print['placement'][ $size_label_key ] );
+					if ( '' !== $candidate ) {
+						return $candidate;
+					}
+				}
+				foreach ( $size_keys as $size_key ) {
+					if ( ! isset( $print['placement'][ $size_key ] ) ) {
+						continue;
+					}
+					$size_value = absint( $print['placement'][ $size_key ] );
+					if ( $size_value > 0 ) {
+						return sprintf( '%s%%', (string) $size_value );
+					}
+				}
+			}
+			return '';
+		};
+
 		$prints_raw = get_post_meta( $post->ID, 'screenprint_quote_prints_json', true );
-		$prints = json_decode( (string) $prints_raw, true );
+		if ( '' === (string) $prints_raw ) {
+			$prints_raw = get_post_meta( $post->ID, 'prints_json', true );
+		}
+		if ( is_array( $prints_raw ) ) {
+			$prints = $prints_raw;
+		} else {
+			$prints = json_decode( (string) $prints_raw, true );
+		}
+		if ( is_array( $prints ) && isset( $prints['prints'] ) && is_array( $prints['prints'] ) ) {
+			$prints = $prints['prints'];
+		}
+		if ( ! is_array( $prints ) || empty( $prints ) ) {
+			$rows_raw = get_post_meta( $post->ID, 'screenprint_quote_rows_json', true );
+			if ( '' === (string) $rows_raw ) {
+				$rows_raw = get_post_meta( $post->ID, 'items_json', true );
+			}
+			if ( is_array( $rows_raw ) ) {
+				$rows = $rows_raw;
+			} else {
+				$rows = json_decode( (string) $rows_raw, true );
+			}
+			if ( is_array( $rows ) && isset( $rows['rows'] ) && is_array( $rows['rows'] ) ) {
+				$rows = $rows['rows'];
+			}
+			if ( is_array( $rows ) && isset( $rows['items'] ) && is_array( $rows['items'] ) ) {
+				$rows = $rows['items'];
+			}
+			if ( is_array( $rows ) && ! empty( $rows ) && array_keys( $rows ) !== range( 0, count( $rows ) - 1 ) ) {
+				$rows = array_values( array_filter( $rows, 'is_array' ) );
+			}
+			$prints = array();
+			if ( is_array( $rows ) ) {
+				foreach ( $rows as $row ) {
+					if ( ! is_array( $row ) ) {
+						continue;
+					}
+					if ( isset( $row['prints'] ) && is_array( $row['prints'] ) ) {
+						foreach ( $row['prints'] as $print_row_entry ) {
+							if ( is_array( $print_row_entry ) ) {
+								$prints[] = $print_row_entry;
+							}
+						}
+					}
+					if ( ! isset( $row['placements'] ) || ! is_array( $row['placements'] ) ) {
+						continue;
+					}
+					foreach ( $row['placements'] as $placement ) {
+						if ( ! is_array( $placement ) ) {
+							continue;
+						}
+						$prints[] = $placement;
+					}
+				}
+			}
+		}
+
 		if ( ! is_array( $prints ) || empty( $prints ) ) {
 			echo '<p>' . esc_html__( 'No prints recorded for this quote.', 'threaddesk' ) . '</p>';
 			return;
 		}
+
 		echo '<ul style="margin:0;padding-left:18px;">';
 		foreach ( $prints as $print ) {
 			if ( ! is_array( $print ) ) {
@@ -5880,18 +6158,13 @@ class TTA_ThreadDesk {
 			}
 			$design_name = isset( $print['designName'] ) ? sanitize_text_field( (string) $print['designName'] ) : __( 'Design', 'threaddesk' );
 			$placement_label = isset( $print['placementLabel'] ) ? sanitize_text_field( (string) $print['placementLabel'] ) : '';
-			$size = isset( $print['approxSize'] ) ? absint( $print['approxSize'] ) : 0;
-			$size_label = isset( $print['approxSizeLabel'] ) ? sanitize_text_field( (string) $print['approxSizeLabel'] ) : '';
-			$colors = isset( $print['selectedColors'] ) && is_array( $print['selectedColors'] ) ? array_map( 'sanitize_text_field', $print['selectedColors'] ) : array();
+			$size_label = $extract_size_label( $print );
+			$colors = $extract_colors( $print );
 			$parts = array( $design_name );
 			if ( '' !== $placement_label ) {
 				$parts[] = sprintf( __( 'Placement: %s', 'threaddesk' ), $placement_label );
 			}
-			if ( '' !== $size_label ) {
-				$parts[] = sprintf( __( 'Size: %s', 'threaddesk' ), $size_label );
-			} elseif ( $size > 0 ) {
-				$parts[] = sprintf( __( 'Size: %s%%', 'threaddesk' ), (string) $size );
-			}
+			$parts[] = sprintf( __( 'Size: %s', 'threaddesk' ), '' !== $size_label ? $size_label : '—' );
 			$parts[] = sprintf( __( 'Colors: %s', 'threaddesk' ), ! empty( $colors ) ? implode( ', ', $colors ) : '—' );
 			echo '<li>' . esc_html( implode( ' • ', $parts ) ) . '</li>';
 		}
