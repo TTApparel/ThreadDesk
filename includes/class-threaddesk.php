@@ -5968,6 +5968,58 @@ class TTA_ThreadDesk {
 			echo '<p>' . esc_html__( 'No print details available.', 'threaddesk' ) . '</p>';
 			return;
 		}
+
+		$extract_colors = static function ( $print ) {
+			$color_keys = array( 'selectedColors', 'colors', 'paletteCurrent', 'paletteOriginal', 'palette' );
+			foreach ( $color_keys as $color_key ) {
+				if ( ! isset( $print[ $color_key ] ) ) {
+					continue;
+				}
+				$raw_colors = $print[ $color_key ];
+				if ( is_string( $raw_colors ) ) {
+					$raw_colors = array_map( 'trim', explode( ',', $raw_colors ) );
+				}
+				if ( ! is_array( $raw_colors ) ) {
+					continue;
+				}
+				$colors = array();
+				foreach ( $raw_colors as $color ) {
+					$clean_color = sanitize_text_field( (string) $color );
+					if ( '' !== $clean_color ) {
+						$colors[] = $clean_color;
+					}
+				}
+				if ( ! empty( $colors ) ) {
+					return array_values( array_unique( $colors ) );
+				}
+			}
+			return array();
+		};
+
+		$extract_size_label = static function ( $print ) {
+			$size_label_keys = array( 'approxSizeLabel', 'sizeLabel' );
+			foreach ( $size_label_keys as $size_label_key ) {
+				if ( ! isset( $print[ $size_label_key ] ) ) {
+					continue;
+				}
+				$candidate = sanitize_text_field( (string) $print[ $size_label_key ] );
+				if ( '' !== $candidate ) {
+					return $candidate;
+				}
+			}
+			$size_keys = array( 'approxSize', 'size' );
+			foreach ( $size_keys as $size_key ) {
+				if ( ! isset( $print[ $size_key ] ) ) {
+					continue;
+				}
+				$size_value = absint( $print[ $size_key ] );
+				if ( $size_value > 0 ) {
+					return sprintf( '%s%%', (string) $size_value );
+				}
+			}
+			return '';
+		};
+
 		$prints_raw = get_post_meta( $post->ID, 'screenprint_quote_prints_json', true );
 		if ( '' === (string) $prints_raw ) {
 			$prints_raw = get_post_meta( $post->ID, 'prints_json', true );
@@ -5995,9 +6047,42 @@ class TTA_ThreadDesk {
 			}
 		}
 		if ( ! is_array( $prints ) || empty( $prints ) ) {
+			$rows_raw = get_post_meta( $post->ID, 'screenprint_quote_rows_json', true );
+			if ( '' === (string) $rows_raw ) {
+				$rows_raw = get_post_meta( $post->ID, 'items_json', true );
+			}
+			$rows = json_decode( (string) $rows_raw, true );
+			$prints = array();
+			if ( is_array( $rows ) ) {
+				foreach ( $rows as $row ) {
+					if ( ! is_array( $row ) ) {
+						continue;
+					}
+					if ( isset( $row['prints'] ) && is_array( $row['prints'] ) ) {
+						foreach ( $row['prints'] as $print_row_entry ) {
+							if ( is_array( $print_row_entry ) ) {
+								$prints[] = $print_row_entry;
+							}
+						}
+					}
+					if ( ! isset( $row['placements'] ) || ! is_array( $row['placements'] ) ) {
+						continue;
+					}
+					foreach ( $row['placements'] as $placement ) {
+						if ( ! is_array( $placement ) ) {
+							continue;
+						}
+						$prints[] = $placement;
+					}
+				}
+			}
+		}
+
+		if ( ! is_array( $prints ) || empty( $prints ) ) {
 			echo '<p>' . esc_html__( 'No prints recorded for this quote.', 'threaddesk' ) . '</p>';
 			return;
 		}
+
 		echo '<ul style="margin:0;padding-left:18px;">';
 		foreach ( $prints as $print ) {
 			if ( ! is_array( $print ) ) {
@@ -6005,18 +6090,13 @@ class TTA_ThreadDesk {
 			}
 			$design_name = isset( $print['designName'] ) ? sanitize_text_field( (string) $print['designName'] ) : __( 'Design', 'threaddesk' );
 			$placement_label = isset( $print['placementLabel'] ) ? sanitize_text_field( (string) $print['placementLabel'] ) : '';
-			$size = isset( $print['approxSize'] ) ? absint( $print['approxSize'] ) : 0;
-			$size_label = isset( $print['approxSizeLabel'] ) ? sanitize_text_field( (string) $print['approxSizeLabel'] ) : '';
-			$colors = isset( $print['selectedColors'] ) && is_array( $print['selectedColors'] ) ? array_map( 'sanitize_text_field', $print['selectedColors'] ) : array();
+			$size_label = $extract_size_label( $print );
+			$colors = $extract_colors( $print );
 			$parts = array( $design_name );
 			if ( '' !== $placement_label ) {
 				$parts[] = sprintf( __( 'Placement: %s', 'threaddesk' ), $placement_label );
 			}
-			if ( '' !== $size_label ) {
-				$parts[] = sprintf( __( 'Size: %s', 'threaddesk' ), $size_label );
-			} elseif ( $size > 0 ) {
-				$parts[] = sprintf( __( 'Size: %s%%', 'threaddesk' ), (string) $size );
-			}
+			$parts[] = sprintf( __( 'Size: %s', 'threaddesk' ), '' !== $size_label ? $size_label : '—' );
 			$parts[] = sprintf( __( 'Colors: %s', 'threaddesk' ), ! empty( $colors ) ? implode( ', ', $colors ) : '—' );
 			echo '<li>' . esc_html( implode( ' • ', $parts ) ) . '</li>';
 		}
