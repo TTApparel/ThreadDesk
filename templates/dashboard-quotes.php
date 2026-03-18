@@ -103,12 +103,22 @@ $format_price = function ( $amount ) use ( $currency ) {
 					<?php if ( ! empty( $context['quotes'] ) ) : ?>
 						<?php foreach ( $context['quotes'] as $quote ) : ?>
 							<?php
-								$status = get_post_meta( $quote->ID, 'status', true );
+								$status_raw = sanitize_key( (string) get_post_meta( $quote->ID, 'status', true ) );
+								$status_map = array(
+									'pending'  => __( 'Pending', 'threaddesk' ),
+									'approved' => __( 'Accepted', 'threaddesk' ),
+									'accepted' => __( 'Accepted', 'threaddesk' ),
+									'rejected' => __( 'Rejected', 'threaddesk' ),
+									'draft'    => __( 'Pending', 'threaddesk' ),
+									'private'  => __( 'Pending', 'threaddesk' ),
+									'new'      => __( 'Pending', 'threaddesk' ),
+								);
+								$status_label = isset( $status_map[ $status_raw ] ) ? $status_map[ $status_raw ] : __( 'Pending', 'threaddesk' );
 								$total  = get_post_meta( $quote->ID, 'total', true );
 							?>
 							<tr>
 								<td><?php echo esc_html( $quote->post_title ); ?></td>
-								<td><?php echo esc_html( ucfirst( $status ? $status : __( 'draft', 'threaddesk' ) ) ); ?></td>
+								<td><?php echo esc_html( $status_label ); ?></td>
 								<td><?php echo wp_kses_post( $format_price( $total ? $total : 0 ) ); ?></td>
 								<td>
 									<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
