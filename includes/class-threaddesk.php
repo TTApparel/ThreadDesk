@@ -7033,6 +7033,28 @@ class TTA_ThreadDesk {
 			$query->set( 'meta_key', 'status' );
 			$query->set( 'orderby', 'meta_value' );
 		}
+		?>
+		<script>
+		jQuery(function ($) {
+			const $wpInlineEdit = inlineEditPost.edit;
+			inlineEditPost.edit = function (postId) {
+				$wpInlineEdit.apply(this, arguments);
+				let id = 0;
+				if (typeof(postId) === 'object') {
+					id = parseInt(this.getId(postId), 10);
+				} else {
+					id = parseInt(postId, 10);
+				}
+				if (!id) { return; }
+				const $editRow = $('#edit-' + id);
+				const $postRow = $('#post-' + id);
+				const rawStatus = String(($postRow.find('.threaddesk-quote-status').attr('data-threaddesk-quote-status') || 'pending')).toLowerCase();
+				const status = rawStatus === 'approved' || rawStatus === 'rejected' ? rawStatus : 'pending';
+				$editRow.find('select[name="threaddesk_quote_status"]').val(status);
+			};
+		});
+		</script>
+		<?php
 	}
 
 	public function render_quote_quick_edit_status_field( $column_name, $post_type ) {
