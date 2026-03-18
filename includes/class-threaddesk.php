@@ -972,6 +972,7 @@ class TTA_ThreadDesk {
 					$mockups[ $view_key ] = isset( $row['mockups'][ $view_key ] ) ? esc_url_raw( (string) $row['mockups'][ $view_key ] ) : '';
 				}
 				$mockups['sideLabel'] = isset( $row['mockups']['sideLabel'] ) && 'right' === sanitize_key( (string) $row['mockups']['sideLabel'] ) ? 'right' : 'left';
+				$mockups['rightSource'] = isset( $row['mockups']['rightSource'] ) && 'left' === sanitize_key( (string) $row['mockups']['rightSource'] ) ? 'left' : 'right';
 			}
 			$placement_overlays = array();
 			if ( isset( $row['placementOverlays'] ) && is_array( $row['placementOverlays'] ) ) {
@@ -3657,7 +3658,7 @@ class TTA_ThreadDesk {
 						estimatedUnitCost:null===unitCost?0:Number(unitCost),
 						placements:Object.values(groupedPlacementEntries).map((entry)=>({placementLabel:entry.placementLabel,designName:entry.designName,designId:entry.designId,approxSize:Number(entry.approxSize||100),approxSizeLabel:entry.approxSizeLabel||String(entry.approxSize||100)+'%',selectedColors:Array.isArray(entry.selectedColors)?entry.selectedColors:[]})),
 						placementOverlays:placementOverlays,
-						mockups:{front:String((images&&images.front)||'').trim(),left:leftView||rightView,right:rightView||leftView,side:sideView,sideLabel:sideLabel,back:String((images&&images.back)||'').trim()}
+						mockups:{front:String((images&&images.front)||'').trim(),left:leftView||rightView,right:rightView||leftView,rightSource:rightView?'right':'left',side:sideView,sideLabel:sideLabel,back:String((images&&images.back)||'').trim()}
 					});
 				});
 				return rows;
@@ -6061,13 +6062,22 @@ class TTA_ThreadDesk {
 			$side_label = isset( $mockups['sideLabel'] ) && 'right' === sanitize_key( (string) $mockups['sideLabel'] ) ? 'right' : 'left';
 			$has_right_mockup = isset( $mockups['right'] ) && '' !== trim( (string) $mockups['right'] );
 			$has_side_mockup = isset( $mockups['side'] ) && '' !== trim( (string) $mockups['side'] );
+			$right_source = isset( $mockups['rightSource'] ) ? sanitize_key( (string) $mockups['rightSource'] ) : '';
+			if ( ! in_array( $right_source, array( 'left', 'right' ), true ) ) {
+				$right_source = 'right';
+				if ( ! $has_right_mockup && $has_side_mockup && 'left' === $side_label ) {
+					$right_source = 'left';
+				} elseif ( $has_right_mockup && isset( $mockups['left'] ) && '' !== trim( (string) $mockups['left'] ) && trim( (string) $mockups['left'] ) === trim( (string) $mockups['right'] ) && 'left' === $side_label ) {
+					$right_source = 'left';
+				}
+			}
 			$mockup_payload = array(
 				'front' => isset( $mockups['front'] ) ? esc_url_raw( (string) $mockups['front'] ) : '',
 				'left'  => isset( $mockups['left'] ) ? esc_url_raw( (string) $mockups['left'] ) : '',
 				'back'  => isset( $mockups['back'] ) ? esc_url_raw( (string) $mockups['back'] ) : '',
 				'right' => isset( $mockups['right'] ) ? esc_url_raw( (string) $mockups['right'] ) : ( isset( $mockups['side'] ) ? esc_url_raw( (string) $mockups['side'] ) : '' ),
 				'sideLabel' => $side_label,
-				'rightMirror' => ( ! $has_right_mockup && $has_side_mockup && 'left' === $side_label ) ? 1 : 0,
+				'rightMirror' => ( 'left' === $right_source ) ? 1 : 0,
 			);
 			$overlay_payload = array(
 				'front' => array(),
@@ -7023,6 +7033,28 @@ class TTA_ThreadDesk {
 			$query->set( 'meta_key', 'status' );
 			$query->set( 'orderby', 'meta_value' );
 		}
+		?>
+		<script>
+		jQuery(function ($) {
+			const $wpInlineEdit = inlineEditPost.edit;
+			inlineEditPost.edit = function (postId) {
+				$wpInlineEdit.apply(this, arguments);
+				let id = 0;
+				if (typeof(postId) === 'object') {
+					id = parseInt(this.getId(postId), 10);
+				} else {
+					id = parseInt(postId, 10);
+				}
+				if (!id) { return; }
+				const $editRow = $('#edit-' + id);
+				const $postRow = $('#post-' + id);
+				const rawStatus = String(($postRow.find('.threaddesk-quote-status').attr('data-threaddesk-quote-status') || 'pending')).toLowerCase();
+				const status = rawStatus === 'approved' || rawStatus === 'rejected' ? rawStatus : 'pending';
+				$editRow.find('select[name="threaddesk_quote_status"]').val(status);
+			};
+		});
+		</script>
+		<?php
 	}
 
 	public function render_quote_quick_edit_status_field( $column_name, $post_type ) {
