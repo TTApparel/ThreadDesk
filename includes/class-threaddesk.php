@@ -50,10 +50,13 @@ class TTA_ThreadDesk {
 		add_action( 'manage_tta_quote_posts_custom_column', array( $this, 'render_custom_admin_columns' ), 10, 2 );
 		add_action( 'manage_tta_design_posts_custom_column', array( $this, 'render_custom_admin_columns' ), 10, 2 );
 		add_action( 'manage_tta_layout_posts_custom_column', array( $this, 'render_custom_admin_columns' ), 10, 2 );
+		add_action( 'quick_edit_custom_box', array( $this, 'render_quote_quick_edit_status_field' ), 10, 2 );
 		add_action( 'quick_edit_custom_box', array( $this, 'render_design_quick_edit_status_field' ), 10, 2 );
 		add_action( 'quick_edit_custom_box', array( $this, 'render_layout_quick_edit_status_field' ), 10, 2 );
+		add_action( 'admin_footer-edit.php', array( $this, 'render_quote_quick_edit_status_script' ) );
 		add_action( 'admin_footer-edit.php', array( $this, 'render_design_quick_edit_status_script' ) );
 		add_action( 'admin_footer-edit.php', array( $this, 'render_layout_quick_edit_status_script' ) );
+		add_action( 'save_post_tta_quote', array( $this, 'handle_quote_status_save' ), 10, 2 );
 		add_action( 'save_post_tta_design', array( $this, 'handle_design_status_save' ), 10, 2 );
 		add_action( 'save_post_tta_layout', array( $this, 'handle_layout_status_save' ), 10, 2 );
 		add_action( 'save_post_product', array( $this, 'handle_product_postbox_save' ), 10, 2 );
@@ -5547,6 +5550,7 @@ class TTA_ThreadDesk {
 		add_meta_box( 'threaddesk_layout_detail', __( 'ThreadDesk Layout Details', 'threaddesk' ), array( $this, 'render_layout_admin_meta_box' ), 'tta_layout', 'normal', 'high' );
 		add_meta_box( 'threaddesk_layout_designs', __( 'Designs', 'threaddesk' ), array( $this, 'render_layout_designs_admin_meta_box' ), 'tta_layout', 'side', 'default' );
 		add_meta_box( 'threaddesk_layout_status', __( 'Layout Status', 'threaddesk' ), array( $this, 'render_layout_status_admin_meta_box' ), 'tta_layout', 'side', 'high' );
+		add_meta_box( 'threaddesk_quote_status', __( 'Quote Status', 'threaddesk' ), array( $this, 'render_quote_status_admin_meta_box' ), 'tta_quote', 'side', 'high' );
 		add_meta_box( 'threaddesk_quote_lines', __( 'Quote Line Items', 'threaddesk' ), array( $this, 'render_quote_line_items_admin_meta_box' ), 'tta_quote', 'normal', 'high' );
 		add_meta_box( 'threaddesk_quote_prints', __( 'Prints in Quote', 'threaddesk' ), array( $this, 'render_quote_prints_admin_meta_box' ), 'tta_quote', 'side', 'default' );
 		add_meta_box( 'threaddesk_product_postbox', __( 'ThreadDesk Product Postbox', 'threaddesk' ), array( $this, 'render_product_postbox_meta_box' ), 'product', 'normal', 'default' );
@@ -5820,6 +5824,18 @@ class TTA_ThreadDesk {
 		});
 		</script>
 		<?php
+	}
+
+	public function render_quote_status_admin_meta_box( $post ) {
+		$status = $this->get_quote_status( $post->ID );
+		$options = $this->get_quote_status_options();
+		wp_nonce_field( 'tta_threaddesk_quote_status_meta_box', 'tta_threaddesk_quote_status_meta_nonce' );
+		echo '<label for="threaddesk_quote_status_field" class="screen-reader-text">' . esc_html__( 'Quote status', 'threaddesk' ) . '</label>';
+		echo '<select id="threaddesk_quote_status_field" name="threaddesk_quote_status" style="width:100%;">';
+		foreach ( $options as $value => $label ) {
+			echo '<option value="' . esc_attr( $value ) . '" ' . selected( $status, $value, false ) . '>' . esc_html( $label ) . '</option>';
+		}
+		echo '</select>';
 	}
 
 	public function render_design_status_admin_meta_box( $post ) {
@@ -6894,6 +6910,55 @@ class TTA_ThreadDesk {
 		}
 	}
 
+	public function render_quote_quick_edit_status_field( $column_name, $post_type ) {
+		if ( 'tta_quote_status' !== $column_name || 'tta_quote' !== $post_type ) {
+			return;
+		}
+		$options = $this->get_quote_status_options();
+		wp_nonce_field( 'tta_threaddesk_quote_status_quick_edit', 'tta_threaddesk_quote_status_nonce' );
+		echo '<fieldset class="inline-edit-col-right">';
+		echo '<div class="inline-edit-col">';
+		echo '<label class="inline-edit-group">';
+		echo '<span class="title">' . esc_html__( 'Quote status', 'threaddesk' ) . '</span>';
+		echo '<select name="threaddesk_quote_status">';
+		foreach ( $options as $value => $label ) {
+			echo '<option value="' . esc_attr( $value ) . '">' . esc_html( $label ) . '</option>';
+		}
+		echo '</select>';
+		echo '</label>';
+		echo '</div>';
+		echo '</fieldset>';
+	}
+
+	public function render_quote_quick_edit_status_script() {
+		$screen = function_exists( 'get_current_screen' ) ? get_current_screen() : null;
+		if ( ! $screen || 'edit-tta_quote' !== $screen->id ) {
+			return;
+		}
+		?>
+		<script>
+		jQuery(function ($) {
+			const $wpInlineEdit = inlineEditPost.edit;
+			inlineEditPost.edit = function (postId) {
+				$wpInlineEdit.apply(this, arguments);
+				let id = 0;
+				if (typeof(postId) === 'object') {
+					id = parseInt(this.getId(postId), 10);
+				} else {
+					id = parseInt(postId, 10);
+				}
+				if (!id) { return; }
+				const $editRow = $('#edit-' + id);
+				const $postRow = $('#post-' + id);
+				const rawStatus = String(($postRow.find('.threaddesk-quote-status').attr('data-threaddesk-quote-status') || 'pending')).toLowerCase();
+				const status = rawStatus === 'approved' || rawStatus === 'rejected' ? rawStatus : 'pending';
+				$editRow.find('select[name="threaddesk_quote_status"]').val(status);
+			};
+		});
+		</script>
+		<?php
+	}
+
 	public function render_design_quick_edit_status_field( $column_name, $post_type ) {
 		if ( 'tta_design_status' !== $column_name || 'tta_design' !== $post_type ) {
 			return;
@@ -7032,6 +7097,30 @@ class TTA_ThreadDesk {
 		});
 		</script>
 		<?php
+	}
+
+	public function handle_quote_status_save( $post_id, $post ) {
+		if ( ! $post || 'tta_quote' !== $post->post_type ) {
+			return;
+		}
+		if ( defined( 'DOING_AUTOSAVE' ) && DOING_AUTOSAVE ) {
+			return;
+		}
+		if ( ! current_user_can( 'edit_post', $post_id ) ) {
+			return;
+		}
+		if ( ! isset( $_POST['threaddesk_quote_status'] ) ) {
+			return;
+		}
+		$has_quick_edit_nonce = isset( $_POST['tta_threaddesk_quote_status_nonce'] ) && wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['tta_threaddesk_quote_status_nonce'] ) ), 'tta_threaddesk_quote_status_quick_edit' );
+		$has_meta_box_nonce   = isset( $_POST['tta_threaddesk_quote_status_meta_nonce'] ) && wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['tta_threaddesk_quote_status_meta_nonce'] ) ), 'tta_threaddesk_quote_status_meta_box' );
+		if ( ! $has_quick_edit_nonce && ! $has_meta_box_nonce ) {
+			return;
+		}
+		$status = $this->sanitize_quote_status( wp_unslash( $_POST['threaddesk_quote_status'] ) );
+		update_post_meta( $post_id, 'status', $status );
+		$label = 'approved' === $status ? __( 'Quote approved', 'threaddesk' ) : ( 'rejected' === $status ? __( 'Quote rejected', 'threaddesk' ) : __( 'Quote marked pending', 'threaddesk' ) );
+		$this->log_user_activity( (int) $post->post_author, sprintf( __( '%1$s: %2$s', 'threaddesk' ), $label, get_the_title( $post_id ) ), 'quote' );
 	}
 
 	public function handle_design_status_save( $post_id, $post ) {
