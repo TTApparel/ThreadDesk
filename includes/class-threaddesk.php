@@ -334,6 +334,28 @@ class TTA_ThreadDesk {
 		return $this->sanitize_layout_status( $stored );
 	}
 
+	private function get_quote_status_options() {
+		return array(
+			'pending'  => __( 'Pending', 'threaddesk' ),
+			'approved' => __( 'Approved', 'threaddesk' ),
+			'rejected' => __( 'Rejected', 'threaddesk' ),
+		);
+	}
+
+	private function sanitize_quote_status( $status ) {
+		$status = sanitize_key( (string) $status );
+		if ( in_array( $status, array( 'draft', 'private', 'new' ), true ) ) {
+			$status = 'pending';
+		}
+		$options = $this->get_quote_status_options();
+		return isset( $options[ $status ] ) ? $status : 'pending';
+	}
+
+	private function get_quote_status( $quote_id ) {
+		$stored = get_post_meta( (int) $quote_id, 'status', true );
+		return $this->sanitize_quote_status( $stored );
+	}
+
 	private function render_media_picker_field( $name, $value ) {
 		$value = $value ? esc_url( $value ) : '';
 		?>
@@ -947,46 +969,6 @@ class TTA_ThreadDesk {
 					$mockups[ $view_key ] = isset( $row['mockups'][ $view_key ] ) ? esc_url_raw( (string) $row['mockups'][ $view_key ] ) : '';
 				}
 				$mockups['sideLabel'] = isset( $row['mockups']['sideLabel'] ) && 'right' === sanitize_key( (string) $row['mockups']['sideLabel'] ) ? 'right' : 'left';
-			}
-			$placement_overlays = array();
-			if ( isset( $row['placementOverlays'] ) && is_array( $row['placementOverlays'] ) ) {
-				foreach ( $row['placementOverlays'] as $angle_key => $entries ) {
-					if ( ! is_array( $entries ) ) {
-						continue;
-					}
-					$clean_angle_key = sanitize_key( (string) $angle_key );
-					if ( '' === $clean_angle_key ) {
-						$clean_angle_key = 'front';
-					}
-					$placement_overlays[ $clean_angle_key ] = array();
-					foreach ( $entries as $entry ) {
-						if ( ! is_array( $entry ) ) {
-							continue;
-						}
-						$url_raw = isset( $entry['url'] ) ? (string) $entry['url'] : '';
-						$url = esc_url_raw( $url_raw );
-						if ( '' === $url && preg_match( '#^data:image\/(png|jpe?g|webp);base64,#i', $url_raw ) ) {
-							$url = $url_raw;
-						}
-						if ( '' === $url ) {
-							continue;
-						}
-						$placement_overlays[ $clean_angle_key ][] = array(
-							'placementKey'   => isset( $entry['placementKey'] ) ? sanitize_text_field( (string) $entry['placementKey'] ) : '',
-							'placementLabel' => isset( $entry['placementLabel'] ) ? sanitize_text_field( (string) $entry['placementLabel'] ) : '',
-							'designId'       => isset( $entry['designId'] ) ? absint( $entry['designId'] ) : 0,
-							'designName'     => isset( $entry['designName'] ) ? sanitize_text_field( (string) $entry['designName'] ) : '',
-							'angle'          => isset( $entry['angle'] ) ? sanitize_key( (string) $entry['angle'] ) : $clean_angle_key,
-							'url'            => $url,
-							'top'            => isset( $entry['top'] ) ? (float) $entry['top'] : 50.0,
-							'left'           => isset( $entry['left'] ) ? (float) $entry['left'] : 50.0,
-							'width'          => isset( $entry['width'] ) ? (float) $entry['width'] : 25.0,
-						);
-					}
-					if ( empty( $placement_overlays[ $clean_angle_key ] ) ) {
-						unset( $placement_overlays[ $clean_angle_key ] );
-					}
-				}
 			}
 			$placement_overlays = array();
 			if ( isset( $row['placementOverlays'] ) && is_array( $row['placementOverlays'] ) ) {
@@ -6759,7 +6741,15 @@ class TTA_ThreadDesk {
 	}
 
 	public function filter_quote_admin_columns( $columns ) {
-		return $this->filter_entity_admin_columns( $columns );
+		$columns = $this->filter_entity_admin_columns( $columns );
+		$updated = array();
+		foreach ( $columns as $key => $label ) {
+			$updated[ $key ] = $label;
+			if ( 'tta_internal_ref' === $key ) {
+				$updated['tta_quote_status'] = __( 'Status', 'threaddesk' );
+			}
+		}
+		return $updated;
 	}
 
 	public function filter_design_admin_columns( $columns ) {
@@ -6833,6 +6823,16 @@ class TTA_ThreadDesk {
 			echo '<span class="threaddesk-layout-status" data-threaddesk-layout-status="' . esc_attr( $status ) . '" data-threaddesk-layout-rejection-reason="' . esc_attr( $rejection_reason ) . '">' . esc_html( isset( $options[ $status ] ) ? $options[ $status ] : $options['pending'] ) . '</span>';
 			return;
 		}
+		if ( 'tta_quote_status' === $column ) {
+			if ( 'tta_quote' !== $post->post_type ) {
+				echo '&mdash;';
+				return;
+			}
+			$status = $this->get_quote_status( $post_id );
+			$options = $this->get_quote_status_options();
+			echo '<span class="threaddesk-quote-status" data-threaddesk-quote-status="' . esc_attr( $status ) . '">' . esc_html( isset( $options[ $status ] ) ? $options[ $status ] : $options['pending'] ) . '</span>';
+			return;
+		}
 	}
 
 	private function filter_entity_sortable_columns( $columns ) {
@@ -6843,7 +6843,9 @@ class TTA_ThreadDesk {
 	}
 
 	public function filter_quote_sortable_columns( $columns ) {
-		return $this->filter_entity_sortable_columns( $columns );
+		$columns = $this->filter_entity_sortable_columns( $columns );
+		$columns['tta_quote_status'] = 'tta_quote_status';
+		return $columns;
 	}
 
 	public function filter_design_sortable_columns( $columns ) {
@@ -6883,6 +6885,11 @@ class TTA_ThreadDesk {
 		}
 		if ( 'tta_layout_status' === $orderby && 'tta_layout' === $post_type ) {
 			$query->set( 'meta_key', 'layout_status' );
+			$query->set( 'orderby', 'meta_value' );
+			return;
+		}
+		if ( 'tta_quote_status' === $orderby && 'tta_quote' === $post_type ) {
+			$query->set( 'meta_key', 'status' );
 			$query->set( 'orderby', 'meta_value' );
 		}
 	}
