@@ -50,10 +50,10 @@ class TTA_ThreadDesk {
 		add_action( 'manage_tta_quote_posts_custom_column', array( $this, 'render_custom_admin_columns' ), 10, 2 );
 		add_action( 'manage_tta_design_posts_custom_column', array( $this, 'render_custom_admin_columns' ), 10, 2 );
 		add_action( 'manage_tta_layout_posts_custom_column', array( $this, 'render_custom_admin_columns' ), 10, 2 );
-		add_action( 'quick_edit_custom_box', array( $this, 'render_quote_quick_edit_status_field' ), 10, 2 );
+		add_action( 'quick_edit_custom_box', array( $this, 'render_quote_quick_edit_status_inline_field' ), 10, 2 );
 		add_action( 'quick_edit_custom_box', array( $this, 'render_design_quick_edit_status_field' ), 10, 2 );
 		add_action( 'quick_edit_custom_box', array( $this, 'render_layout_quick_edit_status_field' ), 10, 2 );
-		add_action( 'admin_footer-edit.php', array( $this, 'render_quote_quick_edit_status_script' ) );
+		add_action( 'admin_footer-edit.php', array( $this, 'render_quote_quick_edit_status_inline_script' ) );
 		add_action( 'admin_footer-edit.php', array( $this, 'render_design_quick_edit_status_script' ) );
 		add_action( 'admin_footer-edit.php', array( $this, 'render_layout_quick_edit_status_script' ) );
 		add_action( 'save_post_tta_quote', array( $this, 'handle_quote_status_save' ), 10, 2 );
@@ -7072,6 +7072,17 @@ class TTA_ThreadDesk {
 			$query->set( 'meta_key', 'status' );
 			$query->set( 'orderby', 'meta_value' );
 		}
+		echo '</select>';
+		echo '</label>';
+		echo '</div>';
+		echo '</fieldset>';
+	}
+
+	public function render_quote_quick_edit_status_script() {
+		$screen = function_exists( 'get_current_screen' ) ? get_current_screen() : null;
+		if ( ! $screen || 'edit-tta_quote' !== $screen->id ) {
+			return;
+		}
 		?>
 		<script>
 		jQuery(function ($) {
@@ -7145,7 +7156,7 @@ class TTA_ThreadDesk {
 		<?php
 	}
 
-	public function render_quote_quick_edit_status_field( $column_name, $post_type ) {
+	public function render_quote_quick_edit_status_inline_field( $column_name, $post_type ) {
 		if ( 'tta_quote_status' !== $column_name || 'tta_quote' !== $post_type ) {
 			return;
 		}
@@ -7165,7 +7176,7 @@ class TTA_ThreadDesk {
 		echo '</fieldset>';
 	}
 
-	public function render_quote_quick_edit_status_script() {
+	public function render_quote_quick_edit_status_inline_script() {
 		$screen = function_exists( 'get_current_screen' ) ? get_current_screen() : null;
 		if ( ! $screen || 'edit-tta_quote' !== $screen->id ) {
 			return;
