@@ -7072,6 +7072,88 @@ class TTA_ThreadDesk {
 			$query->set( 'meta_key', 'status' );
 			$query->set( 'orderby', 'meta_value' );
 		}
+		echo '</select>';
+		echo '</label>';
+		echo '</div>';
+		echo '</fieldset>';
+	}
+
+	public function render_quote_quick_edit_status_script() {
+		$screen = function_exists( 'get_current_screen' ) ? get_current_screen() : null;
+		if ( ! $screen || 'edit-tta_quote' !== $screen->id ) {
+			return;
+		}
+		?>
+		<script>
+		jQuery(function ($) {
+			const $wpInlineEdit = inlineEditPost.edit;
+			inlineEditPost.edit = function (postId) {
+				$wpInlineEdit.apply(this, arguments);
+				let id = 0;
+				if (typeof(postId) === 'object') {
+					id = parseInt(this.getId(postId), 10);
+				} else {
+					id = parseInt(postId, 10);
+				}
+				if (!id) { return; }
+				const $editRow = $('#edit-' + id);
+				const $postRow = $('#post-' + id);
+				const rawStatus = String(($postRow.find('.threaddesk-quote-status').attr('data-threaddesk-quote-status') || 'pending')).toLowerCase();
+				const status = rawStatus === 'approved' || rawStatus === 'rejected' ? rawStatus : 'pending';
+				$editRow.find('select[name="threaddesk_quote_status"]').val(status);
+			};
+		});
+		</script>
+		<?php
+	}
+
+	public function render_quote_quick_edit_status_field( $column_name, $post_type ) {
+		if ( 'tta_quote_status' !== $column_name || 'tta_quote' !== $post_type ) {
+			return;
+		}
+		$options = $this->get_quote_status_options();
+		wp_nonce_field( 'tta_threaddesk_quote_status_quick_edit', 'tta_threaddesk_quote_status_nonce' );
+		echo '<fieldset class="inline-edit-col-right">';
+		echo '<div class="inline-edit-col">';
+		echo '<label class="inline-edit-group">';
+		echo '<span class="title">' . esc_html__( 'Quote status', 'threaddesk' ) . '</span>';
+		echo '<select name="threaddesk_quote_status">';
+		foreach ( $options as $value => $label ) {
+			echo '<option value="' . esc_attr( $value ) . '">' . esc_html( $label ) . '</option>';
+		}
+		echo '</select>';
+		echo '</label>';
+		echo '</div>';
+		echo '</fieldset>';
+	}
+
+	public function render_quote_quick_edit_status_script() {
+		$screen = function_exists( 'get_current_screen' ) ? get_current_screen() : null;
+		if ( ! $screen || 'edit-tta_quote' !== $screen->id ) {
+			return;
+		}
+		?>
+		<script>
+		jQuery(function ($) {
+			const $wpInlineEdit = inlineEditPost.edit;
+			inlineEditPost.edit = function (postId) {
+				$wpInlineEdit.apply(this, arguments);
+				let id = 0;
+				if (typeof(postId) === 'object') {
+					id = parseInt(this.getId(postId), 10);
+				} else {
+					id = parseInt(postId, 10);
+				}
+				if (!id) { return; }
+				const $editRow = $('#edit-' + id);
+				const $postRow = $('#post-' + id);
+				const rawStatus = String(($postRow.find('.threaddesk-quote-status').attr('data-threaddesk-quote-status') || 'pending')).toLowerCase();
+				const status = rawStatus === 'approved' || rawStatus === 'rejected' ? rawStatus : 'pending';
+				$editRow.find('select[name="threaddesk_quote_status"]').val(status);
+			};
+		});
+		</script>
+		<?php
 	}
 
 	public function render_quote_quick_edit_status_inline_field( $column_name, $post_type ) {
