@@ -2731,16 +2731,14 @@ class TTA_ThreadDesk {
 					'author'         => $user_id,
 					'orderby'        => 'date',
 					'order'          => 'DESC',
-					'meta_query'     => array(
-						array(
-							'key'   => 'status',
-							'value' => 'pending',
-						),
-					),
 				)
 			);
 			foreach ( $pending_quote_posts as $pending_quote_post ) {
 				if ( ! $pending_quote_post instanceof WP_Post ) {
+					continue;
+				}
+				$quote_status = $this->get_quote_status( $pending_quote_post->ID );
+				if ( 'pending' !== $quote_status ) {
 					continue;
 				}
 				$screenprint_pending_quotes[] = array(
