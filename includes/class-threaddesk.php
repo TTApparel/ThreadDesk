@@ -1029,9 +1029,19 @@ class TTA_ThreadDesk {
 		$existing_prints = array();
 		$existing_total = 0;
 		if ( $is_update ) {
-			$existing_rows = json_decode( (string) get_post_meta( $quote_id, 'screenprint_quote_rows_json', true ), true );
+			$existing_rows_raw = get_post_meta( $quote_id, 'screenprint_quote_rows_json', true );
+			if ( is_array( $existing_rows_raw ) ) {
+				$existing_rows = $existing_rows_raw;
+			} else {
+				$existing_rows = json_decode( (string) $existing_rows_raw, true );
+			}
 			$existing_rows = is_array( $existing_rows ) ? $existing_rows : array();
-			$existing_prints = json_decode( (string) get_post_meta( $quote_id, 'screenprint_quote_prints_json', true ), true );
+			$existing_prints_raw = get_post_meta( $quote_id, 'screenprint_quote_prints_json', true );
+			if ( is_array( $existing_prints_raw ) ) {
+				$existing_prints = $existing_prints_raw;
+			} else {
+				$existing_prints = json_decode( (string) $existing_prints_raw, true );
+			}
 			$existing_prints = is_array( $existing_prints ) ? $existing_prints : array();
 			$existing_total = (float) get_post_meta( $quote_id, 'total', true );
 		} else {
@@ -1062,9 +1072,9 @@ class TTA_ThreadDesk {
 		update_post_meta( $quote_id, 'currency', function_exists( 'get_woocommerce_currency' ) ? get_woocommerce_currency() : 'USD' );
 		update_post_meta( $quote_id, 'total', $final_total );
 		update_post_meta( $quote_id, 'created_at', current_time( 'mysql' ) );
-		update_post_meta( $quote_id, 'items_json', wp_json_encode( $final_rows ) );
-		update_post_meta( $quote_id, 'screenprint_quote_rows_json', wp_json_encode( $final_rows ) );
-		update_post_meta( $quote_id, 'screenprint_quote_prints_json', wp_json_encode( $final_prints ) );
+		update_post_meta( $quote_id, 'items_json', $final_rows );
+		update_post_meta( $quote_id, 'screenprint_quote_rows_json', $final_rows );
+		update_post_meta( $quote_id, 'screenprint_quote_prints_json', $final_prints );
 		update_post_meta( $quote_id, 'screenprint_quote_context', array(
 			'productId' => $product_id,
 			'layoutId'  => $layout_id,
