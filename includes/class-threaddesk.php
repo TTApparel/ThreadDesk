@@ -988,6 +988,46 @@ class TTA_ThreadDesk {
 					}
 				}
 			}
+			$placement_overlays = array();
+			if ( isset( $row['placementOverlays'] ) && is_array( $row['placementOverlays'] ) ) {
+				foreach ( $row['placementOverlays'] as $angle_key => $entries ) {
+					if ( ! is_array( $entries ) ) {
+						continue;
+					}
+					$clean_angle_key = sanitize_key( (string) $angle_key );
+					if ( '' === $clean_angle_key ) {
+						$clean_angle_key = 'front';
+					}
+					$placement_overlays[ $clean_angle_key ] = array();
+					foreach ( $entries as $entry ) {
+						if ( ! is_array( $entry ) ) {
+							continue;
+						}
+						$url_raw = isset( $entry['url'] ) ? (string) $entry['url'] : '';
+						$url = esc_url_raw( $url_raw );
+						if ( '' === $url && preg_match( '#^data:image\/(png|jpe?g|webp);base64,#i', $url_raw ) ) {
+							$url = $url_raw;
+						}
+						if ( '' === $url ) {
+							continue;
+						}
+						$placement_overlays[ $clean_angle_key ][] = array(
+							'placementKey'   => isset( $entry['placementKey'] ) ? sanitize_text_field( (string) $entry['placementKey'] ) : '',
+							'placementLabel' => isset( $entry['placementLabel'] ) ? sanitize_text_field( (string) $entry['placementLabel'] ) : '',
+							'designId'       => isset( $entry['designId'] ) ? absint( $entry['designId'] ) : 0,
+							'designName'     => isset( $entry['designName'] ) ? sanitize_text_field( (string) $entry['designName'] ) : '',
+							'angle'          => isset( $entry['angle'] ) ? sanitize_key( (string) $entry['angle'] ) : $clean_angle_key,
+							'url'            => $url,
+							'top'            => isset( $entry['top'] ) ? (float) $entry['top'] : 50.0,
+							'left'           => isset( $entry['left'] ) ? (float) $entry['left'] : 50.0,
+							'width'          => isset( $entry['width'] ) ? (float) $entry['width'] : 25.0,
+						);
+					}
+					if ( empty( $placement_overlays[ $clean_angle_key ] ) ) {
+						unset( $placement_overlays[ $clean_angle_key ] );
+					}
+				}
+			}
 			$quote_rows[] = array(
 				'variationId'                => isset( $row['variationId'] ) ? absint( $row['variationId'] ) : 0,
 				'productSku'                 => isset( $row['productSku'] ) ? sanitize_text_field( (string) $row['productSku'] ) : '',
