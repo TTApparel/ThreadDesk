@@ -2721,6 +2721,34 @@ class TTA_ThreadDesk {
 		}
 
 		$saved_designs = array();
+		$screenprint_pending_quotes = array();
+		if ( $is_authenticated && $user_id > 0 ) {
+			$pending_quote_posts = get_posts(
+				array(
+					'post_type'      => 'tta_quote',
+					'post_status'    => array( 'private', 'publish', 'draft', 'pending' ),
+					'posts_per_page' => 50,
+					'author'         => $user_id,
+					'orderby'        => 'date',
+					'order'          => 'DESC',
+					'meta_query'     => array(
+						array(
+							'key'   => 'status',
+							'value' => 'pending',
+						),
+					),
+				)
+			);
+			foreach ( $pending_quote_posts as $pending_quote_post ) {
+				if ( ! $pending_quote_post instanceof WP_Post ) {
+					continue;
+				}
+				$screenprint_pending_quotes[] = array(
+					'id'    => (int) $pending_quote_post->ID,
+					'title' => (string) $pending_quote_post->post_title,
+				);
+			}
+		}
 		$screenprint_variations = array();
 		if ( $product && is_callable( array( $product, 'is_type' ) ) && $product->is_type( 'variable' ) ) {
 			$available_variations = is_callable( array( $product, 'get_available_variations' ) ) ? $product->get_available_variations() : array();
@@ -2830,7 +2858,7 @@ class TTA_ThreadDesk {
 
 		ob_start();
 		?>
-		<div class="threaddesk-screenprint" id="<?php echo esc_attr( $instance_id ); ?>" data-threaddesk-screenprint-layouts="<?php echo esc_attr( wp_json_encode( $layout_items ) ); ?>" data-threaddesk-screenprint-images-by-color="<?php echo esc_attr( wp_json_encode( $screenprint_images_by_color ) ); ?>" data-threaddesk-screenprint-initial-color="<?php echo esc_attr( $initial_color_key ); ?>" data-threaddesk-screenprint-create-layout-category="<?php echo esc_attr( $default_category_slug ); ?>" data-threaddesk-screenprint-create-layout-category-id="<?php echo esc_attr( (string) $default_category_id ); ?>" data-threaddesk-screenprint-open-chooser="<?php echo $screenprint_open_chooser ? '1' : '0'; ?>" data-threaddesk-screenprint-authenticated="<?php echo $is_authenticated ? '1' : '0'; ?>" data-threaddesk-screenprint-variations="<?php echo esc_attr( wp_json_encode( $screenprint_variations ) ); ?>" data-threaddesk-screenprint-pricing="<?php echo esc_attr( wp_json_encode( $print_pricing_settings ) ); ?>">
+		<div class="threaddesk-screenprint" id="<?php echo esc_attr( $instance_id ); ?>" data-threaddesk-screenprint-layouts="<?php echo esc_attr( wp_json_encode( $layout_items ) ); ?>" data-threaddesk-screenprint-images-by-color="<?php echo esc_attr( wp_json_encode( $screenprint_images_by_color ) ); ?>" data-threaddesk-screenprint-initial-color="<?php echo esc_attr( $initial_color_key ); ?>" data-threaddesk-screenprint-create-layout-category="<?php echo esc_attr( $default_category_slug ); ?>" data-threaddesk-screenprint-create-layout-category-id="<?php echo esc_attr( (string) $default_category_id ); ?>" data-threaddesk-screenprint-open-chooser="<?php echo $screenprint_open_chooser ? '1' : '0'; ?>" data-threaddesk-screenprint-authenticated="<?php echo $is_authenticated ? '1' : '0'; ?>" data-threaddesk-screenprint-variations="<?php echo esc_attr( wp_json_encode( $screenprint_variations ) ); ?>" data-threaddesk-screenprint-pricing="<?php echo esc_attr( wp_json_encode( $print_pricing_settings ) ); ?>" data-threaddesk-screenprint-pending-quotes="<?php echo esc_attr( wp_json_encode( $screenprint_pending_quotes ) ); ?>">
 			<div class="threaddesk-screenprint__color-picker" data-threaddesk-screenprint-color-picker style="display:flex;flex-wrap:wrap;gap:10px;align-items:stretch;justify-content:center;">
 				<?php foreach ( $screenprint_color_choices as $choice_index => $choice ) : ?>
 					<button type="button" class="threaddesk-screenprint__open-color" data-threaddesk-screenprint-open-color="<?php echo esc_attr( $choice['key'] ); ?>" aria-label="<?php echo esc_attr( $choice['label'] ); ?>" style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:8px 0;width:70px;border:1px solid #dcdcde;background:#fff;border-radius:4px;cursor:pointer;position:relative;overflow:visible;<?php echo 0 === (int) $choice_index ? 'box-shadow:0 0 0 1px #2271b1;' : ''; ?>">
@@ -2850,8 +2878,14 @@ class TTA_ThreadDesk {
 				<div class="threaddesk-auth-modal__overlay" data-threaddesk-screenprint-close></div>
 				<div class="threaddesk-auth-modal__panel" role="dialog" aria-modal="true" aria-label="<?php echo esc_attr__( 'Screenprint layout chooser', 'threaddesk' ); ?>">
 					<div class="threaddesk-auth-modal__actions"><button type="button" class="threaddesk-auth-modal__close" data-threaddesk-screenprint-close>&times;</button></div>
+					<div class="threaddesk-layout-modal__content" data-threaddesk-screenprint-step="quotes" aria-hidden="true" hidden>
+						<h3><?php echo esc_html__( 'Choose an existing pending quote', 'threaddesk' ); ?></h3>
+						<div class="threaddesk-layout-modal__options" data-threaddesk-screenprint-quote-options></div>
+						<p class="threaddesk-layout-modal__empty" data-threaddesk-screenprint-quote-empty hidden><?php echo esc_html__( 'No pending quotes found. You can create a new quote.', 'threaddesk' ); ?></p>
+					</div>
 					<div class="threaddesk-layout-modal__content is-active" data-threaddesk-screenprint-step="chooser" aria-hidden="false">
 						<h3><?php echo esc_html__( 'Choose from your saved layouts', 'threaddesk' ); ?></h3>
+						<button type="button" class="threaddesk-layout-viewer__back-button" data-threaddesk-screenprint-back-to-quotes hidden><?php echo esc_html__( '← Back to quotes', 'threaddesk' ); ?></button>
 						<div class="threaddesk-layout-modal__options" data-threaddesk-screenprint-options></div>
 						<p class="threaddesk-layout-modal__empty" data-threaddesk-screenprint-empty <?php echo empty( $layout_items ) ? '' : 'hidden'; ?>><?php echo $is_authenticated ? esc_html__( 'No saved layouts match this product categories yet.', 'threaddesk' ) : esc_html__( 'No saved layouts in this browser yet.', 'threaddesk' ); ?></p>
 					</div>
@@ -3089,6 +3123,9 @@ class TTA_ThreadDesk {
 			let pricingSettings={};
 			try{pricingSettings=JSON.parse(root.getAttribute('data-threaddesk-screenprint-pricing')||'{}');}
 			catch(e){console.error('[ThreadDesk screenprint pricing]',e);pricingSettings={};}
+			let pendingQuotes=[];
+			try{pendingQuotes=JSON.parse(root.getAttribute('data-threaddesk-screenprint-pending-quotes')||'[]');}
+			catch(e){console.error('[ThreadDesk screenprint pending quotes]',e);pendingQuotes=[];}
 			const i18nNoPreview=<?php echo wp_json_encode( __( 'No placement preview', 'threaddesk' ) ); ?>;
 			const i18nPrintCountLabel=<?php echo wp_json_encode( __( 'Print count', 'threaddesk' ) ); ?>;
 			const i18nSelectedPrefix=<?php echo wp_json_encode( __( 'LAYOUT', 'threaddesk' ) ); ?>;
@@ -3097,6 +3134,9 @@ class TTA_ThreadDesk {
 			const i18nAdjust=<?php echo wp_json_encode( __( 'ADJUST', 'threaddesk' ) ); ?>;
 			const i18nApproxSizePrefix=<?php echo wp_json_encode( __( 'Approx. size', 'threaddesk' ) ); ?>;
 			const i18nCreateLayout=<?php echo wp_json_encode( __( 'CREATE A LAYOUT', 'threaddesk' ) ); ?>;
+			const i18nCreateNewQuote=<?php echo wp_json_encode( __( 'CREATE NEW QUOTE', 'threaddesk' ) ); ?>;
+			const i18nCreateNewQuoteHint=<?php echo wp_json_encode( __( 'Start a brand new quote for this product.', 'threaddesk' ) ); ?>;
+			const i18nPendingQuotePrefix=<?php echo wp_json_encode( __( 'PENDING QUOTE', 'threaddesk' ) ); ?>;
 			const i18nCreateLayoutHint=<?php echo wp_json_encode( __( 'Need a new layout? Start in the placements builder.', 'threaddesk' ) ); ?>;
 			const i18nGuestEmpty=<?php echo wp_json_encode( __( 'No saved layouts in this browser yet.', 'threaddesk' ) ); ?>;
 			const i18nUserEmpty=<?php echo wp_json_encode( __( 'No saved layouts match this product categories yet.', 'threaddesk' ) ); ?>;
@@ -3128,10 +3168,14 @@ class TTA_ThreadDesk {
 			const showAllWrap=root.querySelector('.hide-colors');
 			const showAllBtn=root.querySelector('[data-threaddesk-screenprint-show-all-colors]');
 			const options=root.querySelector('[data-threaddesk-screenprint-options]');
+			const quoteOptions=root.querySelector('[data-threaddesk-screenprint-quote-options]');
+			const quoteEmptyState=root.querySelector('[data-threaddesk-screenprint-quote-empty]');
 			const emptyState=root.querySelector('[data-threaddesk-screenprint-empty]');
+			const quotesStep=root.querySelector('[data-threaddesk-screenprint-step="quotes"]');
 			const chooserStep=root.querySelector('[data-threaddesk-screenprint-step="chooser"]');
 			const viewerStep=root.querySelector('[data-threaddesk-screenprint-step="viewer"]');
 			const quantitiesStep=root.querySelector('[data-threaddesk-screenprint-step="quantities"]');
+			const backToQuotesButton=root.querySelector('[data-threaddesk-screenprint-back-to-quotes]');
 			const selectedLabel=root.querySelector('[data-threaddesk-screenprint-selected]');
 			const selectedColorLabels=root.querySelectorAll('[data-threaddesk-screenprint-selected-color]');
 			const selectedColorLabel=selectedColorLabels.length?selectedColorLabels[0]:null;
@@ -3148,7 +3192,7 @@ class TTA_ThreadDesk {
 			const stage=root.querySelector('[data-threaddesk-screenprint-stage]');
 			const angleThumbs=root.querySelectorAll('[data-threaddesk-screenprint-angle-image]');
 				if(!colorPicker||!options||!chooserStep||!viewerStep||!quantitiesStep){return;}
-			let selected=null; let angle='front'; let selectedColor=initialColorKey; let stageRatioLocked=false; let colorsExpanded=false; let activePlacementKey=''; let activePaletteEditor=null; let dragState=null;
+			let selected=null; let angle='front'; let selectedColor=initialColorKey; let stageRatioLocked=false; let colorsExpanded=false; let activePlacementKey=''; let activePaletteEditor=null; let dragState=null; let selectedExistingQuoteId=0;
 			const screenprintPaletteOptionSet=['transparent','#FFFFFF','#000000','#FEDB00','#FED141','#FFB81C','#FF6A39','#E38331','#BE531C','#C8102E','#D22730','#BE3A34','#A6192E','#A50034','#FF85BD','#BA9CC5','#512D6D','#833177','#351F65','#10069F','#131F29','#28334A','#002D72','#004C97','#0076A8','#8BBEE8','#0092CB','#00AFD7','#007C80','#007A53','#00AD50','#249E6B','#00664F','#304F42','#4E3629','#7B4D35','#D3BC8D','#D5CB9F','#B1B3B3','#A7A8AA','#F2E9DB'];
 			if(!selectedColor||!imageMap[selectedColor]){const keys=Object.keys(imageMap||{}); selectedColor=keys.length?keys[0]:'';}
 			let images=(imageMap&&imageMap[selectedColor])?imageMap[selectedColor]:{};
@@ -3211,22 +3255,26 @@ class TTA_ThreadDesk {
 				return container.querySelector('button:not([disabled]),[href],input:not([type="hidden"]):not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])');
 			};
 			const setStep=(step,shouldMoveFocus=true)=>{
+				const showQuotes=step==='quotes';
 				const showChooser=step==='chooser';
 				const showViewer=step==='viewer';
 				const showQuantities=step==='quantities';
 				const activeElement=document.activeElement;
 				if(activeElement&&activeElement!==document.body){
+					const activeInQuotes=!!(quotesStep&&quotesStep.contains(activeElement));
 					const activeInChooser=!!(chooserStep&&chooserStep.contains(activeElement));
 					const activeInViewer=!!(viewerStep&&viewerStep.contains(activeElement));
 					const activeInQuantities=!!(quantitiesStep&&quantitiesStep.contains(activeElement));
-					if((activeInChooser&&!showChooser)||(activeInViewer&&!showViewer)||(activeInQuantities&&!showQuantities)){
+					if((activeInQuotes&&!showQuotes)||(activeInChooser&&!showChooser)||(activeInViewer&&!showViewer)||(activeInQuantities&&!showQuantities)){
 						if(typeof activeElement.blur==='function'){activeElement.blur();}
 					}
 				}
+				if(quotesStep){quotesStep.hidden=!showQuotes;quotesStep.classList.toggle('is-active',showQuotes);quotesStep.setAttribute('aria-hidden',showQuotes?'false':'true');}
 				if(chooserStep){chooserStep.hidden=!showChooser;chooserStep.classList.toggle('is-active',showChooser);chooserStep.setAttribute('aria-hidden',showChooser?'false':'true');}
 				if(viewerStep){viewerStep.hidden=!showViewer;viewerStep.classList.toggle('is-active',showViewer);viewerStep.setAttribute('aria-hidden',showViewer?'false':'true');}
 				if(quantitiesStep){quantitiesStep.hidden=!showQuantities;quantitiesStep.classList.toggle('is-active',showQuantities);quantitiesStep.setAttribute('aria-hidden',showQuantities?'false':'true');}
-				const shownStep=showChooser?chooserStep:(showViewer?viewerStep:quantitiesStep);
+				if(backToQuotesButton){backToQuotesButton.hidden=!(showChooser&&Array.isArray(pendingQuotes)&&pendingQuotes.length>0);}
+				const shownStep=showQuotes?quotesStep:(showChooser?chooserStep:(showViewer?viewerStep:quantitiesStep));
 				if(shouldMoveFocus&&shownStep){
 					const nextFocus=getStepFocusable(shownStep);
 					if(nextFocus&&typeof nextFocus.focus==='function'){window.requestAnimationFrame(()=>{nextFocus.focus();});}
@@ -3237,7 +3285,8 @@ class TTA_ThreadDesk {
 				modal.classList.add('is-active');
 				modal.setAttribute('aria-hidden','false');
 				document.body.classList.add('threaddesk-modal-open');
-				setStep('chooser');
+				const shouldPromptQuoteSelection=isAuthenticated&&Array.isArray(pendingQuotes)&&pendingQuotes.length>0;
+				setStep(shouldPromptQuoteSelection?'quotes':'chooser');
 			};
 			const closeScreenprintModal=()=>{
 				if(!modal){return;}
@@ -3246,7 +3295,8 @@ class TTA_ThreadDesk {
 				modal.classList.remove('is-active');
 				modal.setAttribute('aria-hidden','true');
 				document.body.classList.remove('threaddesk-modal-open');
-				setStep('chooser',false);
+				const shouldPromptQuoteSelection=isAuthenticated&&Array.isArray(pendingQuotes)&&pendingQuotes.length>0;
+				setStep(shouldPromptQuoteSelection?'quotes':'chooser',false);
 			};
 			const syncScreenprintPanelHeight=()=>{
 				if(!viewerStep||viewerStep.hidden||!stage){return;}
@@ -3711,22 +3761,29 @@ class TTA_ThreadDesk {
 				payload.set('selectedColorKey',String(selectedColor||''));
 				payload.set('rowsJson',JSON.stringify(rows));
 				payload.set('printsJson',JSON.stringify(prints));
-				const popup=openQuoteFlowPopup();
-				const quoteTitle=await new Promise((resolve)=>{popup.showNameStep(resolve);});
-				if(null===quoteTitle){return;}
-				payload.set('quoteTitle',quoteTitle);
+				const usingSelectedPendingQuote=Number(selectedExistingQuoteId||0)>0;
+				let popup=null;
+				if(usingSelectedPendingQuote){
+					payload.set('existingQuoteId',String(selectedExistingQuoteId));
+				}else{
+					popup=openQuoteFlowPopup();
+					const quoteTitle=await new Promise((resolve)=>{popup.showNameStep(resolve);});
+					if(null===quoteTitle){return;}
+					payload.set('quoteTitle',quoteTitle);
+				}
 				const shouldContinueExisting=window.localStorage&&String(window.localStorage.getItem('tta_threaddesk_continue_quote')||'').trim()==='1';
 				const activeQuoteId=window.localStorage?String(window.localStorage.getItem('tta_threaddesk_active_quote_id')||'').trim():'';
-				if(shouldContinueExisting&&activeQuoteId){payload.set('existingQuoteId',activeQuoteId);}
+				if(!usingSelectedPendingQuote&&shouldContinueExisting&&activeQuoteId){payload.set('existingQuoteId',activeQuoteId);}
 				if(addToQuoteButton){addToQuoteButton.disabled=true;}
 				try{
 					const response=await fetch(screenprintQuoteAjaxUrl,{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/x-www-form-urlencoded; charset=UTF-8'},body:payload.toString()});
 					const data=await response.json();
 					if(!response.ok||!data||!data.success){throw new Error((data&&data.data&&data.data.message)?data.data.message:(i18nAddToQuoteError||'Unable to add quote right now.'));}
 					if(window.localStorage&&data&&data.data&&data.data.quoteId){window.localStorage.setItem('tta_threaddesk_active_quote_id',String(data.data.quoteId));if(!shouldContinueExisting){window.localStorage.removeItem('tta_threaddesk_continue_quote');}}
+					if(!popup){popup=openQuoteFlowPopup();}
 					popup.showSuccessStep((data&&data.data&&data.data.message)||i18nQuoteSavedContinue||'Quote saved. Continue adding articles to this quote?');
 				}catch(error){
-					popup.close();
+					if(popup){popup.close();}
 					window.alert((error&&error.message)?error.message:(i18nAddToQuoteError||'Unable to add quote right now.'));
 				}finally{
 					if(addToQuoteButton){addToQuoteButton.disabled=false;}
@@ -4113,6 +4170,9 @@ class TTA_ThreadDesk {
 			root.querySelectorAll('[data-threaddesk-screenprint-back]').forEach((el)=>{
 				el.addEventListener('click',()=>{setStep('chooser');});
 			});
+			if(backToQuotesButton){
+				backToQuotesButton.addEventListener('click',()=>{setStep('quotes');});
+			}
 			if(openQuantitiesButton){
 				openQuantitiesButton.addEventListener('click',(event)=>{
 					event.preventDefault();
@@ -4273,6 +4333,62 @@ class TTA_ThreadDesk {
 			document.addEventListener('touchend',()=>{dragState=null;});
 			document.addEventListener('touchcancel',()=>{dragState=null;});
 			window.addEventListener('resize',syncScreenprintPanelHeight);
+				const renderQuoteOptions=()=>{
+					if(!quoteOptions){return;}
+					quoteOptions.innerHTML='';
+					const createBtn=document.createElement('button');
+					createBtn.type='button';
+					createBtn.className='threaddesk-screenprint-option threaddesk-screenprint-option--create threaddesk__card threaddesk__card--design';
+					const createPreview=document.createElement('div');
+					createPreview.className='threaddesk__card-design-preview';
+					const createPlaceholder=document.createElement('span');
+					createPlaceholder.className='threaddesk-layout-modal__image-fallback';
+					createPlaceholder.textContent='+';
+					createPreview.appendChild(createPlaceholder);
+					const createTitle=document.createElement('h5');
+					createTitle.className='threaddesk-screenprint-option__title';
+					createTitle.textContent=i18nCreateNewQuote||'CREATE NEW QUOTE';
+					const createHint=document.createElement('p');
+					createHint.className='threaddesk__card-design-color-count';
+					createHint.textContent=i18nCreateNewQuoteHint||'Start a brand new quote for this product.';
+					createBtn.appendChild(createPreview);
+					createBtn.appendChild(createTitle);
+					createBtn.appendChild(createHint);
+					createBtn.addEventListener('click',()=>{
+						selectedExistingQuoteId=0;
+						setStep('chooser');
+					});
+					quoteOptions.appendChild(createBtn);
+					const quotes=Array.isArray(pendingQuotes)?pendingQuotes:[];
+					if(quoteEmptyState){quoteEmptyState.hidden=quotes.length>0;}
+					quotes.forEach((quote)=>{
+						const quoteId=Number(quote&&quote.id||0);
+						if(!quoteId){return;}
+						const btn=document.createElement('button');
+						btn.type='button';
+						btn.className='threaddesk-screenprint-option threaddesk__card threaddesk__card--design';
+						const preview=document.createElement('div');
+						preview.className='threaddesk__card-design-preview';
+						const previewLabel=document.createElement('span');
+						previewLabel.className='threaddesk-layout-modal__image-fallback';
+						previewLabel.textContent='#'+String(quoteId);
+						preview.appendChild(previewLabel);
+						const title=document.createElement('h5');
+						title.className='threaddesk-screenprint-option__title';
+						title.textContent=String((quote&&quote.title)||'').trim()||((i18nPendingQuotePrefix||'PENDING QUOTE')+' #'+String(quoteId));
+						const meta=document.createElement('p');
+						meta.className='threaddesk__card-design-color-count';
+						meta.textContent=(i18nPendingQuotePrefix||'PENDING QUOTE')+' #'+String(quoteId);
+						btn.appendChild(preview);
+						btn.appendChild(title);
+						btn.appendChild(meta);
+						btn.addEventListener('click',()=>{
+							selectedExistingQuoteId=quoteId;
+							setStep('chooser');
+						});
+						quoteOptions.appendChild(btn);
+					});
+				};
 				const renderLayoutOptions=()=>{
 					options.innerHTML='';
 					{
@@ -4369,6 +4485,7 @@ class TTA_ThreadDesk {
 						emptyState.hidden=Array.isArray(layouts)&&layouts.length>0;
 					}
 				};
+				renderQuoteOptions();
 				renderLayoutOptions();
 				document.addEventListener('threaddesk:auth-success',()=>{
 					try{layouts=JSON.parse(root.getAttribute('data-threaddesk-screenprint-layouts')||'[]');}
