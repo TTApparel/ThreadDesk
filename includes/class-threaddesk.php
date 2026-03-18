@@ -5906,14 +5906,14 @@ class TTA_ThreadDesk {
 			$mockup_payload = array(
 				'front' => isset( $mockups['front'] ) ? esc_url_raw( (string) $mockups['front'] ) : '',
 				'left'  => isset( $mockups['left'] ) ? esc_url_raw( (string) $mockups['left'] ) : '',
-				'side'  => isset( $mockups['side'] ) ? esc_url_raw( (string) $mockups['side'] ) : '',
 				'back'  => isset( $mockups['back'] ) ? esc_url_raw( (string) $mockups['back'] ) : '',
+				'right' => isset( $mockups['right'] ) ? esc_url_raw( (string) $mockups['right'] ) : ( isset( $mockups['side'] ) ? esc_url_raw( (string) $mockups['side'] ) : '' ),
 			);
 			$overlay_payload = array(
 				'front' => array(),
 				'left'  => array(),
-				'side'  => array(),
 				'back'  => array(),
+				'right' => array(),
 			);
 
 			$overlay_groups = array();
@@ -5927,8 +5927,8 @@ class TTA_ThreadDesk {
 				'front' => 'front',
 				'back'  => 'back',
 				'left'  => 'left',
-				'right' => 'side',
-				'side'  => 'side',
+				'right' => 'right',
+				'side'  => 'right',
 			);
 
 			foreach ( $overlay_groups as $angle_key => $entries ) {
@@ -5987,7 +5987,7 @@ class TTA_ThreadDesk {
 					);
 				}
 			}
-			$has_mockup = ( '' !== $mockup_payload['front'] ) || ( '' !== $mockup_payload['left'] ) || ( '' !== $mockup_payload['side'] ) || ( '' !== $mockup_payload['back'] );
+			$has_mockup = ( '' !== $mockup_payload['front'] ) || ( '' !== $mockup_payload['left'] ) || ( '' !== $mockup_payload['right'] ) || ( '' !== $mockup_payload['back'] );
 			echo '<td>';
 			if ( $has_mockup ) {
 				echo '<button type="button" class="button" data-threaddesk-quote-mockup="' . esc_attr( wp_json_encode( $mockup_payload ) ) . '" data-threaddesk-quote-mockup-overlays="' . esc_attr( wp_json_encode( $overlay_payload ) ) . '">' . esc_html__( 'SHOW', 'threaddesk' ) . '</button>';
@@ -6023,7 +6023,7 @@ class TTA_ThreadDesk {
 				title.style.margin='0 0 12px 0';
 				var grid=document.createElement('div');
 				grid.style.cssText='display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;';
-				['front','left','side','back'].forEach(function(view){
+				['front','left','back','right'].forEach(function(view){
 					var card=document.createElement('div');
 					card.style.cssText='border:1px solid #dcdcde;border-radius:6px;padding:8px;background:#f9f9f9;';
 					var label=document.createElement('p');
