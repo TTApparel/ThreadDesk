@@ -5773,7 +5773,7 @@ class TTA_ThreadDesk {
 		}
 
 		$rows_raw = get_post_meta( $post->ID, 'screenprint_quote_rows_json', true );
-		if ( '' === (string) $rows_raw ) {
+		if ( ! is_array( $rows_raw ) && '' === trim( (string) $rows_raw ) ) {
 			$rows_raw = get_post_meta( $post->ID, 'items_json', true );
 		}
 		if ( is_array( $rows_raw ) ) {
@@ -6117,7 +6117,7 @@ class TTA_ThreadDesk {
 		};
 
 		$prints_raw = get_post_meta( $post->ID, 'screenprint_quote_prints_json', true );
-		if ( '' === (string) $prints_raw ) {
+		if ( ! is_array( $prints_raw ) && '' === trim( (string) $prints_raw ) ) {
 			$prints_raw = get_post_meta( $post->ID, 'prints_json', true );
 		}
 		if ( is_array( $prints_raw ) ) {
@@ -6130,7 +6130,7 @@ class TTA_ThreadDesk {
 		}
 		if ( ! is_array( $prints ) || empty( $prints ) ) {
 			$rows_raw = get_post_meta( $post->ID, 'screenprint_quote_rows_json', true );
-			if ( '' === (string) $rows_raw ) {
+			if ( ! is_array( $rows_raw ) && '' === trim( (string) $rows_raw ) ) {
 				$rows_raw = get_post_meta( $post->ID, 'items_json', true );
 			}
 			if ( is_array( $rows_raw ) ) {
