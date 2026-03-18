@@ -883,16 +883,16 @@ class TTA_ThreadDesk {
 		$prints_json_raw = isset( $_POST['printsJson'] ) ? wp_unslash( $_POST['printsJson'] ) : '';
 
 		$rows = array();
-		if ( is_array( $rows_raw ) ) {
-			$rows = $rows_raw;
-		} elseif ( is_string( $rows_raw ) && '' !== trim( $rows_raw ) ) {
-			$rows_candidate = json_decode( (string) $rows_raw, true );
+		if ( is_string( $rows_json_raw ) && '' !== trim( $rows_json_raw ) ) {
+			$rows_candidate = json_decode( (string) $rows_json_raw, true );
 			if ( is_array( $rows_candidate ) ) {
 				$rows = $rows_candidate;
 			}
 		}
-		if ( empty( $rows ) && is_string( $rows_json_raw ) && '' !== trim( $rows_json_raw ) ) {
-			$rows_candidate = json_decode( (string) $rows_json_raw, true );
+		if ( empty( $rows ) && is_array( $rows_raw ) ) {
+			$rows = $rows_raw;
+		} elseif ( empty( $rows ) && is_string( $rows_raw ) && '' !== trim( $rows_raw ) ) {
+			$rows_candidate = json_decode( (string) $rows_raw, true );
 			if ( is_array( $rows_candidate ) ) {
 				$rows = $rows_candidate;
 			}
@@ -965,16 +965,16 @@ class TTA_ThreadDesk {
 
 		$prints = array();
 		$prints_source = array();
-		if ( is_array( $prints_raw ) ) {
-			$prints_source = $prints_raw;
-		} elseif ( is_string( $prints_raw ) && '' !== trim( $prints_raw ) ) {
-			$prints_candidate = json_decode( (string) $prints_raw, true );
+		if ( is_string( $prints_json_raw ) && '' !== trim( $prints_json_raw ) ) {
+			$prints_candidate = json_decode( (string) $prints_json_raw, true );
 			if ( is_array( $prints_candidate ) ) {
 				$prints_source = $prints_candidate;
 			}
 		}
-		if ( empty( $prints_source ) && is_string( $prints_json_raw ) && '' !== trim( $prints_json_raw ) ) {
-			$prints_candidate = json_decode( (string) $prints_json_raw, true );
+		if ( empty( $prints_source ) && is_array( $prints_raw ) ) {
+			$prints_source = $prints_raw;
+		} elseif ( empty( $prints_source ) && is_string( $prints_raw ) && '' !== trim( $prints_raw ) ) {
+			$prints_candidate = json_decode( (string) $prints_raw, true );
 			if ( is_array( $prints_candidate ) ) {
 				$prints_source = $prints_candidate;
 			}
@@ -3622,30 +3622,6 @@ class TTA_ThreadDesk {
 				const shouldContinueExisting=window.localStorage&&String(window.localStorage.getItem('tta_threaddesk_continue_quote')||'').trim()==='1';
 				const activeQuoteId=window.localStorage?String(window.localStorage.getItem('tta_threaddesk_active_quote_id')||'').trim():'';
 				if(shouldContinueExisting&&activeQuoteId){payload.set('existingQuoteId',activeQuoteId);}
-				rows.forEach((row,rowIndex)=>{
-					Object.keys(row).forEach((key)=>{
-						if(key==='placements'){
-							row.placements.forEach((placement,pIndex)=>{
-								Object.keys(placement).forEach((placementKey)=>payload.set('rows['+rowIndex+'][placements]['+pIndex+']['+placementKey+']',String(placement[placementKey]||'')));
-							});
-							return;
-						}
-						if(key==='mockups'){
-							Object.keys(row.mockups||{}).forEach((mockupKey)=>payload.set('rows['+rowIndex+'][mockups]['+mockupKey+']',String((row.mockups&&row.mockups[mockupKey])||'')));
-							return;
-						}
-						payload.set('rows['+rowIndex+']['+key+']',String(row[key]));
-					});
-				});
-				prints.forEach((print,printIndex)=>{
-					Object.keys(print).forEach((key)=>{
-						if(key==='selectedColors'){
-							(print.selectedColors||[]).forEach((color,colorIndex)=>payload.set('prints['+printIndex+'][selectedColors]['+colorIndex+']',String(color||'')));
-							return;
-						}
-						payload.set('prints['+printIndex+']['+key+']',String(print[key]||''));
-					});
-				});
 				if(addToQuoteButton){addToQuoteButton.disabled=true;}
 				try{
 					const response=await fetch(screenprintQuoteAjaxUrl,{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/x-www-form-urlencoded; charset=UTF-8'},body:payload.toString()});
