@@ -947,6 +947,46 @@ class TTA_ThreadDesk {
 					$mockups[ $view_key ] = isset( $row['mockups'][ $view_key ] ) ? esc_url_raw( (string) $row['mockups'][ $view_key ] ) : '';
 				}
 			}
+			$placement_overlays = array();
+			if ( isset( $row['placementOverlays'] ) && is_array( $row['placementOverlays'] ) ) {
+				foreach ( $row['placementOverlays'] as $angle_key => $entries ) {
+					if ( ! is_array( $entries ) ) {
+						continue;
+					}
+					$clean_angle_key = sanitize_key( (string) $angle_key );
+					if ( '' === $clean_angle_key ) {
+						$clean_angle_key = 'front';
+					}
+					$placement_overlays[ $clean_angle_key ] = array();
+					foreach ( $entries as $entry ) {
+						if ( ! is_array( $entry ) ) {
+							continue;
+						}
+						$url_raw = isset( $entry['url'] ) ? (string) $entry['url'] : '';
+						$url = esc_url_raw( $url_raw );
+						if ( '' === $url && preg_match( '#^data:image\/(png|jpe?g|webp);base64,#i', $url_raw ) ) {
+							$url = $url_raw;
+						}
+						if ( '' === $url ) {
+							continue;
+						}
+						$placement_overlays[ $clean_angle_key ][] = array(
+							'placementKey'   => isset( $entry['placementKey'] ) ? sanitize_text_field( (string) $entry['placementKey'] ) : '',
+							'placementLabel' => isset( $entry['placementLabel'] ) ? sanitize_text_field( (string) $entry['placementLabel'] ) : '',
+							'designId'       => isset( $entry['designId'] ) ? absint( $entry['designId'] ) : 0,
+							'designName'     => isset( $entry['designName'] ) ? sanitize_text_field( (string) $entry['designName'] ) : '',
+							'angle'          => isset( $entry['angle'] ) ? sanitize_key( (string) $entry['angle'] ) : $clean_angle_key,
+							'url'            => $url,
+							'top'            => isset( $entry['top'] ) ? (float) $entry['top'] : 50.0,
+							'left'           => isset( $entry['left'] ) ? (float) $entry['left'] : 50.0,
+							'width'          => isset( $entry['width'] ) ? (float) $entry['width'] : 25.0,
+						);
+					}
+					if ( empty( $placement_overlays[ $clean_angle_key ] ) ) {
+						unset( $placement_overlays[ $clean_angle_key ] );
+					}
+				}
+			}
 			$quote_rows[] = array(
 				'variationId'                => isset( $row['variationId'] ) ? absint( $row['variationId'] ) : 0,
 				'productSku'                 => isset( $row['productSku'] ) ? sanitize_text_field( (string) $row['productSku'] ) : '',
@@ -955,6 +995,7 @@ class TTA_ThreadDesk {
 				'estimatedUnitCost'          => round( $estimated_unit_cost, 4 ),
 				'estimatedVariationCostTotal'=> round( $line_total, 4 ),
 				'placements'                 => $placement_items,
+				'placementOverlays'          => $placement_overlays,
 				'mockups'                    => $mockups,
 			);
 		}
@@ -3486,10 +3527,37 @@ class TTA_ThreadDesk {
 				});
 				return entries;
 			};
+			const getPlacementOverlaysForRequest=()=>{
+				if(!selected||!selected.placementsByAngle||typeof selected.placementsByAngle!=='object'){return {};}
+				const overlays={};
+				Object.keys(selected.placementsByAngle).forEach((angleKey)=>{
+					const entries=normalizePlacementEntries(selected.placementsByAngle[angleKey],angleKey);
+					const prepared=[];
+					entries.forEach((entry)=>{
+						if(!entry||typeof entry!=='object'){return;}
+						const src=getEntrySource(entry);
+						if(!src){return;}
+						prepared.push({
+							placementKey:String(entry.placementKey||'').trim(),
+							placementLabel:String(entry.placementLabel||angleKey||'Placement').trim()||'Placement',
+							designId:Number(entry.designId||0),
+							designName:String(entry.designName||entry.placementLabel||i18nDesignFallback).trim()||i18nDesignFallback,
+							angle:String(angleKey||'').trim()||'front',
+							url:src,
+							top:Number(entry.top||50),
+							left:Number(entry.left||50),
+							width:Number(entry.width||25)
+						});
+					});
+					if(prepared.length){overlays[String(angleKey||'front').trim()||'front']=prepared;}
+				});
+				return overlays;
+			};
 			const getQuoteRowsForRequest=()=>{
 				const rows=[];
 				if(!quantitiesList){return rows;}
 				const placementEntries=getSelectedPlacementEntries();
+				const placementOverlays=getPlacementOverlaysForRequest();
 				const groupedPlacementEntries={};
 				placementEntries.forEach((entry)=>{if(!groupedPlacementEntries[entry.printKey]){groupedPlacementEntries[entry.printKey]=entry;}});
 				const inputEls=Array.from(quantitiesList.querySelectorAll('input[data-threaddesk-screenprint-variation-id]'));
@@ -3513,6 +3581,7 @@ class TTA_ThreadDesk {
 						qty:qty,
 						estimatedUnitCost:null===unitCost?0:Number(unitCost),
 						placements:Object.values(groupedPlacementEntries).map((entry)=>({placementLabel:entry.placementLabel,designName:entry.designName,designId:entry.designId,approxSize:Number(entry.approxSize||100),approxSizeLabel:entry.approxSizeLabel||String(entry.approxSize||100)+'%',selectedColors:Array.isArray(entry.selectedColors)?entry.selectedColors:[]})),
+						placementOverlays:placementOverlays,
 						mockups:{front:String((images&&images.front)||'').trim(),left:leftView||rightView,side:sideView,back:String((images&&images.back)||'').trim()}
 					});
 				});
