@@ -942,9 +942,50 @@ class TTA_ThreadDesk {
 
 			$mockups = array();
 			if ( isset( $row['mockups'] ) && is_array( $row['mockups'] ) ) {
-				$mockup_views = array( 'front', 'left', 'side', 'back' );
+				$mockup_views = array( 'front', 'left', 'right', 'side', 'back' );
 				foreach ( $mockup_views as $view_key ) {
 					$mockups[ $view_key ] = isset( $row['mockups'][ $view_key ] ) ? esc_url_raw( (string) $row['mockups'][ $view_key ] ) : '';
+				}
+				$mockups['sideLabel'] = isset( $row['mockups']['sideLabel'] ) && 'right' === sanitize_key( (string) $row['mockups']['sideLabel'] ) ? 'right' : 'left';
+			}
+			$placement_overlays = array();
+			if ( isset( $row['placementOverlays'] ) && is_array( $row['placementOverlays'] ) ) {
+				foreach ( $row['placementOverlays'] as $angle_key => $entries ) {
+					if ( ! is_array( $entries ) ) {
+						continue;
+					}
+					$clean_angle_key = sanitize_key( (string) $angle_key );
+					if ( '' === $clean_angle_key ) {
+						$clean_angle_key = 'front';
+					}
+					$placement_overlays[ $clean_angle_key ] = array();
+					foreach ( $entries as $entry ) {
+						if ( ! is_array( $entry ) ) {
+							continue;
+						}
+						$url_raw = isset( $entry['url'] ) ? (string) $entry['url'] : '';
+						$url = esc_url_raw( $url_raw );
+						if ( '' === $url && preg_match( '#^data:image\/(png|jpe?g|webp);base64,#i', $url_raw ) ) {
+							$url = $url_raw;
+						}
+						if ( '' === $url ) {
+							continue;
+						}
+						$placement_overlays[ $clean_angle_key ][] = array(
+							'placementKey'   => isset( $entry['placementKey'] ) ? sanitize_text_field( (string) $entry['placementKey'] ) : '',
+							'placementLabel' => isset( $entry['placementLabel'] ) ? sanitize_text_field( (string) $entry['placementLabel'] ) : '',
+							'designId'       => isset( $entry['designId'] ) ? absint( $entry['designId'] ) : 0,
+							'designName'     => isset( $entry['designName'] ) ? sanitize_text_field( (string) $entry['designName'] ) : '',
+							'angle'          => isset( $entry['angle'] ) ? sanitize_key( (string) $entry['angle'] ) : $clean_angle_key,
+							'url'            => $url,
+							'top'            => isset( $entry['top'] ) ? (float) $entry['top'] : 50.0,
+							'left'           => isset( $entry['left'] ) ? (float) $entry['left'] : 50.0,
+							'width'          => isset( $entry['width'] ) ? (float) $entry['width'] : 25.0,
+						);
+					}
+					if ( empty( $placement_overlays[ $clean_angle_key ] ) ) {
+						unset( $placement_overlays[ $clean_angle_key ] );
+					}
 				}
 			}
 			$placement_overlays = array();
@@ -3574,6 +3615,7 @@ class TTA_ThreadDesk {
 					const leftView=String((images&&images.left)||'').trim();
 					const rightView=String((images&&images.right)||'').trim();
 					const sideView=String((images&&images.side)||leftView||rightView||'').trim();
+					const sideLabel=String((images&&images.sideLabel)||'left').toLowerCase()==='right'?'right':'left';
 					rows.push({
 						variationId:Number(variationId||0),
 						productSku:String((row&&row.productSku)||'').trim(),
@@ -3582,7 +3624,7 @@ class TTA_ThreadDesk {
 						estimatedUnitCost:null===unitCost?0:Number(unitCost),
 						placements:Object.values(groupedPlacementEntries).map((entry)=>({placementLabel:entry.placementLabel,designName:entry.designName,designId:entry.designId,approxSize:Number(entry.approxSize||100),approxSizeLabel:entry.approxSizeLabel||String(entry.approxSize||100)+'%',selectedColors:Array.isArray(entry.selectedColors)?entry.selectedColors:[]})),
 						placementOverlays:placementOverlays,
-						mockups:{front:String((images&&images.front)||'').trim(),left:leftView||rightView,side:sideView,back:String((images&&images.back)||'').trim()}
+						mockups:{front:String((images&&images.front)||'').trim(),left:leftView||rightView,right:rightView||leftView,side:sideView,sideLabel:sideLabel,back:String((images&&images.back)||'').trim()}
 					});
 				});
 				return rows;
@@ -5903,11 +5945,16 @@ class TTA_ThreadDesk {
 			echo '<td>' . esc_html( function_exists( 'wc_price' ) ? wp_strip_all_tags( wc_price( $estimated ) ) : number_format_i18n( $estimated, 2 ) ) . '</td>';
 			echo '<td>' . esc_html( ! empty( $placement_text ) ? implode( ', ', $placement_text ) : '—' ) . '</td>';
 			$mockups = isset( $row['mockups'] ) && is_array( $row['mockups'] ) ? $row['mockups'] : array();
+			$side_label = isset( $mockups['sideLabel'] ) && 'right' === sanitize_key( (string) $mockups['sideLabel'] ) ? 'right' : 'left';
+			$has_right_mockup = isset( $mockups['right'] ) && '' !== trim( (string) $mockups['right'] );
+			$has_side_mockup = isset( $mockups['side'] ) && '' !== trim( (string) $mockups['side'] );
 			$mockup_payload = array(
 				'front' => isset( $mockups['front'] ) ? esc_url_raw( (string) $mockups['front'] ) : '',
 				'left'  => isset( $mockups['left'] ) ? esc_url_raw( (string) $mockups['left'] ) : '',
 				'back'  => isset( $mockups['back'] ) ? esc_url_raw( (string) $mockups['back'] ) : '',
 				'right' => isset( $mockups['right'] ) ? esc_url_raw( (string) $mockups['right'] ) : ( isset( $mockups['side'] ) ? esc_url_raw( (string) $mockups['side'] ) : '' ),
+				'sideLabel' => $side_label,
+				'rightMirror' => ( ! $has_right_mockup && $has_side_mockup && 'left' === $side_label ) ? 1 : 0,
 			);
 			$overlay_payload = array(
 				'front' => array(),
@@ -6038,6 +6085,7 @@ class TTA_ThreadDesk {
 						img.src=src;
 						img.alt=view+' mockup';
 						img.style.cssText='position:absolute;inset:0;width:100%;height:100%;display:block;object-fit:contain;';
+						if(view==='right'&&Number(payload&&payload.rightMirror)===1){img.style.transform='scaleX(-1)';}
 						frame.appendChild(img);
 						var viewOverlays=Array.isArray(overlaysPayload&&overlaysPayload[view])?overlaysPayload[view]:[];
 						viewOverlays.forEach(function(placement){
