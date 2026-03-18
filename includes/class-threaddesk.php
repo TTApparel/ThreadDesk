@@ -1132,8 +1132,47 @@ class TTA_ThreadDesk {
 			wp_update_post( array( 'ID' => $quote_id, 'post_title' => $quote_title ) );
 		}
 
+		$normalize_print_signature = static function ( $print ) {
+			if ( ! is_array( $print ) ) {
+				return '';
+			}
+			$design_id = isset( $print['designId'] ) ? absint( $print['designId'] ) : 0;
+			$design_name = isset( $print['designName'] ) ? sanitize_text_field( (string) $print['designName'] ) : '';
+			$size_value = isset( $print['approxSize'] ) ? absint( $print['approxSize'] ) : 0;
+			if ( $size_value <= 0 && isset( $print['approxSizeLabel'] ) ) {
+				if ( preg_match( '/(\d+)/', (string) $print['approxSizeLabel'], $matches ) ) {
+					$size_value = absint( $matches[1] );
+				}
+			}
+			if ( $size_value <= 0 ) {
+				$size_value = 100;
+			}
+			if ( $design_id > 0 ) {
+				return 'id:' . (string) $design_id . '|size:' . (string) $size_value;
+			}
+			$name_key = sanitize_title( $design_name );
+			if ( '' === $name_key ) {
+				return '';
+			}
+			return 'name:' . $name_key . '|size:' . (string) $size_value;
+		};
+
 		$final_rows = array_merge( $existing_rows, $quote_rows );
-		$final_prints = array_merge( $existing_prints, $prints );
+		$final_prints = array();
+		$seen_print_signatures = array();
+		foreach ( array_merge( $existing_prints, $prints ) as $print_entry ) {
+			if ( ! is_array( $print_entry ) ) {
+				continue;
+			}
+			$signature = $normalize_print_signature( $print_entry );
+			if ( '' !== $signature ) {
+				if ( isset( $seen_print_signatures[ $signature ] ) ) {
+					continue;
+				}
+				$seen_print_signatures[ $signature ] = true;
+			}
+			$final_prints[] = $print_entry;
+		}
 		$final_total = round( $existing_total + $total, 2 );
 
 		update_post_meta( $quote_id, 'status', 'draft' );
@@ -7032,6 +7071,55 @@ class TTA_ThreadDesk {
 		if ( 'tta_quote_status' === $orderby && 'tta_quote' === $post_type ) {
 			$query->set( 'meta_key', 'status' );
 			$query->set( 'orderby', 'meta_value' );
+		}
+		?>
+		<script>
+		jQuery(function ($) {
+			const $wpInlineEdit = inlineEditPost.edit;
+			inlineEditPost.edit = function (postId) {
+				$wpInlineEdit.apply(this, arguments);
+				let id = 0;
+				if (typeof(postId) === 'object') {
+					id = parseInt(this.getId(postId), 10);
+				} else {
+					id = parseInt(postId, 10);
+				}
+				if (!id) { return; }
+				const $editRow = $('#edit-' + id);
+				const $postRow = $('#post-' + id);
+				const rawStatus = String(($postRow.find('.threaddesk-quote-status').attr('data-threaddesk-quote-status') || 'pending')).toLowerCase();
+				const status = rawStatus === 'approved' || rawStatus === 'rejected' ? rawStatus : 'pending';
+				$editRow.find('select[name="threaddesk_quote_status"]').val(status);
+			};
+		});
+		</script>
+		<?php
+	}
+
+	public function render_quote_quick_edit_status_field( $column_name, $post_type ) {
+		if ( 'tta_quote_status' !== $column_name || 'tta_quote' !== $post_type ) {
+			return;
+		}
+		$options = $this->get_quote_status_options();
+		wp_nonce_field( 'tta_threaddesk_quote_status_quick_edit', 'tta_threaddesk_quote_status_nonce' );
+		echo '<fieldset class="inline-edit-col-right">';
+		echo '<div class="inline-edit-col">';
+		echo '<label class="inline-edit-group">';
+		echo '<span class="title">' . esc_html__( 'Quote status', 'threaddesk' ) . '</span>';
+		echo '<select name="threaddesk_quote_status">';
+		foreach ( $options as $value => $label ) {
+			echo '<option value="' . esc_attr( $value ) . '">' . esc_html( $label ) . '</option>';
+		}
+		echo '</select>';
+		echo '</label>';
+		echo '</div>';
+		echo '</fieldset>';
+	}
+
+	public function render_quote_quick_edit_status_script() {
+		$screen = function_exists( 'get_current_screen' ) ? get_current_screen() : null;
+		if ( ! $screen || 'edit-tta_quote' !== $screen->id ) {
+			return;
 		}
 		?>
 		<script>
