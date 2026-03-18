@@ -879,8 +879,24 @@ class TTA_ThreadDesk {
 		$existing_quote_id = isset( $_POST['existingQuoteId'] ) ? absint( $_POST['existingQuoteId'] ) : 0;
 		$rows_raw        = isset( $_POST['rows'] ) ? wp_unslash( $_POST['rows'] ) : array();
 		$prints_raw      = isset( $_POST['prints'] ) ? wp_unslash( $_POST['prints'] ) : array();
+		$rows_json_raw   = isset( $_POST['rowsJson'] ) ? wp_unslash( $_POST['rowsJson'] ) : '';
+		$prints_json_raw = isset( $_POST['printsJson'] ) ? wp_unslash( $_POST['printsJson'] ) : '';
 
-		$rows = is_array( $rows_raw ) ? $rows_raw : array();
+		$rows = array();
+		if ( is_array( $rows_raw ) ) {
+			$rows = $rows_raw;
+		} elseif ( is_string( $rows_raw ) && '' !== trim( $rows_raw ) ) {
+			$rows_candidate = json_decode( (string) $rows_raw, true );
+			if ( is_array( $rows_candidate ) ) {
+				$rows = $rows_candidate;
+			}
+		}
+		if ( empty( $rows ) && is_string( $rows_json_raw ) && '' !== trim( $rows_json_raw ) ) {
+			$rows_candidate = json_decode( (string) $rows_json_raw, true );
+			if ( is_array( $rows_candidate ) ) {
+				$rows = $rows_candidate;
+			}
+		}
 		$quote_rows = array();
 		$total = 0;
 		foreach ( $rows as $row ) {
@@ -901,13 +917,17 @@ class TTA_ThreadDesk {
 						continue;
 					}
 					$placement_colors = array();
+					$placement_selected_colors = array();
 					if ( isset( $placement['selectedColors'] ) && is_array( $placement['selectedColors'] ) ) {
-						foreach ( $placement['selectedColors'] as $placement_color ) {
+						$placement_selected_colors = $placement['selectedColors'];
+					} elseif ( isset( $placement['selectedColors'] ) && is_string( $placement['selectedColors'] ) ) {
+						$placement_selected_colors = array_map( 'trim', explode( ',', (string) $placement['selectedColors'] ) );
+					}
+					foreach ( $placement_selected_colors as $placement_color ) {
 							$clean_color = sanitize_text_field( (string) $placement_color );
 							if ( '' !== $clean_color ) {
 								$placement_colors[] = $clean_color;
 							}
-						}
 					}
 					$placement_items[] = array(
 						'placementLabel' => isset( $placement['placementLabel'] ) ? sanitize_text_field( (string) $placement['placementLabel'] ) : '',
@@ -944,19 +964,38 @@ class TTA_ThreadDesk {
 		}
 
 		$prints = array();
+		$prints_source = array();
 		if ( is_array( $prints_raw ) ) {
-			foreach ( $prints_raw as $print ) {
+			$prints_source = $prints_raw;
+		} elseif ( is_string( $prints_raw ) && '' !== trim( $prints_raw ) ) {
+			$prints_candidate = json_decode( (string) $prints_raw, true );
+			if ( is_array( $prints_candidate ) ) {
+				$prints_source = $prints_candidate;
+			}
+		}
+		if ( empty( $prints_source ) && is_string( $prints_json_raw ) && '' !== trim( $prints_json_raw ) ) {
+			$prints_candidate = json_decode( (string) $prints_json_raw, true );
+			if ( is_array( $prints_candidate ) ) {
+				$prints_source = $prints_candidate;
+			}
+		}
+		if ( is_array( $prints_source ) ) {
+			foreach ( $prints_source as $print ) {
 				if ( ! is_array( $print ) ) {
 					continue;
 				}
 				$colors = array();
+				$print_selected_colors = array();
 				if ( isset( $print['selectedColors'] ) && is_array( $print['selectedColors'] ) ) {
-					foreach ( $print['selectedColors'] as $color ) {
+					$print_selected_colors = $print['selectedColors'];
+				} elseif ( isset( $print['selectedColors'] ) && is_string( $print['selectedColors'] ) ) {
+					$print_selected_colors = array_map( 'trim', explode( ',', (string) $print['selectedColors'] ) );
+				}
+				foreach ( $print_selected_colors as $color ) {
 						$clean_color = sanitize_text_field( (string) $color );
 						if ( '' !== $clean_color ) {
 							$colors[] = $clean_color;
 						}
-					}
 				}
 				$prints[] = array(
 					'printKey'       => isset( $print['printKey'] ) ? sanitize_text_field( (string) $print['printKey'] ) : '',
@@ -3564,6 +3603,8 @@ class TTA_ThreadDesk {
 				payload.set('layoutTitle',String((selected&&selected.title)||''));
 				payload.set('selectedColor',String(getSelectedColorLabel()||''));
 				payload.set('selectedColorKey',String(selectedColor||''));
+				payload.set('rowsJson',JSON.stringify(rows));
+				payload.set('printsJson',JSON.stringify(prints));
 				const popup=openQuoteFlowPopup();
 				const quoteTitle=await new Promise((resolve)=>{popup.showNameStep(resolve);});
 				if(null===quoteTitle){return;}
