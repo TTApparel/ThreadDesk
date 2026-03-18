@@ -334,6 +334,28 @@ class TTA_ThreadDesk {
 		return $this->sanitize_layout_status( $stored );
 	}
 
+	private function get_quote_status_options() {
+		return array(
+			'pending'  => __( 'Pending', 'threaddesk' ),
+			'approved' => __( 'Approved', 'threaddesk' ),
+			'rejected' => __( 'Rejected', 'threaddesk' ),
+		);
+	}
+
+	private function sanitize_quote_status( $status ) {
+		$status = sanitize_key( (string) $status );
+		if ( in_array( $status, array( 'draft', 'private', 'new' ), true ) ) {
+			$status = 'pending';
+		}
+		$options = $this->get_quote_status_options();
+		return isset( $options[ $status ] ) ? $status : 'pending';
+	}
+
+	private function get_quote_status( $quote_id ) {
+		$stored = get_post_meta( (int) $quote_id, 'status', true );
+		return $this->sanitize_quote_status( $stored );
+	}
+
 	private function render_media_picker_field( $name, $value ) {
 		$value = $value ? esc_url( $value ) : '';
 		?>
@@ -879,8 +901,24 @@ class TTA_ThreadDesk {
 		$existing_quote_id = isset( $_POST['existingQuoteId'] ) ? absint( $_POST['existingQuoteId'] ) : 0;
 		$rows_raw        = isset( $_POST['rows'] ) ? wp_unslash( $_POST['rows'] ) : array();
 		$prints_raw      = isset( $_POST['prints'] ) ? wp_unslash( $_POST['prints'] ) : array();
+		$rows_json_raw   = isset( $_POST['rowsJson'] ) ? wp_unslash( $_POST['rowsJson'] ) : '';
+		$prints_json_raw = isset( $_POST['printsJson'] ) ? wp_unslash( $_POST['printsJson'] ) : '';
 
-		$rows = is_array( $rows_raw ) ? $rows_raw : array();
+		$rows = array();
+		if ( is_string( $rows_json_raw ) && '' !== trim( $rows_json_raw ) ) {
+			$rows_candidate = json_decode( (string) $rows_json_raw, true );
+			if ( is_array( $rows_candidate ) ) {
+				$rows = $rows_candidate;
+			}
+		}
+		if ( empty( $rows ) && is_array( $rows_raw ) ) {
+			$rows = $rows_raw;
+		} elseif ( empty( $rows ) && is_string( $rows_raw ) && '' !== trim( $rows_raw ) ) {
+			$rows_candidate = json_decode( (string) $rows_raw, true );
+			if ( is_array( $rows_candidate ) ) {
+				$rows = $rows_candidate;
+			}
+		}
 		$quote_rows = array();
 		$total = 0;
 		foreach ( $rows as $row ) {
@@ -901,13 +939,17 @@ class TTA_ThreadDesk {
 						continue;
 					}
 					$placement_colors = array();
+					$placement_selected_colors = array();
 					if ( isset( $placement['selectedColors'] ) && is_array( $placement['selectedColors'] ) ) {
-						foreach ( $placement['selectedColors'] as $placement_color ) {
+						$placement_selected_colors = $placement['selectedColors'];
+					} elseif ( isset( $placement['selectedColors'] ) && is_string( $placement['selectedColors'] ) ) {
+						$placement_selected_colors = array_map( 'trim', explode( ',', (string) $placement['selectedColors'] ) );
+					}
+					foreach ( $placement_selected_colors as $placement_color ) {
 							$clean_color = sanitize_text_field( (string) $placement_color );
 							if ( '' !== $clean_color ) {
 								$placement_colors[] = $clean_color;
 							}
-						}
 					}
 					$placement_items[] = array(
 						'placementLabel' => isset( $placement['placementLabel'] ) ? sanitize_text_field( (string) $placement['placementLabel'] ) : '',
@@ -922,9 +964,50 @@ class TTA_ThreadDesk {
 
 			$mockups = array();
 			if ( isset( $row['mockups'] ) && is_array( $row['mockups'] ) ) {
-				$mockup_views = array( 'front', 'left', 'side', 'back' );
+				$mockup_views = array( 'front', 'left', 'right', 'side', 'back' );
 				foreach ( $mockup_views as $view_key ) {
 					$mockups[ $view_key ] = isset( $row['mockups'][ $view_key ] ) ? esc_url_raw( (string) $row['mockups'][ $view_key ] ) : '';
+				}
+				$mockups['sideLabel'] = isset( $row['mockups']['sideLabel'] ) && 'right' === sanitize_key( (string) $row['mockups']['sideLabel'] ) ? 'right' : 'left';
+			}
+			$placement_overlays = array();
+			if ( isset( $row['placementOverlays'] ) && is_array( $row['placementOverlays'] ) ) {
+				foreach ( $row['placementOverlays'] as $angle_key => $entries ) {
+					if ( ! is_array( $entries ) ) {
+						continue;
+					}
+					$clean_angle_key = sanitize_key( (string) $angle_key );
+					if ( '' === $clean_angle_key ) {
+						$clean_angle_key = 'front';
+					}
+					$placement_overlays[ $clean_angle_key ] = array();
+					foreach ( $entries as $entry ) {
+						if ( ! is_array( $entry ) ) {
+							continue;
+						}
+						$url_raw = isset( $entry['url'] ) ? (string) $entry['url'] : '';
+						$url = esc_url_raw( $url_raw );
+						if ( '' === $url && preg_match( '#^data:image\/(png|jpe?g|webp);base64,#i', $url_raw ) ) {
+							$url = $url_raw;
+						}
+						if ( '' === $url ) {
+							continue;
+						}
+						$placement_overlays[ $clean_angle_key ][] = array(
+							'placementKey'   => isset( $entry['placementKey'] ) ? sanitize_text_field( (string) $entry['placementKey'] ) : '',
+							'placementLabel' => isset( $entry['placementLabel'] ) ? sanitize_text_field( (string) $entry['placementLabel'] ) : '',
+							'designId'       => isset( $entry['designId'] ) ? absint( $entry['designId'] ) : 0,
+							'designName'     => isset( $entry['designName'] ) ? sanitize_text_field( (string) $entry['designName'] ) : '',
+							'angle'          => isset( $entry['angle'] ) ? sanitize_key( (string) $entry['angle'] ) : $clean_angle_key,
+							'url'            => $url,
+							'top'            => isset( $entry['top'] ) ? (float) $entry['top'] : 50.0,
+							'left'           => isset( $entry['left'] ) ? (float) $entry['left'] : 50.0,
+							'width'          => isset( $entry['width'] ) ? (float) $entry['width'] : 25.0,
+						);
+					}
+					if ( empty( $placement_overlays[ $clean_angle_key ] ) ) {
+						unset( $placement_overlays[ $clean_angle_key ] );
+					}
 				}
 			}
 			$quote_rows[] = array(
@@ -935,6 +1018,7 @@ class TTA_ThreadDesk {
 				'estimatedUnitCost'          => round( $estimated_unit_cost, 4 ),
 				'estimatedVariationCostTotal'=> round( $line_total, 4 ),
 				'placements'                 => $placement_items,
+				'placementOverlays'          => $placement_overlays,
 				'mockups'                    => $mockups,
 			);
 		}
@@ -944,19 +1028,38 @@ class TTA_ThreadDesk {
 		}
 
 		$prints = array();
-		if ( is_array( $prints_raw ) ) {
-			foreach ( $prints_raw as $print ) {
+		$prints_source = array();
+		if ( is_string( $prints_json_raw ) && '' !== trim( $prints_json_raw ) ) {
+			$prints_candidate = json_decode( (string) $prints_json_raw, true );
+			if ( is_array( $prints_candidate ) ) {
+				$prints_source = $prints_candidate;
+			}
+		}
+		if ( empty( $prints_source ) && is_array( $prints_raw ) ) {
+			$prints_source = $prints_raw;
+		} elseif ( empty( $prints_source ) && is_string( $prints_raw ) && '' !== trim( $prints_raw ) ) {
+			$prints_candidate = json_decode( (string) $prints_raw, true );
+			if ( is_array( $prints_candidate ) ) {
+				$prints_source = $prints_candidate;
+			}
+		}
+		if ( is_array( $prints_source ) ) {
+			foreach ( $prints_source as $print ) {
 				if ( ! is_array( $print ) ) {
 					continue;
 				}
 				$colors = array();
+				$print_selected_colors = array();
 				if ( isset( $print['selectedColors'] ) && is_array( $print['selectedColors'] ) ) {
-					foreach ( $print['selectedColors'] as $color ) {
+					$print_selected_colors = $print['selectedColors'];
+				} elseif ( isset( $print['selectedColors'] ) && is_string( $print['selectedColors'] ) ) {
+					$print_selected_colors = array_map( 'trim', explode( ',', (string) $print['selectedColors'] ) );
+				}
+				foreach ( $print_selected_colors as $color ) {
 						$clean_color = sanitize_text_field( (string) $color );
 						if ( '' !== $clean_color ) {
 							$colors[] = $clean_color;
 						}
-					}
 				}
 				$prints[] = array(
 					'printKey'       => isset( $print['printKey'] ) ? sanitize_text_field( (string) $print['printKey'] ) : '',
@@ -990,9 +1093,19 @@ class TTA_ThreadDesk {
 		$existing_prints = array();
 		$existing_total = 0;
 		if ( $is_update ) {
-			$existing_rows = json_decode( (string) get_post_meta( $quote_id, 'screenprint_quote_rows_json', true ), true );
+			$existing_rows_raw = get_post_meta( $quote_id, 'screenprint_quote_rows_json', true );
+			if ( is_array( $existing_rows_raw ) ) {
+				$existing_rows = $existing_rows_raw;
+			} else {
+				$existing_rows = json_decode( (string) $existing_rows_raw, true );
+			}
 			$existing_rows = is_array( $existing_rows ) ? $existing_rows : array();
-			$existing_prints = json_decode( (string) get_post_meta( $quote_id, 'screenprint_quote_prints_json', true ), true );
+			$existing_prints_raw = get_post_meta( $quote_id, 'screenprint_quote_prints_json', true );
+			if ( is_array( $existing_prints_raw ) ) {
+				$existing_prints = $existing_prints_raw;
+			} else {
+				$existing_prints = json_decode( (string) $existing_prints_raw, true );
+			}
 			$existing_prints = is_array( $existing_prints ) ? $existing_prints : array();
 			$existing_total = (float) get_post_meta( $quote_id, 'total', true );
 		} else {
@@ -1023,9 +1136,9 @@ class TTA_ThreadDesk {
 		update_post_meta( $quote_id, 'currency', function_exists( 'get_woocommerce_currency' ) ? get_woocommerce_currency() : 'USD' );
 		update_post_meta( $quote_id, 'total', $final_total );
 		update_post_meta( $quote_id, 'created_at', current_time( 'mysql' ) );
-		update_post_meta( $quote_id, 'items_json', wp_json_encode( $final_rows ) );
-		update_post_meta( $quote_id, 'screenprint_quote_rows_json', wp_json_encode( $final_rows ) );
-		update_post_meta( $quote_id, 'screenprint_quote_prints_json', wp_json_encode( $final_prints ) );
+		update_post_meta( $quote_id, 'items_json', $final_rows );
+		update_post_meta( $quote_id, 'screenprint_quote_rows_json', $final_rows );
+		update_post_meta( $quote_id, 'screenprint_quote_prints_json', $final_prints );
 		update_post_meta( $quote_id, 'screenprint_quote_context', array(
 			'productId' => $product_id,
 			'layoutId'  => $layout_id,
@@ -3437,10 +3550,37 @@ class TTA_ThreadDesk {
 				});
 				return entries;
 			};
+			const getPlacementOverlaysForRequest=()=>{
+				if(!selected||!selected.placementsByAngle||typeof selected.placementsByAngle!=='object'){return {};}
+				const overlays={};
+				Object.keys(selected.placementsByAngle).forEach((angleKey)=>{
+					const entries=normalizePlacementEntries(selected.placementsByAngle[angleKey],angleKey);
+					const prepared=[];
+					entries.forEach((entry)=>{
+						if(!entry||typeof entry!=='object'){return;}
+						const src=getEntrySource(entry);
+						if(!src){return;}
+						prepared.push({
+							placementKey:String(entry.placementKey||'').trim(),
+							placementLabel:String(entry.placementLabel||angleKey||'Placement').trim()||'Placement',
+							designId:Number(entry.designId||0),
+							designName:String(entry.designName||entry.placementLabel||i18nDesignFallback).trim()||i18nDesignFallback,
+							angle:String(angleKey||'').trim()||'front',
+							url:src,
+							top:Number(entry.top||50),
+							left:Number(entry.left||50),
+							width:Number(entry.width||25)
+						});
+					});
+					if(prepared.length){overlays[String(angleKey||'front').trim()||'front']=prepared;}
+				});
+				return overlays;
+			};
 			const getQuoteRowsForRequest=()=>{
 				const rows=[];
 				if(!quantitiesList){return rows;}
 				const placementEntries=getSelectedPlacementEntries();
+				const placementOverlays=getPlacementOverlaysForRequest();
 				const groupedPlacementEntries={};
 				placementEntries.forEach((entry)=>{if(!groupedPlacementEntries[entry.printKey]){groupedPlacementEntries[entry.printKey]=entry;}});
 				const inputEls=Array.from(quantitiesList.querySelectorAll('input[data-threaddesk-screenprint-variation-id]'));
@@ -3457,6 +3597,7 @@ class TTA_ThreadDesk {
 					const leftView=String((images&&images.left)||'').trim();
 					const rightView=String((images&&images.right)||'').trim();
 					const sideView=String((images&&images.side)||leftView||rightView||'').trim();
+					const sideLabel=String((images&&images.sideLabel)||'left').toLowerCase()==='right'?'right':'left';
 					rows.push({
 						variationId:Number(variationId||0),
 						productSku:String((row&&row.productSku)||'').trim(),
@@ -3464,7 +3605,8 @@ class TTA_ThreadDesk {
 						qty:qty,
 						estimatedUnitCost:null===unitCost?0:Number(unitCost),
 						placements:Object.values(groupedPlacementEntries).map((entry)=>({placementLabel:entry.placementLabel,designName:entry.designName,designId:entry.designId,approxSize:Number(entry.approxSize||100),approxSizeLabel:entry.approxSizeLabel||String(entry.approxSize||100)+'%',selectedColors:Array.isArray(entry.selectedColors)?entry.selectedColors:[]})),
-						mockups:{front:String((images&&images.front)||'').trim(),left:leftView||rightView,side:sideView,back:String((images&&images.back)||'').trim()}
+						placementOverlays:placementOverlays,
+						mockups:{front:String((images&&images.front)||'').trim(),left:leftView||rightView,right:rightView||leftView,side:sideView,sideLabel:sideLabel,back:String((images&&images.back)||'').trim()}
 					});
 				});
 				return rows;
@@ -3564,6 +3706,8 @@ class TTA_ThreadDesk {
 				payload.set('layoutTitle',String((selected&&selected.title)||''));
 				payload.set('selectedColor',String(getSelectedColorLabel()||''));
 				payload.set('selectedColorKey',String(selectedColor||''));
+				payload.set('rowsJson',JSON.stringify(rows));
+				payload.set('printsJson',JSON.stringify(prints));
 				const popup=openQuoteFlowPopup();
 				const quoteTitle=await new Promise((resolve)=>{popup.showNameStep(resolve);});
 				if(null===quoteTitle){return;}
@@ -3571,30 +3715,6 @@ class TTA_ThreadDesk {
 				const shouldContinueExisting=window.localStorage&&String(window.localStorage.getItem('tta_threaddesk_continue_quote')||'').trim()==='1';
 				const activeQuoteId=window.localStorage?String(window.localStorage.getItem('tta_threaddesk_active_quote_id')||'').trim():'';
 				if(shouldContinueExisting&&activeQuoteId){payload.set('existingQuoteId',activeQuoteId);}
-				rows.forEach((row,rowIndex)=>{
-					Object.keys(row).forEach((key)=>{
-						if(key==='placements'){
-							row.placements.forEach((placement,pIndex)=>{
-								Object.keys(placement).forEach((placementKey)=>payload.set('rows['+rowIndex+'][placements]['+pIndex+']['+placementKey+']',String(placement[placementKey]||'')));
-							});
-							return;
-						}
-						if(key==='mockups'){
-							Object.keys(row.mockups||{}).forEach((mockupKey)=>payload.set('rows['+rowIndex+'][mockups]['+mockupKey+']',String((row.mockups&&row.mockups[mockupKey])||'')));
-							return;
-						}
-						payload.set('rows['+rowIndex+']['+key+']',String(row[key]));
-					});
-				});
-				prints.forEach((print,printIndex)=>{
-					Object.keys(print).forEach((key)=>{
-						if(key==='selectedColors'){
-							(print.selectedColors||[]).forEach((color,colorIndex)=>payload.set('prints['+printIndex+'][selectedColors]['+colorIndex+']',String(color||'')));
-							return;
-						}
-						payload.set('prints['+printIndex+']['+key+']',String(print[key]||''));
-					});
-				});
 				if(addToQuoteButton){addToQuoteButton.disabled=true;}
 				try{
 					const response=await fetch(screenprintQuoteAjaxUrl,{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/x-www-form-urlencoded; charset=UTF-8'},body:payload.toString()});
@@ -5746,7 +5866,7 @@ class TTA_ThreadDesk {
 		}
 
 		$rows_raw = get_post_meta( $post->ID, 'screenprint_quote_rows_json', true );
-		if ( '' === (string) $rows_raw ) {
+		if ( ! is_array( $rows_raw ) && '' === trim( (string) $rows_raw ) ) {
 			$rows_raw = get_post_meta( $post->ID, 'items_json', true );
 		}
 		if ( is_array( $rows_raw ) ) {
@@ -5807,17 +5927,22 @@ class TTA_ThreadDesk {
 			echo '<td>' . esc_html( function_exists( 'wc_price' ) ? wp_strip_all_tags( wc_price( $estimated ) ) : number_format_i18n( $estimated, 2 ) ) . '</td>';
 			echo '<td>' . esc_html( ! empty( $placement_text ) ? implode( ', ', $placement_text ) : '—' ) . '</td>';
 			$mockups = isset( $row['mockups'] ) && is_array( $row['mockups'] ) ? $row['mockups'] : array();
+			$side_label = isset( $mockups['sideLabel'] ) && 'right' === sanitize_key( (string) $mockups['sideLabel'] ) ? 'right' : 'left';
+			$has_right_mockup = isset( $mockups['right'] ) && '' !== trim( (string) $mockups['right'] );
+			$has_side_mockup = isset( $mockups['side'] ) && '' !== trim( (string) $mockups['side'] );
 			$mockup_payload = array(
 				'front' => isset( $mockups['front'] ) ? esc_url_raw( (string) $mockups['front'] ) : '',
 				'left'  => isset( $mockups['left'] ) ? esc_url_raw( (string) $mockups['left'] ) : '',
-				'side'  => isset( $mockups['side'] ) ? esc_url_raw( (string) $mockups['side'] ) : '',
 				'back'  => isset( $mockups['back'] ) ? esc_url_raw( (string) $mockups['back'] ) : '',
+				'right' => isset( $mockups['right'] ) ? esc_url_raw( (string) $mockups['right'] ) : ( isset( $mockups['side'] ) ? esc_url_raw( (string) $mockups['side'] ) : '' ),
+				'sideLabel' => $side_label,
+				'rightMirror' => ( ! $has_right_mockup && $has_side_mockup && 'left' === $side_label ) ? 1 : 0,
 			);
 			$overlay_payload = array(
 				'front' => array(),
 				'left'  => array(),
-				'side'  => array(),
 				'back'  => array(),
+				'right' => array(),
 			);
 
 			$overlay_groups = array();
@@ -5831,8 +5956,8 @@ class TTA_ThreadDesk {
 				'front' => 'front',
 				'back'  => 'back',
 				'left'  => 'left',
-				'right' => 'side',
-				'side'  => 'side',
+				'right' => 'right',
+				'side'  => 'right',
 			);
 
 			foreach ( $overlay_groups as $angle_key => $entries ) {
@@ -5891,7 +6016,7 @@ class TTA_ThreadDesk {
 					);
 				}
 			}
-			$has_mockup = ( '' !== $mockup_payload['front'] ) || ( '' !== $mockup_payload['left'] ) || ( '' !== $mockup_payload['side'] ) || ( '' !== $mockup_payload['back'] );
+			$has_mockup = ( '' !== $mockup_payload['front'] ) || ( '' !== $mockup_payload['left'] ) || ( '' !== $mockup_payload['right'] ) || ( '' !== $mockup_payload['back'] );
 			echo '<td>';
 			if ( $has_mockup ) {
 				echo '<button type="button" class="button" data-threaddesk-quote-mockup="' . esc_attr( wp_json_encode( $mockup_payload ) ) . '" data-threaddesk-quote-mockup-overlays="' . esc_attr( wp_json_encode( $overlay_payload ) ) . '">' . esc_html__( 'SHOW', 'threaddesk' ) . '</button>';
@@ -5927,7 +6052,7 @@ class TTA_ThreadDesk {
 				title.style.margin='0 0 12px 0';
 				var grid=document.createElement('div');
 				grid.style.cssText='display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;';
-				['front','left','side','back'].forEach(function(view){
+				['front','left','back','right'].forEach(function(view){
 					var card=document.createElement('div');
 					card.style.cssText='border:1px solid #dcdcde;border-radius:6px;padding:8px;background:#f9f9f9;';
 					var label=document.createElement('p');
@@ -5942,6 +6067,7 @@ class TTA_ThreadDesk {
 						img.src=src;
 						img.alt=view+' mockup';
 						img.style.cssText='position:absolute;inset:0;width:100%;height:100%;display:block;object-fit:contain;';
+						if(view==='right'&&Number(payload&&payload.rightMirror)===1){img.style.transform='scaleX(-1)';}
 						frame.appendChild(img);
 						var viewOverlays=Array.isArray(overlaysPayload&&overlaysPayload[view])?overlaysPayload[view]:[];
 						viewOverlays.forEach(function(placement){
@@ -6090,7 +6216,7 @@ class TTA_ThreadDesk {
 		};
 
 		$prints_raw = get_post_meta( $post->ID, 'screenprint_quote_prints_json', true );
-		if ( '' === (string) $prints_raw ) {
+		if ( ! is_array( $prints_raw ) && '' === trim( (string) $prints_raw ) ) {
 			$prints_raw = get_post_meta( $post->ID, 'prints_json', true );
 		}
 		if ( is_array( $prints_raw ) ) {
@@ -6103,7 +6229,7 @@ class TTA_ThreadDesk {
 		}
 		if ( ! is_array( $prints ) || empty( $prints ) ) {
 			$rows_raw = get_post_meta( $post->ID, 'screenprint_quote_rows_json', true );
-			if ( '' === (string) $rows_raw ) {
+			if ( ! is_array( $rows_raw ) && '' === trim( (string) $rows_raw ) ) {
 				$rows_raw = get_post_meta( $post->ID, 'items_json', true );
 			}
 			if ( is_array( $rows_raw ) ) {
@@ -6615,7 +6741,15 @@ class TTA_ThreadDesk {
 	}
 
 	public function filter_quote_admin_columns( $columns ) {
-		return $this->filter_entity_admin_columns( $columns );
+		$columns = $this->filter_entity_admin_columns( $columns );
+		$updated = array();
+		foreach ( $columns as $key => $label ) {
+			$updated[ $key ] = $label;
+			if ( 'tta_internal_ref' === $key ) {
+				$updated['tta_quote_status'] = __( 'Status', 'threaddesk' );
+			}
+		}
+		return $updated;
 	}
 
 	public function filter_design_admin_columns( $columns ) {
@@ -6689,6 +6823,16 @@ class TTA_ThreadDesk {
 			echo '<span class="threaddesk-layout-status" data-threaddesk-layout-status="' . esc_attr( $status ) . '" data-threaddesk-layout-rejection-reason="' . esc_attr( $rejection_reason ) . '">' . esc_html( isset( $options[ $status ] ) ? $options[ $status ] : $options['pending'] ) . '</span>';
 			return;
 		}
+		if ( 'tta_quote_status' === $column ) {
+			if ( 'tta_quote' !== $post->post_type ) {
+				echo '&mdash;';
+				return;
+			}
+			$status = $this->get_quote_status( $post_id );
+			$options = $this->get_quote_status_options();
+			echo '<span class="threaddesk-quote-status" data-threaddesk-quote-status="' . esc_attr( $status ) . '">' . esc_html( isset( $options[ $status ] ) ? $options[ $status ] : $options['pending'] ) . '</span>';
+			return;
+		}
 	}
 
 	private function filter_entity_sortable_columns( $columns ) {
@@ -6699,7 +6843,9 @@ class TTA_ThreadDesk {
 	}
 
 	public function filter_quote_sortable_columns( $columns ) {
-		return $this->filter_entity_sortable_columns( $columns );
+		$columns = $this->filter_entity_sortable_columns( $columns );
+		$columns['tta_quote_status'] = 'tta_quote_status';
+		return $columns;
 	}
 
 	public function filter_design_sortable_columns( $columns ) {
@@ -6739,6 +6885,11 @@ class TTA_ThreadDesk {
 		}
 		if ( 'tta_layout_status' === $orderby && 'tta_layout' === $post_type ) {
 			$query->set( 'meta_key', 'layout_status' );
+			$query->set( 'orderby', 'meta_value' );
+			return;
+		}
+		if ( 'tta_quote_status' === $orderby && 'tta_quote' === $post_type ) {
+			$query->set( 'meta_key', 'status' );
 			$query->set( 'orderby', 'meta_value' );
 		}
 	}
