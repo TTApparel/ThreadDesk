@@ -6646,10 +6646,16 @@ class TTA_ThreadDesk {
 			$has_side_mockup = isset( $mockups['side'] ) && '' !== trim( (string) $mockups['side'] );
 			$right_source = isset( $mockups['rightSource'] ) ? sanitize_key( (string) $mockups['rightSource'] ) : '';
 			if ( ! in_array( $right_source, array( 'left', 'right' ), true ) ) {
+				$left_mockup = isset( $mockups['left'] ) ? trim( (string) $mockups['left'] ) : '';
+				$right_mockup = $has_right_mockup ? trim( (string) $mockups['right'] ) : '';
+				$side_mockup = $has_side_mockup ? trim( (string) $mockups['side'] ) : '';
 				$right_source = 'right';
 				if ( ! $has_right_mockup && $has_side_mockup && 'left' === $side_label ) {
 					$right_source = 'left';
-				} elseif ( $has_right_mockup && isset( $mockups['left'] ) && '' !== trim( (string) $mockups['left'] ) && trim( (string) $mockups['left'] ) === trim( (string) $mockups['right'] ) && 'left' === $side_label ) {
+				} elseif ( 'left' === $side_label && $has_right_mockup && (
+					( '' !== $left_mockup && $left_mockup === $right_mockup ) ||
+					( '' !== $side_mockup && $side_mockup === $right_mockup )
+				) ) {
 					$right_source = 'left';
 				}
 			}
