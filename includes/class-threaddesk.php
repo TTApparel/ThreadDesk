@@ -19,6 +19,7 @@ class TTA_ThreadDesk {
 	private $auth_register_success = false;
 	private $screenprint_payload_request_cache = array();
 	private $screenprint_cache_group = 'tta_threaddesk_screenprint';
+	private $screenprint_variation_page_limit = 150;
 
 	public static function instance() {
 		if ( null === self::$instance ) {
@@ -97,6 +98,8 @@ class TTA_ThreadDesk {
 		add_action( 'admin_post_tta_threaddesk_admin_save_user', array( $this, 'handle_admin_save_user' ) );
 		add_action( 'admin_post_tta_threaddesk_export_activity_csv', array( $this, 'handle_admin_export_activity_csv' ) );
 		add_action( 'wp_ajax_tta_threaddesk_screenprint_add_to_quote', array( $this, 'handle_screenprint_add_to_quote' ) );
+		add_action( 'wp_ajax_tta_threaddesk_screenprint_variations', array( $this, 'handle_screenprint_variations' ) );
+		add_action( 'wp_ajax_nopriv_tta_threaddesk_screenprint_variations', array( $this, 'handle_screenprint_variations' ) );
 		add_action( 'user_register', array( $this, 'handle_user_register' ) );
 		add_action( 'init', array( $this, 'handle_auth_login' ) );
 		add_action( 'init', array( $this, 'handle_auth_register' ) );
@@ -2406,6 +2409,53 @@ class TTA_ThreadDesk {
 		return ob_get_clean();
 	}
 
+	public function handle_screenprint_variations() {
+		check_ajax_referer( 'tta_threaddesk_screenprint_variations', 'nonce' );
+
+		$product_id    = isset( $_POST['productId'] ) ? absint( $_POST['productId'] ) : 0;
+		$offset        = isset( $_POST['offset'] ) ? max( 0, absint( $_POST['offset'] ) ) : 0;
+		$requested_raw = isset( $_POST['limit'] ) ? absint( $_POST['limit'] ) : $this->screenprint_variation_page_limit;
+		$limit         = max( 1, min( $requested_raw, $this->screenprint_variation_page_limit ) );
+		$in_stock_only = isset( $_POST['inStockOnly'] ) && '1' === sanitize_text_field( wp_unslash( $_POST['inStockOnly'] ) );
+		$fields        = isset( $_POST['fields'] ) ? sanitize_key( wp_unslash( $_POST['fields'] ) ) : 'full';
+
+		if ( $product_id <= 0 || ! function_exists( 'wc_get_product' ) ) {
+			wp_send_json_error( array( 'message' => __( 'Invalid product.', 'threaddesk' ) ), 400 );
+		}
+
+		$product = wc_get_product( $product_id );
+		if ( ! $product ) {
+			wp_send_json_error( array( 'message' => __( 'Unable to load product.', 'threaddesk' ) ), 404 );
+		}
+
+		$total = $this->count_screenprint_variations(
+			$product,
+			array(
+				'in_stock_only' => $in_stock_only,
+			)
+		);
+		$rows  = $this->build_screenprint_variation_payload(
+			$product,
+			array(
+				'offset'        => $offset,
+				'limit'         => $limit,
+				'in_stock_only' => $in_stock_only,
+				'fields'        => 'keys' === $fields ? 'keys' : 'full',
+			)
+		);
+
+		wp_send_json_success(
+			array(
+				'variations' => $rows,
+				'total'      => $total,
+				'offset'     => $offset,
+				'returned'   => count( $rows ),
+				'hasMore'    => ( $offset + count( $rows ) ) < $total,
+				'limit'      => $limit,
+			)
+		);
+	}
+
 
 	private function get_screenprint_shortcode_data_payload( $product_id, $product, $is_authenticated, $owner_context ) {
 		$user_id       = $is_authenticated ? get_current_user_id() : 0;
@@ -2432,12 +2482,38 @@ class TTA_ThreadDesk {
 		$product_context          = $this->build_screenprint_product_category_context( $product_id );
 		$product_term_ids         = isset( $product_context['product_term_ids'] ) && is_array( $product_context['product_term_ids'] ) ? $product_context['product_term_ids'] : array();
 		$product_term_slugs       = isset( $product_context['product_term_slugs'] ) && is_array( $product_context['product_term_slugs'] ) ? $product_context['product_term_slugs'] : array();
+		$variation_limit          = absint( apply_filters( 'tta_threaddesk_screenprint_variation_initial_limit', $this->screenprint_variation_page_limit, $product_id ) );
+		$variation_limit          = max( 1, min( $variation_limit, 500 ) );
+		$screenprint_variations   = $this->build_screenprint_variation_payload(
+			$product,
+			array(
+				'offset'        => 0,
+				'limit'         => $variation_limit,
+				'in_stock_only' => true,
+				'fields'        => 'full',
+			)
+		);
+		$screenprint_variation_total = $this->count_screenprint_variations(
+			$product,
+			array(
+				'in_stock_only' => true,
+			)
+		);
 
 		$payload = array(
 			'layout_items'               => $this->build_screenprint_layout_list_payload( $owner_context, $user_id, $layout_category_settings, $product_term_ids, $product_term_slugs ),
 			'saved_designs'              => $this->build_screenprint_design_list_payload( $owner_context, $user_id ),
 			'screenprint_pending_quotes' => $this->build_screenprint_pending_quotes_payload( $is_authenticated, $user_id ),
-			'screenprint_variations'     => $this->build_screenprint_variation_payload( $product ),
+			'screenprint_variations'     => $screenprint_variations,
+			'screenprint_variations_meta' => array(
+				'total'       => $screenprint_variation_total,
+				'offset'      => 0,
+				'returned'    => count( $screenprint_variations ),
+				'has_more'    => count( $screenprint_variations ) < $screenprint_variation_total,
+				'limit'       => $variation_limit,
+				'in_stock_only' => true,
+				'fields'      => 'full',
+			),
 			'print_pricing_settings'     => wp_parse_args( (array) get_option( 'tta_threaddesk_print_pricing', array() ), $this->get_default_print_pricing_settings() ),
 		);
 
@@ -2682,21 +2758,50 @@ class TTA_ThreadDesk {
 		return $screenprint_pending_quotes;
 	}
 
-	private function build_screenprint_variation_payload( $product ) {
+	private function build_screenprint_variation_payload( $product, $args = array() ) {
 		$screenprint_variations = array();
 		if ( ! $product || ! is_callable( array( $product, 'is_type' ) ) || ! $product->is_type( 'variable' ) ) {
 			return $screenprint_variations;
 		}
+
+		$args = wp_parse_args(
+			(array) $args,
+			array(
+				'offset'        => 0,
+				'limit'         => 0,
+				'in_stock_only' => false,
+				'fields'        => 'full',
+			)
+		);
+
+		$debug_start = microtime( true );
 		$available_variations = is_callable( array( $product, 'get_available_variations' ) ) ? $product->get_available_variations() : array();
+		$term_label_maps      = $this->build_screenprint_attribute_term_label_maps( $available_variations );
+		$offset               = max( 0, absint( $args['offset'] ) );
+		$limit                = max( 0, absint( $args['limit'] ) );
+		$end                  = $limit > 0 ? $offset + $limit : 0;
+		$rendered             = 0;
+		$processed            = 0;
+		$garment_name         = is_callable( array( $product, 'get_name' ) ) ? (string) $product->get_name() : '';
+		$fields_mode          = 'keys' === $args['fields'] ? 'keys' : 'full';
 		foreach ( $available_variations as $available_variation ) {
 			$variation_id = isset( $available_variation['variation_id'] ) ? absint( $available_variation['variation_id'] ) : 0;
 			if ( $variation_id <= 0 ) {
 				continue;
 			}
-			$variation_product = function_exists( 'wc_get_product' ) ? wc_get_product( $variation_id ) : false;
-			if ( ! $variation_product ) {
+			$in_stock = ! empty( $available_variation['is_in_stock'] );
+			if ( ! empty( $args['in_stock_only'] ) && ! $in_stock ) {
 				continue;
 			}
+			if ( $processed < $offset ) {
+				$processed++;
+				continue;
+			}
+			if ( $end > 0 && $processed >= $end ) {
+				break;
+			}
+			$processed++;
+
 			$attributes  = isset( $available_variation['attributes'] ) && is_array( $available_variation['attributes'] ) ? $available_variation['attributes'] : array();
 			$size_label  = '';
 			$color_label = '';
@@ -2711,11 +2816,9 @@ class TTA_ThreadDesk {
 					continue;
 				}
 				$resolved_label = $raw_value;
-				if ( 0 === strpos( $key, 'pa_' ) ) {
-					$term = get_term_by( 'slug', $raw_value, $key );
-					if ( $term && ! is_wp_error( $term ) && ! empty( $term->name ) ) {
-						$resolved_label = (string) $term->name;
-					}
+				$raw_value_slug = sanitize_title( $raw_value );
+				if ( 0 === strpos( $key, 'pa_' ) && '' !== $raw_value_slug && isset( $term_label_maps[ $key ][ $raw_value_slug ] ) ) {
+					$resolved_label = (string) $term_label_maps[ $key ][ $raw_value_slug ];
 				}
 				if ( '' === $size_label && false !== strpos( $key, 'size' ) ) {
 					$size_label = $resolved_label;
@@ -2729,22 +2832,111 @@ class TTA_ThreadDesk {
 					}
 				}
 			}
-			$stock_quantity = $variation_product->managing_stock() ? $variation_product->get_stock_quantity() : null;
-			$in_stock       = $variation_product->is_in_stock();
-			$variation_price = is_callable( array( $variation_product, 'get_price' ) ) ? (float) $variation_product->get_price() : 0;
-			$screenprint_variations[] = array(
+
+			$row = array(
 				'variationId' => $variation_id,
-				'productSku'  => is_callable( array( $variation_product, 'get_sku' ) ) ? (string) $variation_product->get_sku() : '',
 				'size'        => '' !== $size_label ? $size_label : __( 'N/A', 'threaddesk' ),
 				'color'       => '' !== $color_label ? $color_label : __( 'N/A', 'threaddesk' ),
 				'colorKey'    => '' !== $color_key ? $color_key : '',
-				'garmentName' => is_callable( array( $product, 'get_name' ) ) ? (string) $product->get_name() : '',
-				'inventory'   => null !== $stock_quantity ? (int) $stock_quantity : ( $in_stock ? __( 'In stock', 'threaddesk' ) : __( 'Out of stock', 'threaddesk' ) ),
-				'price'       => $variation_price > 0 ? round( $variation_price, 4 ) : 0,
-				'inStock'     => (bool) $in_stock,
 			);
+			if ( 'full' === $fields_mode ) {
+				$max_qty         = isset( $available_variation['max_qty'] ) && '' !== $available_variation['max_qty'] ? (int) $available_variation['max_qty'] : null;
+				$inventory_label = $in_stock ? __( 'In stock', 'threaddesk' ) : __( 'Out of stock', 'threaddesk' );
+				$row             = array_merge(
+					$row,
+					array(
+						'productSku'  => isset( $available_variation['sku'] ) ? sanitize_text_field( (string) $available_variation['sku'] ) : '',
+						'garmentName' => $garment_name,
+						'inventory'   => null !== $max_qty ? $max_qty : $inventory_label,
+						'price'       => isset( $available_variation['display_price'] ) ? round( (float) $available_variation['display_price'], 4 ) : 0,
+						'inStock'     => (bool) $in_stock,
+					)
+				);
+			}
+			$screenprint_variations[] = $row;
+			$rendered++;
 		}
+
+		if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
+			$elapsed_ms = round( ( microtime( true ) - $debug_start ) * 1000, 2 );
+			error_log( sprintf( '[ThreadDesk] screenprint variations assembled product=%d rows=%d mode=%s offset=%d limit=%d in_stock_only=%d elapsed_ms=%s', absint( $product->get_id() ), $rendered, $fields_mode, $offset, $limit, ! empty( $args['in_stock_only'] ) ? 1 : 0, $elapsed_ms ) );
+		}
+
 		return $screenprint_variations;
+	}
+
+	private function build_screenprint_attribute_term_label_maps( $available_variations ) {
+		$taxonomy_slug_map = array();
+		foreach ( $available_variations as $available_variation ) {
+			$attributes = isset( $available_variation['attributes'] ) && is_array( $available_variation['attributes'] ) ? $available_variation['attributes'] : array();
+			foreach ( $attributes as $attribute_key => $attribute_value ) {
+				$taxonomy = sanitize_key( str_replace( 'attribute_', '', (string) $attribute_key ) );
+				if ( '' === $taxonomy || 0 !== strpos( $taxonomy, 'pa_' ) ) {
+					continue;
+				}
+				$slug = sanitize_title( (string) $attribute_value );
+				if ( '' === $slug ) {
+					continue;
+				}
+				if ( ! isset( $taxonomy_slug_map[ $taxonomy ] ) ) {
+					$taxonomy_slug_map[ $taxonomy ] = array();
+				}
+				$taxonomy_slug_map[ $taxonomy ][ $slug ] = true;
+			}
+		}
+
+		$term_label_maps = array();
+		foreach ( $taxonomy_slug_map as $taxonomy => $slug_map ) {
+			$slugs = array_keys( $slug_map );
+			if ( empty( $slugs ) ) {
+				continue;
+			}
+			$terms = get_terms(
+				array(
+					'taxonomy'   => $taxonomy,
+					'hide_empty' => false,
+					'slug'       => $slugs,
+				)
+			);
+			if ( is_wp_error( $terms ) || ! is_array( $terms ) ) {
+				continue;
+			}
+			foreach ( $terms as $term ) {
+				if ( ! $term instanceof WP_Term ) {
+					continue;
+				}
+				$term_slug = sanitize_title( (string) $term->slug );
+				if ( '' === $term_slug ) {
+					continue;
+				}
+				if ( ! isset( $term_label_maps[ $taxonomy ] ) ) {
+					$term_label_maps[ $taxonomy ] = array();
+				}
+				$term_label_maps[ $taxonomy ][ $term_slug ] = (string) $term->name;
+			}
+		}
+
+		return $term_label_maps;
+	}
+
+	private function count_screenprint_variations( $product, $args = array() ) {
+		if ( ! $product || ! is_callable( array( $product, 'is_type' ) ) || ! $product->is_type( 'variable' ) ) {
+			return 0;
+		}
+		$args                 = wp_parse_args( (array) $args, array( 'in_stock_only' => false ) );
+		$available_variations = is_callable( array( $product, 'get_available_variations' ) ) ? $product->get_available_variations() : array();
+		$total                = 0;
+		foreach ( $available_variations as $available_variation ) {
+			$variation_id = isset( $available_variation['variation_id'] ) ? absint( $available_variation['variation_id'] ) : 0;
+			if ( $variation_id <= 0 ) {
+				continue;
+			}
+			if ( ! empty( $args['in_stock_only'] ) && empty( $available_variation['is_in_stock'] ) ) {
+				continue;
+			}
+			$total++;
+		}
+		return $total;
 	}
 
 	private function build_screenprint_color_payload( $product_id, $product ) {
@@ -2956,6 +3148,7 @@ class TTA_ThreadDesk {
 		$saved_designs              = isset( $screenprint_data['saved_designs'] ) && is_array( $screenprint_data['saved_designs'] ) ? $screenprint_data['saved_designs'] : array();
 		$screenprint_pending_quotes = isset( $screenprint_data['screenprint_pending_quotes'] ) && is_array( $screenprint_data['screenprint_pending_quotes'] ) ? $screenprint_data['screenprint_pending_quotes'] : array();
 		$screenprint_variations     = isset( $screenprint_data['screenprint_variations'] ) && is_array( $screenprint_data['screenprint_variations'] ) ? $screenprint_data['screenprint_variations'] : array();
+		$screenprint_variations_meta = isset( $screenprint_data['screenprint_variations_meta'] ) && is_array( $screenprint_data['screenprint_variations_meta'] ) ? $screenprint_data['screenprint_variations_meta'] : array();
 		$screenprint_images_by_color = isset( $screenprint_data['screenprint_images_by_color'] ) && is_array( $screenprint_data['screenprint_images_by_color'] ) ? $screenprint_data['screenprint_images_by_color'] : array();
 		$screenprint_color_choices   = isset( $screenprint_data['screenprint_color_choices'] ) && is_array( $screenprint_data['screenprint_color_choices'] ) ? $screenprint_data['screenprint_color_choices'] : array();
 		$initial_color_key           = isset( $screenprint_data['initial_color_key'] ) ? (string) $screenprint_data['initial_color_key'] : '';
@@ -2963,6 +3156,10 @@ class TTA_ThreadDesk {
 		$default_category_id         = isset( $screenprint_data['default_category_id'] ) ? absint( $screenprint_data['default_category_id'] ) : 0;
 		$placement_categories        = isset( $screenprint_data['placement_categories'] ) && is_array( $screenprint_data['placement_categories'] ) ? $screenprint_data['placement_categories'] : array();
 		$print_pricing_settings      = isset( $screenprint_data['print_pricing_settings'] ) && is_array( $screenprint_data['print_pricing_settings'] ) ? $screenprint_data['print_pricing_settings'] : array();
+		$variation_total             = isset( $screenprint_variations_meta['total'] ) ? absint( $screenprint_variations_meta['total'] ) : count( $screenprint_variations );
+		$variation_returned          = isset( $screenprint_variations_meta['returned'] ) ? absint( $screenprint_variations_meta['returned'] ) : count( $screenprint_variations );
+		$variation_has_more          = ! empty( $screenprint_variations_meta['has_more'] ) && $variation_returned < $variation_total;
+		$variation_limit             = isset( $screenprint_variations_meta['limit'] ) ? absint( $screenprint_variations_meta['limit'] ) : $this->screenprint_variation_page_limit;
 
 		$instance_id                = 'threaddesk-screenprint-' . wp_rand( 1000, 99999 );
 		$screenprint_open_chooser   = isset( $_GET['td_screenprint_return'] ) && '1' === sanitize_text_field( wp_unslash( $_GET['td_screenprint_return'] ) );
@@ -2973,7 +3170,7 @@ class TTA_ThreadDesk {
 
 		ob_start();
 		?>
-		<div class="threaddesk-screenprint" id="<?php echo esc_attr( $instance_id ); ?>" data-threaddesk-screenprint-layouts="<?php echo esc_attr( wp_json_encode( $layout_items ) ); ?>" data-threaddesk-screenprint-images-by-color="<?php echo esc_attr( wp_json_encode( $screenprint_images_by_color ) ); ?>" data-threaddesk-screenprint-initial-color="<?php echo esc_attr( $initial_color_key ); ?>" data-threaddesk-screenprint-create-layout-category="<?php echo esc_attr( $default_category_slug ); ?>" data-threaddesk-screenprint-create-layout-category-id="<?php echo esc_attr( (string) $default_category_id ); ?>" data-threaddesk-screenprint-open-chooser="<?php echo $screenprint_open_chooser ? '1' : '0'; ?>" data-threaddesk-screenprint-authenticated="<?php echo $is_authenticated ? '1' : '0'; ?>" data-threaddesk-screenprint-variations="<?php echo esc_attr( wp_json_encode( $screenprint_variations ) ); ?>" data-threaddesk-screenprint-pricing="<?php echo esc_attr( wp_json_encode( $print_pricing_settings ) ); ?>" data-threaddesk-screenprint-pending-quotes="<?php echo esc_attr( wp_json_encode( $screenprint_pending_quotes ) ); ?>">
+		<div class="threaddesk-screenprint" id="<?php echo esc_attr( $instance_id ); ?>" data-threaddesk-screenprint-layouts="<?php echo esc_attr( wp_json_encode( $layout_items ) ); ?>" data-threaddesk-screenprint-images-by-color="<?php echo esc_attr( wp_json_encode( $screenprint_images_by_color ) ); ?>" data-threaddesk-screenprint-initial-color="<?php echo esc_attr( $initial_color_key ); ?>" data-threaddesk-screenprint-create-layout-category="<?php echo esc_attr( $default_category_slug ); ?>" data-threaddesk-screenprint-create-layout-category-id="<?php echo esc_attr( (string) $default_category_id ); ?>" data-threaddesk-screenprint-open-chooser="<?php echo $screenprint_open_chooser ? '1' : '0'; ?>" data-threaddesk-screenprint-authenticated="<?php echo $is_authenticated ? '1' : '0'; ?>" data-threaddesk-screenprint-variations="<?php echo esc_attr( wp_json_encode( $screenprint_variations ) ); ?>" data-threaddesk-screenprint-variation-total="<?php echo esc_attr( (string) $variation_total ); ?>" data-threaddesk-screenprint-variation-returned="<?php echo esc_attr( (string) $variation_returned ); ?>" data-threaddesk-screenprint-variation-has-more="<?php echo $variation_has_more ? '1' : '0'; ?>" data-threaddesk-screenprint-variation-limit="<?php echo esc_attr( (string) $variation_limit ); ?>" data-threaddesk-screenprint-pricing="<?php echo esc_attr( wp_json_encode( $print_pricing_settings ) ); ?>" data-threaddesk-screenprint-pending-quotes="<?php echo esc_attr( wp_json_encode( $screenprint_pending_quotes ) ); ?>">
 			<div class="threaddesk-screenprint__color-picker" data-threaddesk-screenprint-color-picker style="display:flex;flex-wrap:wrap;gap:10px;align-items:stretch;justify-content:center;">
 				<?php foreach ( $screenprint_color_choices as $choice_index => $choice ) : ?>
 					<button type="button" class="threaddesk-screenprint__open-color" data-threaddesk-screenprint-open-color="<?php echo esc_attr( $choice['key'] ); ?>" aria-label="<?php echo esc_attr( $choice['label'] ); ?>" style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:8px 0;width:70px;border:1px solid #dcdcde;background:#fff;border-radius:4px;cursor:pointer;position:relative;overflow:visible;<?php echo 0 === (int) $choice_index ? 'box-shadow:0 0 0 1px #2271b1;' : ''; ?>">
@@ -3235,6 +3432,13 @@ class TTA_ThreadDesk {
 			let variationRows=[];
 			try{variationRows=JSON.parse(root.getAttribute('data-threaddesk-screenprint-variations')||'[]');}
 			catch(e){console.error('[ThreadDesk screenprint variations]',e);variationRows=[];}
+			let variationTotal=Number(root.getAttribute('data-threaddesk-screenprint-variation-total')||variationRows.length||0);
+			if(!Number.isFinite(variationTotal)||variationTotal<0){variationTotal=variationRows.length;}
+			let variationReturned=Number(root.getAttribute('data-threaddesk-screenprint-variation-returned')||variationRows.length||0);
+			if(!Number.isFinite(variationReturned)||variationReturned<0){variationReturned=variationRows.length;}
+			let variationHasMore=String(root.getAttribute('data-threaddesk-screenprint-variation-has-more')||'0').trim()==='1';
+			const variationPageLimit=Math.max(1,Number(root.getAttribute('data-threaddesk-screenprint-variation-limit')||150)||150);
+			let variationLoading=false;
 			let pricingSettings={};
 			try{pricingSettings=JSON.parse(root.getAttribute('data-threaddesk-screenprint-pricing')||'{}');}
 			catch(e){console.error('[ThreadDesk screenprint pricing]',e);pricingSettings={};}
@@ -3271,6 +3475,7 @@ class TTA_ThreadDesk {
 			const i18nContinueHere=<?php echo wp_json_encode( __( 'SUBMIT QUOTE', 'threaddesk' ) ); ?>;
 			const screenprintQuoteAjaxUrl=<?php echo wp_json_encode( admin_url( 'admin-ajax.php' ) ); ?>;
 			const screenprintQuoteNonce=<?php echo wp_json_encode( wp_create_nonce( 'tta_threaddesk_screenprint_quote' ) ); ?>;
+			const screenprintVariationNonce=<?php echo wp_json_encode( wp_create_nonce( 'tta_threaddesk_screenprint_variations' ) ); ?>;
 			const screenprintProductId=<?php echo (int) $product_id; ?>;
 			const screenprintProductsPageUrl=<?php echo wp_json_encode( function_exists( 'wc_get_page_permalink' ) ? wc_get_page_permalink( 'shop' ) : home_url( '/shop/' ) ); ?>;
 			const createLayoutCategory=String(root.getAttribute('data-threaddesk-screenprint-create-layout-category')||'').trim();
@@ -3595,6 +3800,58 @@ class TTA_ThreadDesk {
 				quoteDesigns.appendChild(list);
 				quoteDesigns.hidden=false;
 			};
+			const createOrGetLoadMoreButton=()=>{
+				if(!quantitiesList){return null;}
+				let btn=quantitiesList.parentElement?quantitiesList.parentElement.querySelector('[data-threaddesk-screenprint-load-more-variations]'):null;
+				if(btn){return btn;}
+				btn=document.createElement('button');
+				btn.type='button';
+				btn.className='threaddesk-layout-viewer__back-button';
+				btn.setAttribute('data-threaddesk-screenprint-load-more-variations','1');
+				btn.style.marginTop='12px';
+				btn.hidden=true;
+				btn.textContent='Load more sizes';
+				btn.addEventListener('click',async()=>{
+					await loadMoreVariations();
+					renderVariationQuantities();
+				});
+				if(quantitiesList.parentElement){quantitiesList.parentElement.appendChild(btn);}
+				return btn;
+			};
+			const loadMoreVariations=async()=>{
+				if(variationLoading||!variationHasMore){return;}
+				variationLoading=true;
+				const button=createOrGetLoadMoreButton();
+				if(button){button.disabled=true;button.textContent='Loading…';}
+				try{
+					const payload=new URLSearchParams();
+					payload.set('action','tta_threaddesk_screenprint_variations');
+					payload.set('nonce',screenprintVariationNonce||'');
+					payload.set('productId',String(screenprintProductId||0));
+					payload.set('offset',String(Array.isArray(variationRows)?variationRows.length:0));
+					payload.set('limit',String(variationPageLimit));
+					payload.set('inStockOnly','1');
+					payload.set('fields','full');
+					const response=await fetch(screenprintQuoteAjaxUrl,{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/x-www-form-urlencoded; charset=UTF-8'},body:payload.toString()});
+					const data=await response.json();
+					if(!data||!data.success){throw new Error((data&&data.data&&data.data.message)?String(data.data.message):'Unable to load more variants');}
+					const rows=(data&&data.data&&Array.isArray(data.data.variations))?data.data.variations:[];
+					if(rows.length){variationRows=variationRows.concat(rows);}
+					variationReturned=Number((data&&data.data&&data.data.returned)||0);
+					const receivedTotal=Number((data&&data.data&&data.data.total)||variationTotal);
+					variationTotal=Number.isFinite(receivedTotal)&&receivedTotal>=0?receivedTotal:variationTotal;
+					variationHasMore=!!(data&&data.data&&data.data.hasMore);
+				}catch(error){
+					console.error('[ThreadDesk screenprint variations load]',error);
+				}finally{
+					variationLoading=false;
+					if(button){
+						button.disabled=false;
+						button.textContent='Load more sizes';
+						button.hidden=!variationHasMore;
+					}
+				}
+			};
 			const renderVariationQuantities=()=>{
 				if(!quantitiesList){return;}
 				quantitiesList.innerHTML='';
@@ -3657,6 +3914,8 @@ class TTA_ThreadDesk {
 					item.appendChild(estimate);
 					quantitiesList.appendChild(item);
 				});
+				const loadMoreButton=createOrGetLoadMoreButton();
+				if(loadMoreButton){loadMoreButton.hidden=!variationHasMore;}
 
 				refreshAllEstimates();
 			};
