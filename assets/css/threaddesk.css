@@ -2355,7 +2355,8 @@ body.threaddesk-modal-open {
 
 .threaddesk-screenprint__active-adjust-palette,
 .threaddesk-screenprint__active-adjust-palette-options,
-.threaddesk-screenprint__active-size-reading {
+.threaddesk-screenprint__active-size-reading,
+.threaddesk-screenprint__active-save-changes {
 	display: none;
 }
 
@@ -2377,6 +2378,12 @@ body.threaddesk-modal-open {
 .threaddesk-screenprint__selected-design-item.is-active .threaddesk-screenprint__active-size-reading {
 	display: block;
 	margin: 6px 0 0;
+}
+
+.threaddesk-screenprint__selected-design-item.is-active .threaddesk-screenprint__active-save-changes {
+	display: inline-flex;
+	justify-content: center;
+	margin: 8px 0 0;
 }
 
 .threaddesk-screenprint__quantities-step h4 {
