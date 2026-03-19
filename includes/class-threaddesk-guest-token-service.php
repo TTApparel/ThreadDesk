@@ -9,6 +9,7 @@ class TTA_ThreadDesk_Guest_Token_Service {
 	const TOKEN_BYTES           = 32;
 	const TTL_SECONDS           = 604800; // 7 days.
 	const INACTIVITY_SECONDS    = 172800; // 48 hours.
+	const STATE_WRITE_INTERVAL_SECONDS = 900; // 15 minutes.
 	const CLEANUP_EVENT_HOOK    = 'tta_threaddesk_cleanup_guest_posts';
 	const TOKEN_TRANSIENT_PREFIX = 'tta_threaddesk_guest_token_';
 	const OWNER_META_KEY        = 'tta_guest_token_hash';
@@ -57,6 +58,10 @@ class TTA_ThreadDesk_Guest_Token_Service {
 
 		if ( $expires_at <= $now || $is_inactive ) {
 			$this->rotate_token();
+			return;
+		}
+
+		if ( ! $this->should_update_activity_state( $state, $now ) ) {
 			return;
 		}
 
@@ -169,6 +174,13 @@ class TTA_ThreadDesk_Guest_Token_Service {
 	}
 
 	/**
+	 * @return int
+	 */
+	public function get_state_write_interval_seconds() {
+		return max( 0, (int) apply_filters( 'tta_threaddesk_guest_token_state_write_interval_seconds', self::STATE_WRITE_INTERVAL_SECONDS ) );
+	}
+
+	/**
 	 * @return void
 	 */
 	public function handle_explicit_reset() {
@@ -204,6 +216,38 @@ class TTA_ThreadDesk_Guest_Token_Service {
 	}
 
 	/**
+	 * Decide whether request activity should be persisted.
+	 *
+	 * @param array<string,int> $state Existing token state.
+	 * @param int               $now   Current unix timestamp.
+	 *
+	 * @return bool
+	 */
+	private function should_update_activity_state( $state, $now ) {
+		$last_seen      = isset( $state['last_seen'] ) ? (int) $state['last_seen'] : 0;
+		$write_interval = $this->get_state_write_interval_seconds();
+
+		if ( $last_seen <= 0 || $write_interval <= 0 ) {
+			return true;
+		}
+
+		if ( ( $now - $last_seen ) < $write_interval ) {
+			return false;
+		}
+
+		if ( $this->is_high_traffic_page() ) {
+			$time_since_seen = $now - $last_seen;
+			$guard_interval  = max( $write_interval, $write_interval * 2 );
+
+			if ( $time_since_seen < $guard_interval ) {
+				return false;
+			}
+		}
+
+		return true;
+	}
+
+	/**
 	 * @param string $token
 	 *
 	 * @return string
@@ -225,6 +269,29 @@ class TTA_ThreadDesk_Guest_Token_Service {
 		}
 
 		return true;
+	}
+
+	/**
+	 * @return bool
+	 */
+	private function is_high_traffic_page() {
+		if ( is_archive() || is_home() || is_front_page() ) {
+			return true;
+		}
+
+		if ( function_exists( 'is_product' ) && is_product() ) {
+			return true;
+		}
+
+		if ( function_exists( 'is_shop' ) && is_shop() ) {
+			return true;
+		}
+
+		if ( function_exists( 'is_product_taxonomy' ) && is_product_taxonomy() ) {
+			return true;
+		}
+
+		return false;
 	}
 
 	/**
