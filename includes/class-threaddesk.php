@@ -4001,29 +4001,18 @@ class TTA_ThreadDesk {
 				quoteDesigns.appendChild(list);
 				quoteDesigns.hidden=false;
 			};
-			const createOrGetLoadMoreButton=()=>{
-				if(!quantitiesList){return null;}
-				let btn=quantitiesList.parentElement?quantitiesList.parentElement.querySelector('[data-threaddesk-screenprint-load-more-variations]'):null;
-				if(btn){return btn;}
-				btn=document.createElement('button');
-				btn.type='button';
-				btn.className='threaddesk-layout-viewer__back-button';
-				btn.setAttribute('data-threaddesk-screenprint-load-more-variations','1');
-				btn.style.marginTop='12px';
-				btn.hidden=true;
-				btn.textContent='Load more sizes';
-				btn.addEventListener('click',async()=>{
-					await loadMoreVariations();
-					renderVariationQuantities();
+			const variationPreloadByColor={};
+			const getVariationRowsForColor=()=>{
+				return (Array.isArray(variationRows)?variationRows:[]).filter((row)=>{
+					const rowColorKey=normalizeColorValue(row&&row.colorKey);
+					const selectedColorKey=normalizeColorValue(selectedColor);
+					if(rowColorKey&&selectedColorKey){return rowColorKey===selectedColorKey;}
+					return normalizeColorValue(row&&row.color)===normalizeColorValue(getSelectedColorLabel());
 				});
-				if(quantitiesList.parentElement){quantitiesList.parentElement.appendChild(btn);}
-				return btn;
 			};
 			const loadMoreVariations=async()=>{
 				if(variationLoading||!variationHasMore){return;}
 				variationLoading=true;
-				const button=createOrGetLoadMoreButton();
-				if(button){button.disabled=true;button.textContent='Loading…';}
 				try{
 					const payload=new URLSearchParams();
 					payload.set('action','tta_threaddesk_screenprint_variations');
@@ -4046,23 +4035,30 @@ class TTA_ThreadDesk {
 					console.error('[ThreadDesk screenprint variations load]',error);
 				}finally{
 					variationLoading=false;
-					if(button){
-						button.disabled=false;
-						button.textContent='Load more sizes';
-						button.hidden=!variationHasMore;
+				}
+			};
+			const ensureVariationsReadyForSelectedColor=async()=>{
+				const colorKey=normalizeColorValue(selectedColor||getSelectedColorLabel()||'default');
+				if(!variationHasMore){return;}
+				if(variationPreloadByColor[colorKey]){await variationPreloadByColor[colorKey];return;}
+				variationPreloadByColor[colorKey]=(async()=>{
+					while(variationHasMore){
+						await loadMoreVariations();
+						const hasRowsForColor=getVariationRowsForColor().length>0;
+						if(hasRowsForColor&&!variationHasMore){break;}
 					}
+				})();
+				try{
+					await variationPreloadByColor[colorKey];
+				}finally{
+					delete variationPreloadByColor[colorKey];
 				}
 			};
 			const renderVariationQuantities=()=>{
 				if(!quantitiesList){return;}
 				quantitiesList.innerHTML='';
 				const designSummaries=getSelectedDesignSummaries();
-				const rows=(Array.isArray(variationRows)?variationRows:[]).filter((row)=>{
-					const rowColorKey=normalizeColorValue(row&&row.colorKey);
-					const selectedColorKey=normalizeColorValue(selectedColor);
-					if(rowColorKey&&selectedColorKey){return rowColorKey===selectedColorKey;}
-					return normalizeColorValue(row&&row.color)===normalizeColorValue(getSelectedColorLabel());
-				});
+				const rows=getVariationRowsForColor();
 				if(quantitiesEmpty){quantitiesEmpty.hidden=rows.length>0;}
 				renderQuoteDesignSummary(rows);
 				const estimateRows=[];
@@ -4115,9 +4111,6 @@ class TTA_ThreadDesk {
 					item.appendChild(estimate);
 					quantitiesList.appendChild(item);
 				});
-				const loadMoreButton=createOrGetLoadMoreButton();
-				if(loadMoreButton){loadMoreButton.hidden=!variationHasMore;}
-
 				refreshAllEstimates();
 			};
 
@@ -4734,7 +4727,8 @@ class TTA_ThreadDesk {
 				root.querySelectorAll('[data-threaddesk-screenprint-open-color]').forEach((item)=>{item.style.boxShadow='none';});
 				btn.style.boxShadow='0 0 0 1px #2271b1';
 				openScreenprintChooserModal();
-			syncCartSelection();
+				syncCartSelection();
+				ensureVariationsReadyForSelectedColor();
 			};
 			root.querySelectorAll('[data-threaddesk-screenprint-open-color]').forEach((btn)=>{
 				btn.addEventListener('click',()=>{onScreenprintColorClick(btn);});
@@ -4749,10 +4743,16 @@ class TTA_ThreadDesk {
 				backToQuotesButton.addEventListener('click',()=>{setStep('quotes');});
 			}
 			if(openQuantitiesButton){
-				openQuantitiesButton.addEventListener('click',(event)=>{
+				openQuantitiesButton.addEventListener('click',async(event)=>{
 					event.preventDefault();
-					renderVariationQuantities();
-					setStep('quantities');
+					openQuantitiesButton.disabled=true;
+					try{
+						await ensureVariationsReadyForSelectedColor();
+						renderVariationQuantities();
+						setStep('quantities');
+					}finally{
+						openQuantitiesButton.disabled=false;
+					}
 				});
 			}
 			if(addToQuoteButton){
@@ -4761,12 +4761,18 @@ class TTA_ThreadDesk {
 					submitAddToQuote();
 				});
 			}
-			root.addEventListener('click',(event)=>{
+			root.addEventListener('click',async(event)=>{
 				const trigger=event.target&&event.target.closest?event.target.closest('[data-threaddesk-screenprint-open-quantities]'):null;
 				if(!trigger){return;}
 				event.preventDefault();
-				renderVariationQuantities();
-				setStep('quantities');
+				trigger.disabled=true;
+				try{
+					await ensureVariationsReadyForSelectedColor();
+					renderVariationQuantities();
+					setStep('quantities');
+				}finally{
+					trigger.disabled=false;
+				}
 			});
 			root.querySelectorAll('[data-threaddesk-screenprint-back-to-viewer]').forEach((el)=>{
 				el.addEventListener('click',()=>{setStep('viewer');});
