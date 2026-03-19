@@ -6654,22 +6654,24 @@ class TTA_ThreadDesk {
 			echo '<td>' . esc_html( ! empty( $placement_text ) ? implode( ', ', $placement_text ) : '—' ) . '</td>';
 			$mockups = isset( $row['mockups'] ) && is_array( $row['mockups'] ) ? $row['mockups'] : array();
 			$side_label = isset( $mockups['sideLabel'] ) && 'right' === sanitize_key( (string) $mockups['sideLabel'] ) ? 'right' : 'left';
-			$has_right_mockup = isset( $mockups['right'] ) && '' !== trim( (string) $mockups['right'] );
-			$has_side_mockup = isset( $mockups['side'] ) && '' !== trim( (string) $mockups['side'] );
+			$left_mockup = isset( $mockups['left'] ) ? trim( (string) $mockups['left'] ) : '';
+			$right_mockup = isset( $mockups['right'] ) ? trim( (string) $mockups['right'] ) : '';
+			$side_mockup = isset( $mockups['side'] ) ? trim( (string) $mockups['side'] ) : '';
+			$has_right_mockup = '' !== $right_mockup;
+			$has_side_mockup = '' !== $side_mockup;
+			$right_reuses_left_view = ! $has_right_mockup && $has_side_mockup;
+			if ( $has_right_mockup && (
+				( '' !== $left_mockup && $left_mockup === $right_mockup ) ||
+				( '' !== $side_mockup && $side_mockup === $right_mockup )
+			) ) {
+				$right_reuses_left_view = true;
+			}
 			$right_source = isset( $mockups['rightSource'] ) ? sanitize_key( (string) $mockups['rightSource'] ) : '';
 			if ( ! in_array( $right_source, array( 'left', 'right' ), true ) ) {
-				$left_mockup = isset( $mockups['left'] ) ? trim( (string) $mockups['left'] ) : '';
-				$right_mockup = $has_right_mockup ? trim( (string) $mockups['right'] ) : '';
-				$side_mockup = $has_side_mockup ? trim( (string) $mockups['side'] ) : '';
-				$right_source = 'right';
-				if ( ! $has_right_mockup && $has_side_mockup && 'left' === $side_label ) {
-					$right_source = 'left';
-				} elseif ( 'left' === $side_label && $has_right_mockup && (
-					( '' !== $left_mockup && $left_mockup === $right_mockup ) ||
-					( '' !== $side_mockup && $side_mockup === $right_mockup )
-				) ) {
-					$right_source = 'left';
-				}
+				$right_source = $right_reuses_left_view ? 'left' : 'right';
+			}
+			if ( 'left' === $side_label && $right_reuses_left_view ) {
+				$right_source = 'left';
 			}
 			$mockup_payload = array(
 				'front' => isset( $mockups['front'] ) ? esc_url_raw( (string) $mockups['front'] ) : '',
