@@ -4643,6 +4643,17 @@ class TTA_ThreadDesk {
 					sizeReading.setAttribute('aria-hidden','true');
 					const sliderValue=Number(entry.sliderValue||100);
 					sizeReading.textContent=i18nApproxSizePrefix+': '+getApproxSizeLabelForEntry(entry);
+					const saveChangesBtn=document.createElement('button');
+					saveChangesBtn.type='button';
+					saveChangesBtn.className='threaddesk-screenprint__active-save-changes';
+					saveChangesBtn.textContent='SAVE CHANGES';
+					saveChangesBtn.setAttribute('aria-label','Save changes');
+					saveChangesBtn.addEventListener('click',(event)=>{
+						event.preventDefault();
+						event.stopPropagation();
+						setActivePlacement('');
+						render();
+					});
 					item.appendChild(img);
 					item.appendChild(name);
 					itemWrap.appendChild(item);
@@ -4650,6 +4661,7 @@ class TTA_ThreadDesk {
 					itemWrap.appendChild(adjustPalette);
 					itemWrap.appendChild(adjustPaletteOptions);
 					itemWrap.appendChild(sizeReading);
+					itemWrap.appendChild(saveChangesBtn);
 					item.addEventListener('click',()=>{
 						if(!selected){return;}
 						const currentPlacementKey=String(entry.placementKey||'').trim();
