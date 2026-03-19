@@ -346,6 +346,10 @@
 	z-index: 1000;
 }
 
+.threaddesk-auth-modal {
+	z-index: 1100;
+}
+
 .threaddesk-auth-modal.is-active,
 .threaddesk-address-modal.is-active,
 .threaddesk-design-modal.is-active,
