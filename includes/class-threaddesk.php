@@ -17,6 +17,8 @@ class TTA_ThreadDesk {
 	private $auth_active_panel = '';
 	private $auth_login_success = false;
 	private $auth_register_success = false;
+	private $screenprint_payload_request_cache = array();
+	private $screenprint_cache_group = 'tta_threaddesk_screenprint';
 
 	public static function instance() {
 		if ( null === self::$instance ) {
@@ -60,6 +62,12 @@ class TTA_ThreadDesk {
 		add_action( 'save_post_tta_design', array( $this, 'handle_design_status_save' ), 10, 2 );
 		add_action( 'save_post_tta_layout', array( $this, 'handle_layout_status_save' ), 10, 2 );
 		add_action( 'save_post_product', array( $this, 'handle_product_postbox_save' ), 10, 2 );
+		add_action( 'save_post_tta_layout', array( $this, 'invalidate_screenprint_payload_cache' ) );
+		add_action( 'save_post_tta_design', array( $this, 'invalidate_screenprint_payload_cache' ) );
+		add_action( 'save_post_tta_quote', array( $this, 'invalidate_screenprint_payload_cache' ) );
+		add_action( 'save_post_product', array( $this, 'invalidate_screenprint_payload_cache' ) );
+		add_action( 'update_option_tta_threaddesk_layout_categories', array( $this, 'handle_layout_categories_option_updated' ), 10, 3 );
+		add_action( 'update_option_tta_threaddesk_print_pricing', array( $this, 'handle_print_pricing_option_updated' ), 10, 3 );
 		add_filter( 'manage_edit-tta_quote_sortable_columns', array( $this, 'filter_quote_sortable_columns' ) );
 		add_filter( 'manage_edit-tta_design_sortable_columns', array( $this, 'filter_design_sortable_columns' ) );
 		add_filter( 'manage_edit-tta_layout_sortable_columns', array( $this, 'filter_layout_sortable_columns' ) );
@@ -2399,31 +2407,63 @@ class TTA_ThreadDesk {
 	}
 
 
-	public function render_screenprint_shortcode() {
-		if ( ! function_exists( 'is_product' ) || ! is_product() ) {
-			return '';
+	private function get_screenprint_shortcode_data_payload( $product_id, $product, $is_authenticated, $owner_context ) {
+		$user_id       = $is_authenticated ? get_current_user_id() : 0;
+		$cache_key     = $this->get_screenprint_payload_cache_key( $product_id, $user_id, $owner_context );
+		$request_cache = isset( $this->screenprint_payload_request_cache[ $cache_key ] ) ? $this->screenprint_payload_request_cache[ $cache_key ] : null;
+		if ( is_array( $request_cache ) ) {
+			return $request_cache;
 		}
 
-		$is_authenticated = is_user_logged_in();
-		$owner_context    = $this->get_request_owner_context();
-
-		$product_id = get_the_ID();
-		$product = function_exists( 'wc_get_product' ) ? wc_get_product( $product_id ) : false;
-		if ( ! $product ) {
-			return '';
+		$cached_payload = wp_cache_get( $cache_key, $this->screenprint_cache_group );
+		if ( is_array( $cached_payload ) ) {
+			$this->screenprint_payload_request_cache[ $cache_key ] = $cached_payload;
+			return $cached_payload;
 		}
 
-		$user_id = $is_authenticated ? get_current_user_id() : 0;
-		$product_term_ids = wp_get_post_terms( $product_id, 'product_cat', array( 'fields' => 'ids' ) );
+		$transient_payload = get_transient( $cache_key );
+		if ( is_array( $transient_payload ) ) {
+			wp_cache_set( $cache_key, $transient_payload, $this->screenprint_cache_group, 5 * MINUTE_IN_SECONDS );
+			$this->screenprint_payload_request_cache[ $cache_key ] = $transient_payload;
+			return $transient_payload;
+		}
+
+		$layout_category_settings = get_option( 'tta_threaddesk_layout_categories', array() );
+		$product_context          = $this->build_screenprint_product_category_context( $product_id );
+		$product_term_ids         = isset( $product_context['product_term_ids'] ) && is_array( $product_context['product_term_ids'] ) ? $product_context['product_term_ids'] : array();
+		$product_term_slugs       = isset( $product_context['product_term_slugs'] ) && is_array( $product_context['product_term_slugs'] ) ? $product_context['product_term_slugs'] : array();
+
+		$payload = array(
+			'layout_items'               => $this->build_screenprint_layout_list_payload( $owner_context, $user_id, $layout_category_settings, $product_term_ids, $product_term_slugs ),
+			'saved_designs'              => $this->build_screenprint_design_list_payload( $owner_context, $user_id ),
+			'screenprint_pending_quotes' => $this->build_screenprint_pending_quotes_payload( $is_authenticated, $user_id ),
+			'screenprint_variations'     => $this->build_screenprint_variation_payload( $product ),
+			'print_pricing_settings'     => wp_parse_args( (array) get_option( 'tta_threaddesk_print_pricing', array() ), $this->get_default_print_pricing_settings() ),
+		);
+
+		$payload = array_merge( $payload, $this->build_screenprint_color_payload( $product_id, $product ) );
+		$payload = array_merge( $payload, $this->build_screenprint_placement_categories_payload( $layout_category_settings, $product_context ) );
+
+		set_transient( $cache_key, $payload, 5 * MINUTE_IN_SECONDS );
+		wp_cache_set( $cache_key, $payload, $this->screenprint_cache_group, 5 * MINUTE_IN_SECONDS );
+		$this->screenprint_payload_request_cache[ $cache_key ] = $payload;
+
+		return $payload;
+	}
+
+	private function build_screenprint_product_category_context( $product_id ) {
+		$product_term_ids   = wp_get_post_terms( $product_id, 'product_cat', array( 'fields' => 'ids' ) );
 		$product_term_slugs = wp_get_post_terms( $product_id, 'product_cat', array( 'fields' => 'slugs' ) );
-		$product_term_ids = is_array( $product_term_ids ) ? array_map( 'absint', $product_term_ids ) : array();
+		$product_term_ids   = is_array( $product_term_ids ) ? array_map( 'absint', $product_term_ids ) : array();
 		$product_term_slugs = is_array( $product_term_slugs ) ? array_map( 'sanitize_key', $product_term_slugs ) : array();
-		$preferred_product_category_id = ! empty( $product_term_ids ) ? (int) reset( $product_term_ids ) : 0;
+
+		$preferred_product_category_id   = ! empty( $product_term_ids ) ? (int) reset( $product_term_ids ) : 0;
 		$preferred_product_category_slug = ! empty( $product_term_slugs ) ? (string) reset( $product_term_slugs ) : '';
+
 		if ( taxonomy_exists( 'product_cat' ) && ! empty( $product_term_ids ) ) {
 			$product_terms = wp_get_post_terms( $product_id, 'product_cat' );
 			if ( is_array( $product_terms ) && ! empty( $product_terms ) ) {
-				$deepest_term = null;
+				$deepest_term  = null;
 				$deepest_depth = -1;
 				foreach ( $product_terms as $product_term ) {
 					if ( ! $product_term || is_wp_error( $product_term ) || ! isset( $product_term->term_id ) ) {
@@ -2432,17 +2472,25 @@ class TTA_ThreadDesk {
 					$depth = count( get_ancestors( (int) $product_term->term_id, 'product_cat', 'taxonomy' ) );
 					if ( $depth > $deepest_depth ) {
 						$deepest_depth = $depth;
-						$deepest_term = $product_term;
+						$deepest_term  = $product_term;
 					}
 				}
 				if ( $deepest_term && ! empty( $deepest_term->term_id ) ) {
-					$preferred_product_category_id = absint( $deepest_term->term_id );
+					$preferred_product_category_id   = absint( $deepest_term->term_id );
 					$preferred_product_category_slug = sanitize_key( (string) $deepest_term->slug );
 				}
 			}
 		}
-		$layout_category_settings = get_option( 'tta_threaddesk_layout_categories', array() );
 
+		return array(
+			'product_term_ids'               => $product_term_ids,
+			'product_term_slugs'             => $product_term_slugs,
+			'preferred_product_category_id'   => $preferred_product_category_id,
+			'preferred_product_category_slug' => $preferred_product_category_slug,
+		);
+	}
+
+	private function build_screenprint_layout_list_payload( $owner_context, $user_id, $layout_category_settings, $product_term_ids, $product_term_slugs ) {
 		$layout_query_args = array(
 			'post_type'      => 'tta_layout',
 			'posts_per_page' => 100,
@@ -2456,20 +2504,18 @@ class TTA_ThreadDesk {
 			$layout_query_args['meta_value'] = isset( $owner_context['guest_token_hash'] ) ? (string) $owner_context['guest_token_hash'] : '';
 		}
 		$layout_posts = get_posts( $layout_query_args );
-
 		$layout_status_labels = array(
 			'pending'  => __( 'Pending', 'threaddesk' ),
 			'approved' => __( 'Approved', 'threaddesk' ),
 			'rejected' => __( 'Rejected', 'threaddesk' ),
 		);
-
 		$layout_items = array();
 		foreach ( $layout_posts as $layout_post ) {
-			$layout_category_id = (int) get_post_meta( $layout_post->ID, 'layout_category_id', true );
+			$layout_category_id   = (int) get_post_meta( $layout_post->ID, 'layout_category_id', true );
 			$layout_category_slug = sanitize_key( (string) get_post_meta( $layout_post->ID, 'layout_category', true ) );
-			$matches_category = false;
+			$matches_category     = false;
 			if ( $layout_category_id > 0 ) {
-				$settings = isset( $layout_category_settings[ $layout_category_id ] ) && is_array( $layout_category_settings[ $layout_category_id ] ) ? $layout_category_settings[ $layout_category_id ] : array();
+				$settings                    = isset( $layout_category_settings[ $layout_category_id ] ) && is_array( $layout_category_settings[ $layout_category_id ] ) ? $layout_category_settings[ $layout_category_id ] : array();
 				$has_product_category_mapping = isset( $settings['product_categories'] );
 				$configured_product_categories = $has_product_category_mapping && is_array( $settings['product_categories'] ) ? array_map( 'absint', $settings['product_categories'] ) : array();
 				if ( $has_product_category_mapping ) {
@@ -2484,16 +2530,15 @@ class TTA_ThreadDesk {
 			if ( ! $matches_category ) {
 				continue;
 			}
-
 			$payload_raw = get_post_meta( $layout_post->ID, 'layout_payload', true );
-			$payload = json_decode( (string) $payload_raw, true );
+			$payload     = json_decode( (string) $payload_raw, true );
 			if ( ! is_array( $payload ) ) {
 				$payload = array();
 			}
 			$placements = isset( $payload['placementsByAngle'] ) && is_array( $payload['placementsByAngle'] ) ? $payload['placementsByAngle'] : array();
 			if ( empty( $placements ) ) {
 				$legacy_placements_raw = get_post_meta( $layout_post->ID, 'layout_placements', true );
-				$legacy_placements = json_decode( (string) $legacy_placements_raw, true );
+				$legacy_placements     = json_decode( (string) $legacy_placements_raw, true );
 				if ( is_array( $legacy_placements ) ) {
 					$placements = $legacy_placements;
 				}
@@ -2504,11 +2549,10 @@ class TTA_ThreadDesk {
 			if ( empty( $payload['placementsByAngle'] ) ) {
 				$payload['placementsByAngle'] = $placements;
 			}
-
-			$layout_angles = isset( $payload['angles'] ) && is_array( $payload['angles'] ) ? $payload['angles'] : array();
-			$preview_angle = '';
+			$layout_angles   = isset( $payload['angles'] ) && is_array( $payload['angles'] ) ? $payload['angles'] : array();
+			$preview_angle   = '';
 			$preview_entries = array();
-			$print_count = 0;
+			$print_count     = 0;
 			foreach ( $placements as $angle_key => $angle_placements ) {
 				if ( ! is_array( $angle_placements ) ) {
 					continue;
@@ -2556,57 +2600,178 @@ class TTA_ThreadDesk {
 			if ( 'rejected' === $layout_status ) {
 				continue;
 			}
-
 			$layout_items[] = array(
-				'id' => (int) $layout_post->ID,
-				'title' => (string) $layout_post->post_title,
-				'category_id' => $layout_category_id,
-				'category_slug' => $layout_category_slug,
+				'id'              => (int) $layout_post->ID,
+				'title'           => (string) $layout_post->post_title,
+				'category_id'     => $layout_category_id,
+				'category_slug'   => $layout_category_slug,
 				'placementsByAngle' => $placements,
-				'previewBaseUrl' => $preview_base_url,
-				'previewEntries' => $preview_entries,
-				'printCount' => $print_count,
-				'statusKey' => $layout_status,
-				'statusLabel' => $layout_status_labels[ $layout_status ],
+				'previewBaseUrl'  => $preview_base_url,
+				'previewEntries'  => $preview_entries,
+				'printCount'      => $print_count,
+				'statusKey'       => $layout_status,
+				'statusLabel'     => $layout_status_labels[ $layout_status ],
 			);
 		}
+		return $layout_items;
+	}
 
-		$default_product_images = $this->get_screenprint_product_images( $product );
-		$product_color_options  = $this->get_product_color_options( $product_id );
-		$product_postbox_views  = $this->get_product_postbox_views( $product_id );
-		$product_postbox_colors = isset( $product_postbox_views['colors'] ) && is_array( $product_postbox_views['colors'] ) ? $product_postbox_views['colors'] : array();
+	private function build_screenprint_design_list_payload( $owner_context, $user_id ) {
+		$design_query_args = array(
+			'post_type'      => 'tta_design',
+			'posts_per_page' => 100,
+			'post_status'    => array( 'private', 'publish' ),
+		);
+		if ( (int) $owner_context['user_id'] > 0 ) {
+			$design_query_args['author'] = $user_id;
+		} else {
+			$design_query_args['author']     = 0;
+			$design_query_args['meta_key']   = '_tta_guest_token';
+			$design_query_args['meta_value'] = isset( $owner_context['guest_token_hash'] ) ? (string) $owner_context['guest_token_hash'] : '';
+		}
+		$design_posts  = get_posts( $design_query_args );
+		$saved_designs = array();
+		foreach ( $design_posts as $design_post ) {
+			$design_title = trim( (string) $design_post->post_title );
+			if ( '' === $design_title ) {
+				$design_title = __( 'Design', 'threaddesk' );
+			}
+			$saved_designs[] = array(
+				'id'       => (int) $design_post->ID,
+				'title'    => $design_title,
+				'svg'      => esc_url_raw( (string) get_post_meta( $design_post->ID, 'design_svg_file_url', true ) ),
+				'preview'  => esc_url_raw( (string) get_post_meta( $design_post->ID, 'design_preview_url', true ) ),
+				'mockup'   => esc_url_raw( (string) get_post_meta( $design_post->ID, 'design_mockup_file_url', true ) ),
+				'ratio'    => 0,
+				'fileName' => (string) get_post_meta( $design_post->ID, 'design_file_name', true ),
+				'palette'  => (string) get_post_meta( $design_post->ID, 'design_palette', true ) ?: '[]',
+				'settings' => (string) get_post_meta( $design_post->ID, 'design_analysis_settings', true ) ?: '{}',
+				'svgName'  => (string) get_post_meta( $design_post->ID, 'design_svg_file_name', true ),
+			);
+		}
+		return $saved_designs;
+	}
+
+	private function build_screenprint_pending_quotes_payload( $is_authenticated, $user_id ) {
+		$screenprint_pending_quotes = array();
+		if ( ! $is_authenticated || $user_id <= 0 ) {
+			return $screenprint_pending_quotes;
+		}
+		$pending_quote_posts = get_posts(
+			array(
+				'post_type'      => 'tta_quote',
+				'post_status'    => array( 'private', 'publish', 'draft', 'pending' ),
+				'posts_per_page' => 50,
+				'author'         => $user_id,
+				'orderby'        => 'date',
+				'order'          => 'DESC',
+			)
+		);
+		foreach ( $pending_quote_posts as $pending_quote_post ) {
+			if ( ! $pending_quote_post instanceof WP_Post ) {
+				continue;
+			}
+			if ( 'pending' !== $this->get_quote_status( $pending_quote_post->ID ) ) {
+				continue;
+			}
+			$screenprint_pending_quotes[] = array(
+				'id'    => (int) $pending_quote_post->ID,
+				'title' => (string) $pending_quote_post->post_title,
+			);
+		}
+		return $screenprint_pending_quotes;
+	}
+
+	private function build_screenprint_variation_payload( $product ) {
+		$screenprint_variations = array();
+		if ( ! $product || ! is_callable( array( $product, 'is_type' ) ) || ! $product->is_type( 'variable' ) ) {
+			return $screenprint_variations;
+		}
+		$available_variations = is_callable( array( $product, 'get_available_variations' ) ) ? $product->get_available_variations() : array();
+		foreach ( $available_variations as $available_variation ) {
+			$variation_id = isset( $available_variation['variation_id'] ) ? absint( $available_variation['variation_id'] ) : 0;
+			if ( $variation_id <= 0 ) {
+				continue;
+			}
+			$variation_product = function_exists( 'wc_get_product' ) ? wc_get_product( $variation_id ) : false;
+			if ( ! $variation_product ) {
+				continue;
+			}
+			$attributes  = isset( $available_variation['attributes'] ) && is_array( $available_variation['attributes'] ) ? $available_variation['attributes'] : array();
+			$size_label  = '';
+			$color_label = '';
+			$color_key   = '';
+			foreach ( $attributes as $attribute_key => $attribute_value ) {
+				$key = sanitize_key( str_replace( 'attribute_', '', (string) $attribute_key ) );
+				if ( '' === $key ) {
+					continue;
+				}
+				$raw_value = sanitize_text_field( (string) $attribute_value );
+				if ( '' === $raw_value ) {
+					continue;
+				}
+				$resolved_label = $raw_value;
+				if ( 0 === strpos( $key, 'pa_' ) ) {
+					$term = get_term_by( 'slug', $raw_value, $key );
+					if ( $term && ! is_wp_error( $term ) && ! empty( $term->name ) ) {
+						$resolved_label = (string) $term->name;
+					}
+				}
+				if ( '' === $size_label && false !== strpos( $key, 'size' ) ) {
+					$size_label = $resolved_label;
+				}
+				if ( false !== strpos( $key, 'color' ) ) {
+					if ( '' === $color_label ) {
+						$color_label = $resolved_label;
+					}
+					if ( '' === $color_key ) {
+						$color_key = sanitize_key( (string) $raw_value );
+					}
+				}
+			}
+			$stock_quantity = $variation_product->managing_stock() ? $variation_product->get_stock_quantity() : null;
+			$in_stock       = $variation_product->is_in_stock();
+			$variation_price = is_callable( array( $variation_product, 'get_price' ) ) ? (float) $variation_product->get_price() : 0;
+			$screenprint_variations[] = array(
+				'variationId' => $variation_id,
+				'productSku'  => is_callable( array( $variation_product, 'get_sku' ) ) ? (string) $variation_product->get_sku() : '',
+				'size'        => '' !== $size_label ? $size_label : __( 'N/A', 'threaddesk' ),
+				'color'       => '' !== $color_label ? $color_label : __( 'N/A', 'threaddesk' ),
+				'colorKey'    => '' !== $color_key ? $color_key : '',
+				'garmentName' => is_callable( array( $product, 'get_name' ) ) ? (string) $product->get_name() : '',
+				'inventory'   => null !== $stock_quantity ? (int) $stock_quantity : ( $in_stock ? __( 'In stock', 'threaddesk' ) : __( 'Out of stock', 'threaddesk' ) ),
+				'price'       => $variation_price > 0 ? round( $variation_price, 4 ) : 0,
+				'inStock'     => (bool) $in_stock,
+			);
+		}
+		return $screenprint_variations;
+	}
+
+	private function build_screenprint_color_payload( $product_id, $product ) {
+		$default_product_images    = $this->get_screenprint_product_images( $product );
+		$product_color_options     = $this->get_product_color_options( $product_id );
+		$product_postbox_views     = $this->get_product_postbox_views( $product_id );
+		$product_postbox_colors    = isset( $product_postbox_views['colors'] ) && is_array( $product_postbox_views['colors'] ) ? $product_postbox_views['colors'] : array();
 		$screenprint_color_choices = array();
 		$screenprint_images_by_color = array();
-
 		if ( empty( $product_color_options ) ) {
-			$product_color_options = array(
-				'default' => __( 'Default', 'threaddesk' ),
-			);
+			$product_color_options = array( 'default' => __( 'Default', 'threaddesk' ) );
 		}
-
 		foreach ( $product_color_options as $color_key => $color_label ) {
 			$normalized_key = sanitize_key( (string) $color_key );
 			if ( '' === $normalized_key ) {
 				continue;
 			}
-			$config = isset( $product_postbox_colors[ $normalized_key ] ) && is_array( $product_postbox_colors[ $normalized_key ] ) ? $product_postbox_colors[ $normalized_key ] : array();
-			$front_image = isset( $config['front_image'] ) ? (string) $config['front_image'] : '';
-			$front_fallback = isset( $config['front_fallback_url'] ) ? (string) $config['front_fallback_url'] : '';
-			$back_image = isset( $config['back_image'] ) ? (string) $config['back_image'] : '';
-			$back_fallback = isset( $config['back_fallback_url'] ) ? (string) $config['back_fallback_url'] : '';
-			$side_image = isset( $config['side_image'] ) ? (string) $config['side_image'] : '';
-			$side_fallback = isset( $config['side_fallback_url'] ) ? (string) $config['side_fallback_url'] : '';
-			$side_label = isset( $config['side_label'] ) && 'right' === sanitize_key( (string) $config['side_label'] ) ? 'right' : 'left';
-			$resolved_side = $side_image ? $side_image : ( $side_fallback ? $side_fallback : (string) $default_product_images['left'] );
-
+			$config         = isset( $product_postbox_colors[ $normalized_key ] ) && is_array( $product_postbox_colors[ $normalized_key ] ) ? $product_postbox_colors[ $normalized_key ] : array();
+			$side_label     = isset( $config['side_label'] ) && 'right' === sanitize_key( (string) $config['side_label'] ) ? 'right' : 'left';
+			$resolved_side  = ! empty( $config['side_image'] ) ? (string) $config['side_image'] : ( ! empty( $config['side_fallback_url'] ) ? (string) $config['side_fallback_url'] : (string) $default_product_images['left'] );
 			$images_for_color = array(
-				'front' => $front_image ? $front_image : ( $front_fallback ? $front_fallback : (string) $default_product_images['front'] ),
-				'left'  => $resolved_side,
-				'back'  => $back_image ? $back_image : ( $back_fallback ? $back_fallback : (string) $default_product_images['back'] ),
-				'right' => $resolved_side,
+				'front'     => ! empty( $config['front_image'] ) ? (string) $config['front_image'] : ( ! empty( $config['front_fallback_url'] ) ? (string) $config['front_fallback_url'] : (string) $default_product_images['front'] ),
+				'left'      => $resolved_side,
+				'back'      => ! empty( $config['back_image'] ) ? (string) $config['back_image'] : ( ! empty( $config['back_fallback_url'] ) ? (string) $config['back_fallback_url'] : (string) $default_product_images['back'] ),
+				'right'     => $resolved_side,
 				'sideLabel' => $side_label,
 			);
-
 			$screenprint_images_by_color[ $normalized_key ] = $images_for_color;
 			$screenprint_color_choices[] = array(
 				'key'   => $normalized_key,
@@ -2614,13 +2779,12 @@ class TTA_ThreadDesk {
 				'image' => (string) $images_for_color['front'],
 			);
 		}
-
 		if ( empty( $screenprint_images_by_color ) ) {
 			$screenprint_images_by_color['default'] = array(
-				'front' => (string) $default_product_images['front'],
-				'left'  => (string) $default_product_images['left'],
-				'back'  => (string) $default_product_images['back'],
-				'right' => (string) $default_product_images['right'],
+				'front'     => (string) $default_product_images['front'],
+				'left'      => (string) $default_product_images['left'],
+				'back'      => (string) $default_product_images['back'],
+				'right'     => (string) $default_product_images['right'],
 				'sideLabel' => 'left',
 			);
 			$screenprint_color_choices[] = array(
@@ -2629,46 +2793,35 @@ class TTA_ThreadDesk {
 				'image' => (string) $default_product_images['front'],
 			);
 		}
+		return array(
+			'screenprint_images_by_color' => $screenprint_images_by_color,
+			'screenprint_color_choices'   => $screenprint_color_choices,
+			'initial_color_key'           => isset( $screenprint_color_choices[0]['key'] ) ? (string) $screenprint_color_choices[0]['key'] : 'default',
+		);
+	}
 
-		$initial_color_key = (string) $screenprint_color_choices[0]['key'];
-		$instance_id = 'threaddesk-screenprint-' . wp_rand( 1000, 99999 );
-		$default_category_slug = $preferred_product_category_slug;
-		$default_category_id   = $preferred_product_category_id;
-		$screenprint_open_chooser = isset( $_GET['td_screenprint_return'] ) && '1' === sanitize_text_field( wp_unslash( $_GET['td_screenprint_return'] ) );
-		$screenprint_return_url  = remove_query_arg( 'td_screenprint_return', get_permalink( $product_id ) );
-
+	private function build_screenprint_placement_categories_payload( $layout_category_settings, $product_context ) {
+		$product_term_ids   = isset( $product_context['product_term_ids'] ) ? (array) $product_context['product_term_ids'] : array();
+		$product_term_slugs = isset( $product_context['product_term_slugs'] ) ? (array) $product_context['product_term_slugs'] : array();
+		$default_category_slug = isset( $product_context['preferred_product_category_slug'] ) ? (string) $product_context['preferred_product_category_slug'] : '';
+		$default_category_id   = isset( $product_context['preferred_product_category_id'] ) ? absint( $product_context['preferred_product_category_id'] ) : 0;
 		$placement_slot_labels = $this->get_available_placement_slots();
-		$placement_categories = array();
+		$placement_categories  = array();
 		if ( taxonomy_exists( 'product_cat' ) && is_array( $layout_category_settings ) ) {
-			uasort(
-				$layout_category_settings,
-				function ( $a, $b ) {
-					$a_order = isset( $a['order'] ) ? absint( $a['order'] ) : 9999;
-					$b_order = isset( $b['order'] ) ? absint( $b['order'] ) : 9999;
-
-					return $a_order - $b_order;
-				}
-			);
-
+			uasort( $layout_category_settings, function ( $a, $b ) {
+				return ( isset( $a['order'] ) ? absint( $a['order'] ) : 9999 ) - ( isset( $b['order'] ) ? absint( $b['order'] ) : 9999 );
+			} );
 			foreach ( $layout_category_settings as $term_id => $settings ) {
-				$term_id  = absint( $term_id );
+				$term_id = absint( $term_id );
 				$settings = is_array( $settings ) ? $settings : array();
 				if ( ! $term_id || empty( $settings['enabled'] ) ) {
 					continue;
 				}
-
 				$term = get_term( $term_id, 'product_cat' );
 				if ( ! $term || is_wp_error( $term ) ) {
 					continue;
 				}
-
-				$thumbnail_id = (int) get_term_meta( $term_id, 'thumbnail_id', true );
-				$term_thumb   = $thumbnail_id ? wp_get_attachment_image_url( $thumbnail_id, 'medium' ) : '';
-				$front_image  = ! empty( $settings['front_image'] ) ? esc_url_raw( $settings['front_image'] ) : '';
-				$back_image   = ! empty( $settings['back_image'] ) ? esc_url_raw( $settings['back_image'] ) : '';
-				$side_image   = ! empty( $settings['side_image'] ) ? esc_url_raw( $settings['side_image'] ) : '';
-				$side_label   = isset( $settings['side_label'] ) && 'right' === $settings['side_label'] ? 'right' : 'left';
-				$has_product_category_mapping = isset( $settings['product_categories'] );
+				$has_product_category_mapping  = isset( $settings['product_categories'] );
 				$configured_product_categories = $has_product_category_mapping && is_array( $settings['product_categories'] ) ? array_map( 'absint', $settings['product_categories'] ) : array();
 				if ( $has_product_category_mapping ) {
 					if ( empty( $configured_product_categories ) || empty( array_intersect( $configured_product_categories, $product_term_ids ) ) ) {
@@ -2682,52 +2835,42 @@ class TTA_ThreadDesk {
 				foreach ( $configured_placements as $placement_key ) {
 					$placement_key = sanitize_key( $placement_key );
 					if ( isset( $placement_slot_labels[ $placement_key ] ) ) {
-						$placements[] = array(
-							'key'   => $placement_key,
-							'label' => $placement_slot_labels[ $placement_key ],
-						);
+						$placements[] = array( 'key' => $placement_key, 'label' => $placement_slot_labels[ $placement_key ] );
 					}
 				}
-
+				$thumbnail_id = (int) get_term_meta( $term_id, 'thumbnail_id', true );
+				$term_thumb   = $thumbnail_id ? wp_get_attachment_image_url( $thumbnail_id, 'medium' ) : '';
 				$placement_categories[] = array(
 					'label'       => $term->name,
-					'image_url'   => $front_image ? $front_image : $term_thumb,
-					'front_image' => $front_image,
-					'back_image'  => $back_image,
-					'side_image'  => $side_image,
-					'side_label'  => $side_label,
+					'image_url'   => ! empty( $settings['front_image'] ) ? esc_url_raw( $settings['front_image'] ) : $term_thumb,
+					'front_image' => ! empty( $settings['front_image'] ) ? esc_url_raw( $settings['front_image'] ) : '',
+					'back_image'  => ! empty( $settings['back_image'] ) ? esc_url_raw( $settings['back_image'] ) : '',
+					'side_image'  => ! empty( $settings['side_image'] ) ? esc_url_raw( $settings['side_image'] ) : '',
+					'side_label'  => isset( $settings['side_label'] ) && 'right' === $settings['side_label'] ? 'right' : 'left',
 					'placements'  => $placements,
 					'term_id'     => (int) $term->term_id,
 					'term_slug'   => $term->slug,
 				);
 			}
 		}
-
 		if ( ! empty( $placement_categories ) ) {
-			$primary_category = null;
-
-			$placement_category_map_by_id   = array();
+			$placement_category_map_by_id = array();
 			$placement_category_map_by_slug = array();
 			foreach ( $placement_categories as $placement_category ) {
-				$placement_term_id   = isset( $placement_category['term_id'] ) ? absint( $placement_category['term_id'] ) : 0;
-				$placement_term_slug = isset( $placement_category['term_slug'] ) ? sanitize_key( (string) $placement_category['term_slug'] ) : '';
-				if ( $placement_term_id > 0 ) {
-					$placement_category_map_by_id[ $placement_term_id ] = $placement_category;
+				if ( ! empty( $placement_category['term_id'] ) ) {
+					$placement_category_map_by_id[ absint( $placement_category['term_id'] ) ] = $placement_category;
 				}
-				if ( '' !== $placement_term_slug ) {
-					$placement_category_map_by_slug[ $placement_term_slug ] = $placement_category;
+				if ( ! empty( $placement_category['term_slug'] ) ) {
+					$placement_category_map_by_slug[ sanitize_key( (string) $placement_category['term_slug'] ) ] = $placement_category;
 				}
 			}
-
-			// Prefer the first product category that is actually available in placement mappings.
+			$primary_category = null;
 			foreach ( $product_term_ids as $product_term_id ) {
-				$product_term_id = absint( $product_term_id );
-				if ( $product_term_id > 0 && isset( $placement_category_map_by_id[ $product_term_id ] ) ) {
-					$primary_category = $placement_category_map_by_id[ $product_term_id ];
+				if ( isset( $placement_category_map_by_id[ absint( $product_term_id ) ] ) ) {
+					$primary_category = $placement_category_map_by_id[ absint( $product_term_id ) ];
 					break;
 				}
 			}
-
 			if ( ! is_array( $primary_category ) ) {
 				foreach ( $product_term_slugs as $product_term_slug ) {
 					$product_term_slug = sanitize_key( (string) $product_term_slug );
@@ -2737,162 +2880,96 @@ class TTA_ThreadDesk {
 					}
 				}
 			}
-
 			if ( ! is_array( $primary_category ) && $default_category_id > 0 && isset( $placement_category_map_by_id[ $default_category_id ] ) ) {
 				$primary_category = $placement_category_map_by_id[ $default_category_id ];
 			}
-
 			if ( ! is_array( $primary_category ) && '' !== $default_category_slug && isset( $placement_category_map_by_slug[ $default_category_slug ] ) ) {
 				$primary_category = $placement_category_map_by_slug[ $default_category_slug ];
 			}
-
 			if ( ! is_array( $primary_category ) ) {
 				$primary_category = reset( $placement_categories );
 			}
-
 			if ( is_array( $primary_category ) ) {
-				if ( ! empty( $primary_category['term_slug'] ) ) {
-					$default_category_slug = sanitize_key( (string) $primary_category['term_slug'] );
-				}
-				if ( ! empty( $primary_category['term_id'] ) ) {
-					$default_category_id = absint( $primary_category['term_id'] );
-				}
+				$default_category_slug = ! empty( $primary_category['term_slug'] ) ? sanitize_key( (string) $primary_category['term_slug'] ) : $default_category_slug;
+				$default_category_id   = ! empty( $primary_category['term_id'] ) ? absint( $primary_category['term_id'] ) : $default_category_id;
 			}
 		}
-
-		$saved_designs = array();
-		$screenprint_pending_quotes = array();
-		if ( $is_authenticated && $user_id > 0 ) {
-			$pending_quote_posts = get_posts(
-				array(
-					'post_type'      => 'tta_quote',
-					'post_status'    => array( 'private', 'publish', 'draft', 'pending' ),
-					'posts_per_page' => 50,
-					'author'         => $user_id,
-					'orderby'        => 'date',
-					'order'          => 'DESC',
-				)
-			);
-			foreach ( $pending_quote_posts as $pending_quote_post ) {
-				if ( ! $pending_quote_post instanceof WP_Post ) {
-					continue;
-				}
-				$quote_status = $this->get_quote_status( $pending_quote_post->ID );
-				if ( 'pending' !== $quote_status ) {
-					continue;
-				}
-				$screenprint_pending_quotes[] = array(
-					'id'    => (int) $pending_quote_post->ID,
-					'title' => (string) $pending_quote_post->post_title,
-				);
-			}
-		}
-		$screenprint_variations = array();
-		if ( $product && is_callable( array( $product, 'is_type' ) ) && $product->is_type( 'variable' ) ) {
-			$available_variations = is_callable( array( $product, 'get_available_variations' ) ) ? $product->get_available_variations() : array();
-			foreach ( $available_variations as $available_variation ) {
-				$variation_id = isset( $available_variation['variation_id'] ) ? absint( $available_variation['variation_id'] ) : 0;
-				if ( $variation_id <= 0 ) {
-					continue;
-				}
-				$variation_product = function_exists( 'wc_get_product' ) ? wc_get_product( $variation_id ) : false;
-				if ( ! $variation_product ) {
-					continue;
-				}
-
-				$attributes = isset( $available_variation['attributes'] ) && is_array( $available_variation['attributes'] ) ? $available_variation['attributes'] : array();
-				$size_label = '';
-				$color_label = '';
-				$color_key = '';
-				foreach ( $attributes as $attribute_key => $attribute_value ) {
-					$key = sanitize_key( str_replace( 'attribute_', '', (string) $attribute_key ) );
-					if ( '' === $key ) {
-						continue;
-					}
-					$raw_value = sanitize_text_field( (string) $attribute_value );
-					if ( '' === $raw_value ) {
-						continue;
-					}
-					$resolved_label = $raw_value;
-					if ( 0 === strpos( $key, 'pa_' ) ) {
-						$term = get_term_by( 'slug', $raw_value, $key );
-						if ( $term && ! is_wp_error( $term ) && ! empty( $term->name ) ) {
-							$resolved_label = (string) $term->name;
-						}
-					}
-					if ( '' === $size_label && false !== strpos( $key, 'size' ) ) {
-						$size_label = $resolved_label;
-					}
-					if ( false !== strpos( $key, 'color' ) ) {
-						if ( '' === $color_label ) {
-							$color_label = $resolved_label;
-						}
-						if ( '' === $color_key ) {
-							$color_key = sanitize_key( (string) $raw_value );
-						}
-					}
-				}
-
-				$stock_quantity = $variation_product->managing_stock() ? $variation_product->get_stock_quantity() : null;
-				$in_stock = $variation_product->is_in_stock();
-				$variation_price = is_callable( array( $variation_product, 'get_price' ) ) ? (float) $variation_product->get_price() : 0;
-				$screenprint_variations[] = array(
-					'variationId' => $variation_id,
-					'productSku'  => is_callable( array( $variation_product, 'get_sku' ) ) ? (string) $variation_product->get_sku() : '',
-					'size'        => '' !== $size_label ? $size_label : __( 'N/A', 'threaddesk' ),
-					'color'       => '' !== $color_label ? $color_label : __( 'N/A', 'threaddesk' ),
-					'colorKey'    => '' !== $color_key ? $color_key : '',
-					'garmentName' => is_callable( array( $product, 'get_name' ) ) ? (string) $product->get_name() : '',
-					'inventory'   => null !== $stock_quantity ? (int) $stock_quantity : ( $in_stock ? __( 'In stock', 'threaddesk' ) : __( 'Out of stock', 'threaddesk' ) ),
-					'price'       => $variation_price > 0 ? round( $variation_price, 4 ) : 0,
-					'inStock'     => (bool) $in_stock,
-				);
-			}
-		}
-		$design_query_args = array(
-			'post_type'      => 'tta_design',
-			'posts_per_page' => 100,
-			'post_status'    => array( 'private', 'publish' ),
+		return array(
+			'placement_categories' => $placement_categories,
+			'default_category_slug' => $default_category_slug,
+			'default_category_id'   => $default_category_id,
 		);
-		if ( (int) $owner_context['user_id'] > 0 ) {
-			$design_query_args['author'] = $user_id;
-		} else {
-			$design_query_args['author']     = 0;
-			$design_query_args['meta_key']   = '_tta_guest_token';
-			$design_query_args['meta_value'] = isset( $owner_context['guest_token_hash'] ) ? (string) $owner_context['guest_token_hash'] : '';
-		}
-		$design_posts = get_posts( $design_query_args );
-		foreach ( $design_posts as $design_post ) {
-			$design_svg_url    = (string) get_post_meta( $design_post->ID, 'design_svg_file_url', true );
-			$design_preview    = (string) get_post_meta( $design_post->ID, 'design_preview_url', true );
-			$design_mockup_url = (string) get_post_meta( $design_post->ID, 'design_mockup_file_url', true );
-			$design_file_name  = (string) get_post_meta( $design_post->ID, 'design_file_name', true );
-			$design_palette    = (string) get_post_meta( $design_post->ID, 'design_palette', true );
-			$design_settings   = (string) get_post_meta( $design_post->ID, 'design_analysis_settings', true );
-			$design_svg_name   = (string) get_post_meta( $design_post->ID, 'design_svg_file_name', true );
-			$design_title      = trim( (string) $design_post->post_title );
-			if ( '' === $design_title ) {
-				$design_title = __( 'Design', 'threaddesk' );
-			}
+	}
 
-			$saved_designs[] = array(
-				'id'       => (int) $design_post->ID,
-				'title'    => $design_title,
-				'svg'      => $design_svg_url ? esc_url_raw( $design_svg_url ) : '',
-				'preview'  => $design_preview ? esc_url_raw( $design_preview ) : '',
-				'mockup'   => $design_mockup_url ? esc_url_raw( $design_mockup_url ) : '',
-				'ratio'    => 0,
-				'fileName' => $design_file_name,
-				'palette'  => $design_palette ? $design_palette : '[]',
-				'settings' => $design_settings ? $design_settings : '{}',
-				'svgName'  => $design_svg_name,
-			);
+	private function get_screenprint_payload_cache_key( $product_id, $user_id, $owner_context ) {
+		$auth_fragment = $user_id > 0 ? 'u:' . absint( $user_id ) : 'guest';
+		$guest_hash    = isset( $owner_context['guest_token_hash'] ) ? (string) $owner_context['guest_token_hash'] : '';
+		$layout_version = (string) get_option( 'tta_threaddesk_layout_categories_version', '0' );
+		$pricing_version = (string) get_option( 'tta_threaddesk_print_pricing_version', '0' );
+		$cache_version   = (string) get_option( 'tta_threaddesk_screenprint_cache_version', '1' );
+		$key_parts = array(
+			'pid:' . absint( $product_id ),
+			'auth:' . $auth_fragment,
+			'guest:' . md5( $guest_hash ),
+			'layoutv:' . $layout_version,
+			'pricingv:' . $pricing_version,
+			'cachev:' . $cache_version,
+		);
+		return 'tta_screenprint_payload_' . md5( implode( '|', $key_parts ) );
+	}
+
+	public function handle_layout_categories_option_updated( $old_value, $value, $option ) {
+		update_option( 'tta_threaddesk_layout_categories_version', (string) time(), false );
+		$this->invalidate_screenprint_payload_cache();
+	}
+
+	public function handle_print_pricing_option_updated( $old_value, $value, $option ) {
+		update_option( 'tta_threaddesk_print_pricing_version', (string) time(), false );
+		$this->invalidate_screenprint_payload_cache();
+	}
+
+	public function invalidate_screenprint_payload_cache( ...$args ) {
+		$version = (int) get_option( 'tta_threaddesk_screenprint_cache_version', 1 );
+		update_option( 'tta_threaddesk_screenprint_cache_version', $version + 1, false );
+		$this->screenprint_payload_request_cache = array();
+	}
+
+
+
+	public function render_screenprint_shortcode() {
+		if ( ! function_exists( 'is_product' ) || ! is_product() ) {
+			return '';
 		}
+
+		$is_authenticated = is_user_logged_in();
+		$owner_context    = $this->get_request_owner_context();
+
+		$product_id = get_the_ID();
+		$product    = function_exists( 'wc_get_product' ) ? wc_get_product( $product_id ) : false;
+		if ( ! $product ) {
+			return '';
+		}
+
+		$screenprint_data = $this->get_screenprint_shortcode_data_payload( $product_id, $product, $is_authenticated, $owner_context );
+
+		$layout_items               = isset( $screenprint_data['layout_items'] ) && is_array( $screenprint_data['layout_items'] ) ? $screenprint_data['layout_items'] : array();
+		$saved_designs              = isset( $screenprint_data['saved_designs'] ) && is_array( $screenprint_data['saved_designs'] ) ? $screenprint_data['saved_designs'] : array();
+		$screenprint_pending_quotes = isset( $screenprint_data['screenprint_pending_quotes'] ) && is_array( $screenprint_data['screenprint_pending_quotes'] ) ? $screenprint_data['screenprint_pending_quotes'] : array();
+		$screenprint_variations     = isset( $screenprint_data['screenprint_variations'] ) && is_array( $screenprint_data['screenprint_variations'] ) ? $screenprint_data['screenprint_variations'] : array();
+		$screenprint_images_by_color = isset( $screenprint_data['screenprint_images_by_color'] ) && is_array( $screenprint_data['screenprint_images_by_color'] ) ? $screenprint_data['screenprint_images_by_color'] : array();
+		$screenprint_color_choices   = isset( $screenprint_data['screenprint_color_choices'] ) && is_array( $screenprint_data['screenprint_color_choices'] ) ? $screenprint_data['screenprint_color_choices'] : array();
+		$initial_color_key           = isset( $screenprint_data['initial_color_key'] ) ? (string) $screenprint_data['initial_color_key'] : '';
+		$default_category_slug       = isset( $screenprint_data['default_category_slug'] ) ? (string) $screenprint_data['default_category_slug'] : '';
+		$default_category_id         = isset( $screenprint_data['default_category_id'] ) ? absint( $screenprint_data['default_category_id'] ) : 0;
+		$placement_categories        = isset( $screenprint_data['placement_categories'] ) && is_array( $screenprint_data['placement_categories'] ) ? $screenprint_data['placement_categories'] : array();
+		$print_pricing_settings      = isset( $screenprint_data['print_pricing_settings'] ) && is_array( $screenprint_data['print_pricing_settings'] ) ? $screenprint_data['print_pricing_settings'] : array();
+
+		$instance_id                = 'threaddesk-screenprint-' . wp_rand( 1000, 99999 );
+		$screenprint_open_chooser   = isset( $_GET['td_screenprint_return'] ) && '1' === sanitize_text_field( wp_unslash( $_GET['td_screenprint_return'] ) );
+		$screenprint_return_url     = remove_query_arg( 'td_screenprint_return', get_permalink( $product_id ) );
 
 		wp_enqueue_style( 'threaddesk', THREDDESK_URL . 'assets/css/threaddesk.css', array(), THREDDESK_VERSION );
 		wp_enqueue_script( 'threaddesk', THREDDESK_URL . 'assets/js/threaddesk.js', array( 'jquery' ), THREDDESK_VERSION, true );
-		$print_pricing_settings = get_option( 'tta_threaddesk_print_pricing', array() );
-		$print_pricing_settings = wp_parse_args( is_array( $print_pricing_settings ) ? $print_pricing_settings : array(), $this->get_default_print_pricing_settings() );
 
 		ob_start();
 		?>
