@@ -1500,6 +1500,11 @@ body.threaddesk-modal-open {
 	align-self: center;
 }
 
+.threaddesk-layout-modal [data-threaddesk-screenprint-step="viewer"].is-active .threaddesk-screenprint__quantities-loading {
+	grid-column: 1 / -1;
+	grid-row: 3;
+}
+
 .threaddesk-layout-viewer__design-panel h4 {
 	margin: 0;
 	text-transform: uppercase;
@@ -1580,6 +1585,37 @@ body.threaddesk-modal-open {
 
 .threaddesk-screenprint__right-column > .threaddesk-screenprint__quantities-button {
 	margin-top: 0;
+}
+
+.threaddesk-screenprint__quantities-button.is-loading,
+.threaddesk-screenprint__quantities-button[disabled] {
+	background: #8a8a8a;
+	border-color: #8a8a8a;
+	color: #f3f3f3;
+	cursor: wait;
+}
+
+.threaddesk-screenprint__quantities-loading {
+	width: 100%;
+	height: 4px;
+	margin-top: 6px;
+	border-radius: 999px;
+	background: #d6d6d6;
+	overflow: hidden;
+}
+
+.threaddesk-screenprint__quantities-loading > span {
+	display: block;
+	width: 40%;
+	height: 100%;
+	background: #111;
+	border-radius: inherit;
+	animation: threaddesk-screenprint-quantities-loading 1.05s ease-in-out infinite;
+}
+
+@keyframes threaddesk-screenprint-quantities-loading {
+	0% { transform: translateX(-120%); }
+	100% { transform: translateX(300%); }
 }
 
 .threaddesk-layout-viewer__placement-list {
