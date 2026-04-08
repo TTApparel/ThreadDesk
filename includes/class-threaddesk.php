@@ -3407,6 +3407,8 @@ class TTA_ThreadDesk {
 		$instance_id                = 'threaddesk-screenprint-' . wp_rand( 1000, 99999 );
 		$screenprint_open_chooser   = isset( $_GET['td_screenprint_return'] ) && '1' === sanitize_text_field( wp_unslash( $_GET['td_screenprint_return'] ) );
 		$screenprint_return_url     = remove_query_arg( 'td_screenprint_return', get_permalink( $product_id ) );
+		$user_id                    = isset( $owner_context['user_id'] ) ? absint( $owner_context['user_id'] ) : get_current_user_id();
+		$saved_designs              = $this->build_screenprint_design_list_payload( $owner_context, $user_id );
 
 		wp_enqueue_style( 'threaddesk', THREDDESK_URL . 'assets/css/threaddesk.css', array(), THREDDESK_VERSION );
 		wp_enqueue_script( 'threaddesk', THREDDESK_URL . 'assets/js/threaddesk.js', array( 'jquery' ), THREDDESK_VERSION, true );
