@@ -2964,13 +2964,24 @@ class TTA_ThreadDesk {
 		$term_label_maps      = $this->build_screenprint_attribute_term_label_maps( $available_variations );
 		$offset               = max( 0, absint( $args['offset'] ) );
 		$limit                = max( 0, absint( $args['limit'] ) );
-		$end                  = $limit > 0 ? $offset + $limit : 0;
 		$rendered             = 0;
-		$processed            = 0;
+		$filtered_processed   = 0;
 		$garment_name         = is_callable( array( $product, 'get_name' ) ) ? (string) $product->get_name() : '';
 		$fields_mode          = 'keys' === $args['fields'] ? 'keys' : 'full';
 		$requested_color_key  = sanitize_key( (string) $args['color_key'] );
 		$requested_color_name = sanitize_title( (string) $args['color_label'] );
+		if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
+			error_log(
+				sprintf(
+					'[ThreadDesk] screenprint variations filter context product=%d requested_color_key=%s requested_color_label=%s offset=%d limit=%d',
+					absint( $product->get_id() ),
+					'' !== $requested_color_key ? $requested_color_key : '(none)',
+					'' !== $requested_color_name ? $requested_color_name : '(none)',
+					$offset,
+					$limit
+				)
+			);
+		}
 		foreach ( $available_variations as $available_variation ) {
 			$variation_id = isset( $available_variation['variation_id'] ) ? absint( $available_variation['variation_id'] ) : 0;
 			if ( $variation_id <= 0 ) {
@@ -2980,14 +2991,6 @@ class TTA_ThreadDesk {
 			if ( ! empty( $args['in_stock_only'] ) && ! $in_stock ) {
 				continue;
 			}
-			if ( $processed < $offset ) {
-				$processed++;
-				continue;
-			}
-			if ( $end > 0 && $processed >= $end ) {
-				break;
-			}
-			$processed++;
 
 			$attributes  = isset( $available_variation['attributes'] ) && is_array( $available_variation['attributes'] ) ? $available_variation['attributes'] : array();
 			$size_label  = '';
@@ -3035,6 +3038,39 @@ class TTA_ThreadDesk {
 					continue;
 				}
 			}
+			$filtered_processed++;
+			if ( $filtered_processed <= $offset ) {
+				if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
+					error_log(
+						sprintf(
+							'[ThreadDesk] screenprint variations skip by offset product=%d variation_id=%d filtered_processed=%d offset=%d limit=%d emitted=%d',
+							absint( $product->get_id() ),
+							$variation_id,
+							$filtered_processed,
+							$offset,
+							$limit,
+							$rendered
+						)
+					);
+				}
+				continue;
+			}
+			if ( $limit > 0 && $rendered >= $limit ) {
+				if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
+					error_log(
+						sprintf(
+							'[ThreadDesk] screenprint variations hit limit product=%d variation_id=%d filtered_processed=%d offset=%d limit=%d emitted=%d',
+							absint( $product->get_id() ),
+							$variation_id,
+							$filtered_processed,
+							$offset,
+							$limit,
+							$rendered
+						)
+					);
+				}
+				break;
+			}
 			if ( 'full' === $fields_mode ) {
 				$max_qty         = isset( $available_variation['max_qty'] ) && '' !== $available_variation['max_qty'] ? (int) $available_variation['max_qty'] : null;
 				$inventory_label = $in_stock ? __( 'In stock', 'threaddesk' ) : __( 'Out of stock', 'threaddesk' );
@@ -3055,7 +3091,7 @@ class TTA_ThreadDesk {
 
 		if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
 			$elapsed_ms = round( ( microtime( true ) - $debug_start ) * 1000, 2 );
-			error_log( sprintf( '[ThreadDesk] screenprint variations assembled product=%d rows=%d mode=%s offset=%d limit=%d in_stock_only=%d elapsed_ms=%s', absint( $product->get_id() ), $rendered, $fields_mode, $offset, $limit, ! empty( $args['in_stock_only'] ) ? 1 : 0, $elapsed_ms ) );
+			error_log( sprintf( '[ThreadDesk] screenprint variations assembled product=%d rows=%d filtered_processed=%d mode=%s offset=%d limit=%d in_stock_only=%d elapsed_ms=%s', absint( $product->get_id() ), $rendered, $filtered_processed, $fields_mode, $offset, $limit, ! empty( $args['in_stock_only'] ) ? 1 : 0, $elapsed_ms ) );
 		}
 
 		return $screenprint_variations;
@@ -3163,6 +3199,18 @@ class TTA_ThreadDesk {
 				}
 			}
 			$total++;
+		}
+		if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
+			error_log(
+				sprintf(
+					'[ThreadDesk] screenprint variation count product=%d total=%d requested_color_key=%s requested_color_label=%s in_stock_only=%d',
+					absint( $product->get_id() ),
+					$total,
+					'' !== $requested_color_key ? $requested_color_key : '(none)',
+					'' !== $requested_color_name ? $requested_color_name : '(none)',
+					! empty( $args['in_stock_only'] ) ? 1 : 0
+				)
+			);
 		}
 		return $total;
 	}
