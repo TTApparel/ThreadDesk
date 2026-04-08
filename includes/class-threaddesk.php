@@ -5045,21 +5045,17 @@ class TTA_ThreadDesk {
 				createBtn.appendChild(createPreview);
 				createBtn.appendChild(createTitle);
 				createBtn.appendChild(createMeta);
-				createBtn.addEventListener('click',()=>{
-					if(typeof createBtn.blur==='function'){createBtn.blur();}
-					if(modal){modal.classList.remove('is-active');modal.setAttribute('aria-hidden','true');}
-					if(window.jQuery&&typeof window.jQuery.fn==='object'){
-						window.jQuery(document).trigger('threaddesk:open-layout-modal',[{category:createLayoutCategory,categoryId:createLayoutCategoryId,forceViewer:true}]);
-						return;
-					}
-					const localScope=root.closest('.product')||document;
-					const layoutOpen=localScope.querySelector('[data-threaddesk-layout-open]')||document.querySelector('[data-threaddesk-layout-open]');
-					if(!layoutOpen){return;}
-					if(createLayoutCategory){layoutOpen.setAttribute('data-threaddesk-layout-category-open', createLayoutCategory);}
-					if(createLayoutCategoryId>0){layoutOpen.setAttribute('data-threaddesk-layout-category-id-open', String(createLayoutCategoryId));}
-					document.body.classList.remove('threaddesk-modal-open');
-					window.setTimeout(()=>{layoutOpen.click();},0);
-				});
+					createBtn.addEventListener('click',()=>{
+						if(typeof createBtn.blur==='function'){createBtn.blur();}
+						if(modal){modal.classList.remove('is-active');modal.setAttribute('aria-hidden','true');}
+						const localScope=root.closest('.product')||document;
+						const layoutOpen=localScope.querySelector('[data-threaddesk-layout-open]')||document.querySelector('[data-threaddesk-layout-open]');
+						if(!layoutOpen){return;}
+						if(createLayoutCategory){layoutOpen.setAttribute('data-threaddesk-layout-category-open', createLayoutCategory);}
+						if(createLayoutCategoryId>0){layoutOpen.setAttribute('data-threaddesk-layout-category-id-open', String(createLayoutCategoryId));}
+						document.body.classList.remove('threaddesk-modal-open');
+						window.setTimeout(()=>{layoutOpen.click();},0);
+					});
 					options.appendChild(createBtn);
 					}
 					(layouts||[]).forEach((layout)=>{
