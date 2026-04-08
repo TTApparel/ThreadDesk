@@ -5330,7 +5330,14 @@ class TTA_ThreadDesk {
 							if(createLayoutCategoryId>0){layoutOpen.setAttribute('data-threaddesk-layout-category-id-open', String(createLayoutCategoryId));}
 							layoutOpen.setAttribute('data-threaddesk-layout-force-viewer-open','1');
 							document.body.classList.remove('threaddesk-modal-open');
-							window.setTimeout(()=>{layoutOpen.click();},0);
+							window.setTimeout(()=>{
+								layoutOpen.click();
+								window.requestAnimationFrame(()=>{
+									const activeBuilder=document.querySelector('.threaddesk-layout-modal[data-threaddesk-layout-builder].is-active');
+									if(activeBuilder||!window.jQuery||typeof window.jQuery.fn!=='object'){return;}
+									window.jQuery(document).trigger('threaddesk:open-layout-modal',[{category:createLayoutCategory,categoryId:createLayoutCategoryId,forceViewer:true}]);
+								});
+							},0);
 						});
 					options.appendChild(createBtn);
 					}
