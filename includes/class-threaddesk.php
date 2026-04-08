@@ -3413,7 +3413,7 @@ class TTA_ThreadDesk {
 					</div>
 				</div>
 			</div>
-			<button type="button" data-threaddesk-layout-open data-threaddesk-layout-category-open="<?php echo esc_attr( $default_category_slug ); ?>" data-threaddesk-layout-category-id-open="<?php echo esc_attr( (string) $default_category_id ); ?>" hidden></button>
+			<button type="button" data-threaddesk-layout-open data-threaddesk-screenprint-layout-open data-threaddesk-layout-category-open="<?php echo esc_attr( $default_category_slug ); ?>" data-threaddesk-layout-category-id-open="<?php echo esc_attr( (string) $default_category_id ); ?>" hidden></button>
 			<div class="threaddesk-layout-modal" aria-hidden="true" data-threaddesk-layout-builder data-threaddesk-layout-designs="<?php echo esc_attr( wp_json_encode( $saved_designs ) ); ?>">
 				<div class="threaddesk-auth-modal__overlay" data-threaddesk-layout-close></div>
 				<div class="threaddesk-auth-modal__panel" role="dialog" aria-label="<?php echo esc_attr__( 'Choose a placement category', 'threaddesk' ); ?>" aria-modal="true">
@@ -5045,21 +5045,22 @@ class TTA_ThreadDesk {
 				createBtn.appendChild(createPreview);
 				createBtn.appendChild(createTitle);
 				createBtn.appendChild(createMeta);
-				createBtn.addEventListener('click',()=>{
-					if(typeof createBtn.blur==='function'){createBtn.blur();}
-					if(modal){modal.classList.remove('is-active');modal.setAttribute('aria-hidden','true');}
-					if(window.jQuery&&typeof window.jQuery.fn==='object'){
-						window.jQuery(document).trigger('threaddesk:open-layout-modal',[{category:createLayoutCategory,categoryId:createLayoutCategoryId,forceViewer:true}]);
-						return;
-					}
-					const localScope=root.closest('.product')||document;
-					const layoutOpen=localScope.querySelector('[data-threaddesk-layout-open]')||document.querySelector('[data-threaddesk-layout-open]');
-					if(!layoutOpen){return;}
-					if(createLayoutCategory){layoutOpen.setAttribute('data-threaddesk-layout-category-open', createLayoutCategory);}
-					if(createLayoutCategoryId>0){layoutOpen.setAttribute('data-threaddesk-layout-category-id-open', String(createLayoutCategoryId));}
-					document.body.classList.remove('threaddesk-modal-open');
-					window.setTimeout(()=>{layoutOpen.click();},0);
-				});
+					createBtn.addEventListener('click',()=>{
+						if(typeof createBtn.blur==='function'){createBtn.blur();}
+						if(modal){modal.classList.remove('is-active');modal.setAttribute('aria-hidden','true');}
+						const localScope=root.closest('.product')||document;
+						const layoutOpen=
+							root.querySelector('[data-threaddesk-screenprint-layout-open]')||
+							localScope.querySelector('[data-threaddesk-screenprint-layout-open]')||
+							root.querySelector('[data-threaddesk-layout-open]')||
+							localScope.querySelector('[data-threaddesk-layout-open]')||
+							document.querySelector('[data-threaddesk-layout-open]');
+						if(!layoutOpen){return;}
+						if(createLayoutCategory){layoutOpen.setAttribute('data-threaddesk-layout-category-open', createLayoutCategory);}
+						if(createLayoutCategoryId>0){layoutOpen.setAttribute('data-threaddesk-layout-category-id-open', String(createLayoutCategoryId));}
+						document.body.classList.remove('threaddesk-modal-open');
+						window.setTimeout(()=>{layoutOpen.click();},0);
+					});
 					options.appendChild(createBtn);
 					}
 					(layouts||[]).forEach((layout)=>{
