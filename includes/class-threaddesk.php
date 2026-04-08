@@ -3670,13 +3670,8 @@ class TTA_ThreadDesk {
 			let layouts=[];
 			let imageMap=<?php echo wp_json_encode( $screenprint_images_by_color ); ?>||{};
 			const initialColorKey=<?php echo wp_json_encode( $initial_color_key ); ?>;
-			let variationRows=[];
-			let variationTotal=0;
-			let variationReturned=0;
-			let variationHasMore=false;
-			let variationRowsMode='full';
+			const variationStateByColor={};
 			const variationPageLimit=<?php echo (int) $this->screenprint_variation_page_limit; ?>;
-			let variationLoading=false;
 			let pricingSettings=<?php echo wp_json_encode( wp_parse_args( (array) get_option( 'tta_threaddesk_print_pricing', array() ), $this->get_default_print_pricing_settings() ) ); ?>||{};
 			let pendingQuotes=[];
 			let savedDesigns=[];
@@ -3818,6 +3813,17 @@ class TTA_ThreadDesk {
 				if(datasets.layouts&&Array.isArray(datasets.layouts.items)){layouts=datasets.layouts.items;}
 				if(datasets.designs&&Array.isArray(datasets.designs.items)){savedDesigns=datasets.designs.items;}
 				if(datasets.quote_list&&Array.isArray(datasets.quote_list.items)){pendingQuotes=datasets.quote_list.items;}
+				if(datasets.variations){
+					const colorState=getVariationStateForColor(getCurrentColorStateKey());
+					colorState.rows=Array.isArray(datasets.variations.items)?datasets.variations.items:[];
+					colorState.mode='keys';
+					const variationMeta=datasets.variations.meta&&typeof datasets.variations.meta==='object'?datasets.variations.meta:{};
+					const total=Number(variationMeta.total||colorState.rows.length||0);
+					colorState.total=Number.isFinite(total)&&total>=0?total:colorState.rows.length;
+					const returned=Number(variationMeta.returned||colorState.rows.length||0);
+					colorState.returned=Number.isFinite(returned)&&returned>=0?returned:colorState.rows.length;
+					colorState.hasMore=!!variationMeta.has_more;
+				}
 			};
 			const getSessionBootstrapCache=()=>{
 				if(!window.sessionStorage){return null;}
@@ -3934,6 +3940,14 @@ class TTA_ThreadDesk {
 				if(stageHeight>0){viewerStep.style.setProperty('--threaddesk-screenprint-stage-rendered-height',stageHeight+'px');}
 			};
 			const normalizeColorValue=(value)=>String(value||'').trim().toLowerCase().replace(/\s+/g,'-');
+			const getCurrentColorStateKey=()=>normalizeColorValue(selectedColor||getSelectedColorLabel()||'default');
+			const getVariationStateForColor=(rawColorKey)=>{
+				const key=normalizeColorValue(rawColorKey||'default')||'default';
+				if(!variationStateByColor[key]){
+					variationStateByColor[key]={rows:[],total:0,returned:0,hasMore:false,loadingPromise:null,mode:'keys'};
+				}
+				return variationStateByColor[key];
+			};
 			const getApproxSizeLabel=(placementKey,sliderValue,designRatio)=>{
 				const key=String(placementKey||'').trim().toLowerCase();
 				const slider=Number(sliderValue);
@@ -4110,54 +4124,46 @@ class TTA_ThreadDesk {
 				quoteDesigns.appendChild(list);
 				quoteDesigns.hidden=false;
 			};
-			const variationPreloadByColor={};
-			const variationRowsByColorKey={};
-			const getVariationColorCacheKey=(colorKey,colorLabel='')=>{
-				const normalizedKey=normalizeColorValue(colorKey);
-				if(normalizedKey){return normalizedKey;}
-				return normalizeColorValue(colorLabel||'default')||'default';
-			};
 			const getVariationRowsForColor=()=>{
-				return (Array.isArray(variationRows)?variationRows:[]).filter((row)=>{
-					const rowColorKey=normalizeColorValue(row&&row.colorKey);
-					const selectedColorKey=normalizeColorValue(selectedColor);
-					if(rowColorKey&&selectedColorKey){return rowColorKey===selectedColorKey;}
-					return normalizeColorValue(row&&row.color)===normalizeColorValue(getSelectedColorLabel());
-				});
+				const colorState=getVariationStateForColor(getCurrentColorStateKey());
+				return Array.isArray(colorState.rows)?colorState.rows:[];
 			};
 			const hasVariationDataForActiveColor=()=>getVariationRowsForColor().length>0;
 			const loadMoreVariations=async()=>{
-				if(variationLoading||!variationHasMore){return;}
-				variationLoading=true;
-				try{
-					const payload=new URLSearchParams();
-					payload.set('action','tta_threaddesk_screenprint_variations');
-					payload.set('nonce',screenprintVariationNonce||'');
-					payload.set('productId',String(screenprintProductId||0));
-					payload.set('offset',String(Array.isArray(variationRows)?variationRows.length:0));
-					payload.set('limit',String(variationPageLimit));
-					payload.set('inStockOnly','1');
-					payload.set('fields',variationRowsMode==='full'?'full':'keys');
-					payload.set('colorKey',String(selectedColor||''));
-					payload.set('colorLabel',String(getSelectedColorLabel()||''));
-					const response=await fetch(screenprintQuoteAjaxUrl,{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/x-www-form-urlencoded; charset=UTF-8'},body:payload.toString()});
-					const data=await response.json();
-					if(!data||!data.success){throw new Error((data&&data.data&&data.data.message)?String(data.data.message):'Unable to load more variants');}
-					const rows=(data&&data.data&&Array.isArray(data.data.variations))?data.data.variations:[];
-					if(rows.length){variationRows=variationRows.concat(rows);}
-					variationReturned=Number((data&&data.data&&data.data.returned)||0);
-					const receivedTotal=Number((data&&data.data&&data.data.total)||variationTotal);
-					variationTotal=Number.isFinite(receivedTotal)&&receivedTotal>=0?receivedTotal:variationTotal;
-					variationHasMore=!!(data&&data.data&&data.data.hasMore);
-				}catch(error){
-					console.error('[ThreadDesk screenprint variations load]',error);
-				}finally{
-					variationLoading=false;
-				}
+				const colorState=getVariationStateForColor(getCurrentColorStateKey());
+				if(colorState.loadingPromise){await colorState.loadingPromise;return;}
+				if(!colorState.hasMore){return;}
+				colorState.loadingPromise=(async()=>{
+					try{
+						const payload=new URLSearchParams();
+						payload.set('action','tta_threaddesk_screenprint_variations');
+						payload.set('nonce',screenprintVariationNonce||'');
+						payload.set('productId',String(screenprintProductId||0));
+						payload.set('offset',String(Array.isArray(colorState.rows)?colorState.rows.length:0));
+						payload.set('limit',String(variationPageLimit));
+						payload.set('inStockOnly','1');
+						payload.set('fields',colorState.mode==='full'?'full':'keys');
+						payload.set('colorKey',String(selectedColor||''));
+						payload.set('colorLabel',String(getSelectedColorLabel()||''));
+						const response=await fetch(screenprintQuoteAjaxUrl,{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/x-www-form-urlencoded; charset=UTF-8'},body:payload.toString()});
+						const data=await response.json();
+						if(!data||!data.success){throw new Error((data&&data.data&&data.data.message)?String(data.data.message):'Unable to load more variants');}
+						const rows=(data&&data.data&&Array.isArray(data.data.variations))?data.data.variations:[];
+						if(rows.length){colorState.rows=colorState.rows.concat(rows);}
+						colorState.returned=Number((data&&data.data&&data.data.returned)||0);
+						const receivedTotal=Number((data&&data.data&&data.data.total)||colorState.total);
+						colorState.total=Number.isFinite(receivedTotal)&&receivedTotal>=0?receivedTotal:colorState.total;
+						colorState.hasMore=!!(data&&data.data&&data.data.hasMore);
+					}catch(error){
+						console.error('[ThreadDesk screenprint variations load]',error);
+					}
+				})();
+				try{await colorState.loadingPromise;}finally{colorState.loadingPromise=null;}
 			};
 			const loadVariationsForSelectedColor=async(fields='full')=>{
-				variationLoading=true;
-				try{
+				const colorState=getVariationStateForColor(getCurrentColorStateKey());
+				if(colorState.loadingPromise){await colorState.loadingPromise;return;}
+				colorState.loadingPromise=(async()=>{
 					const payload=new URLSearchParams();
 					payload.set('action','tta_threaddesk_screenprint_variations');
 					payload.set('nonce',screenprintVariationNonce||'');
@@ -4171,15 +4177,14 @@ class TTA_ThreadDesk {
 					const response=await fetch(screenprintQuoteAjaxUrl,{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/x-www-form-urlencoded; charset=UTF-8'},body:payload.toString()});
 					const data=await response.json();
 					if(!data||!data.success){throw new Error((data&&data.data&&data.data.message)?String(data.data.message):'Unable to load variants');}
-					variationRows=(data&&data.data&&Array.isArray(data.data.variations))?data.data.variations:[];
-					variationRowsMode=fields==='keys'?'keys':'full';
-					variationReturned=Number((data&&data.data&&data.data.returned)||variationRows.length||0);
-					const receivedTotal=Number((data&&data.data&&data.data.total)||variationRows.length||0);
-					variationTotal=Number.isFinite(receivedTotal)&&receivedTotal>=0?receivedTotal:variationRows.length;
-					variationHasMore=!!(data&&data.data&&data.data.hasMore);
-				}finally{
-					variationLoading=false;
-				}
+					colorState.rows=(data&&data.data&&Array.isArray(data.data.variations))?data.data.variations:[];
+					colorState.mode=fields==='keys'?'keys':'full';
+					colorState.returned=Number((data&&data.data&&data.data.returned)||colorState.rows.length||0);
+					const receivedTotal=Number((data&&data.data&&data.data.total)||colorState.rows.length||0);
+					colorState.total=Number.isFinite(receivedTotal)&&receivedTotal>=0?receivedTotal:colorState.rows.length;
+					colorState.hasMore=!!(data&&data.data&&data.data.hasMore);
+				})();
+				try{await colorState.loadingPromise;}finally{colorState.loadingPromise=null;}
 			};
 			const loadVariationsForColor=async(colorKey,colorLabel)=>{
 				const requestedColorKey=String(colorKey||'').trim();
@@ -4233,16 +4238,12 @@ class TTA_ThreadDesk {
 				}
 			};
 			const ensureVariationsReadyForSelectedColor=async()=>{
-				const colorLabel=String(getSelectedColorLabel()||'').trim();
-				const colorKey=getVariationColorCacheKey(selectedColor,colorLabel);
-				if(variationPreloadByColor[colorKey]){await variationPreloadByColor[colorKey];return;}
-				variationPreloadByColor[colorKey]=(async()=>{
-					await loadVariationsForColor(selectedColor,colorLabel);
-				})();
-				try{
-					await variationPreloadByColor[colorKey];
-				}finally{
-					delete variationPreloadByColor[colorKey];
+				const colorState=getVariationStateForColor(getCurrentColorStateKey());
+				if(colorState.mode!=='full'){
+					await loadVariationsForSelectedColor('full');
+				}
+				while(colorState.hasMore){
+					await loadMoreVariations();
 				}
 			};
 			const renderVariationQuantities=()=>{
@@ -4400,7 +4401,8 @@ class TTA_ThreadDesk {
 					const qty=Math.max(0,Math.floor(Number(input.value||0)));
 					if(!qty){return;}
 					const variationId=String(input.getAttribute('data-threaddesk-screenprint-variation-id')||'0');
-					const row=(Array.isArray(variationRows)?variationRows:[]).find((item)=>String((item&&item.variationId)||0)===variationId)||{};
+					const colorRows=getVariationRowsForColor();
+					const row=(Array.isArray(colorRows)?colorRows:[]).find((item)=>String((item&&item.variationId)||0)===variationId)||{};
 					const size=String((row&&row.size)||'N/A').trim()||'N/A';
 					const color=String((row&&row.color)||getSelectedColorLabel()||'').trim();
 					const garmentName=String((row&&row.garmentName)||'').trim();
