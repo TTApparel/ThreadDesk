@@ -2886,12 +2886,40 @@ class TTA_ThreadDesk {
 			if ( 'pending' !== $this->get_quote_status( $pending_quote_post->ID ) ) {
 				continue;
 			}
+			$quote_design_names = $this->get_screenprint_quote_design_names( $pending_quote_post->ID );
 			$screenprint_pending_quotes[] = array(
-				'id'    => (int) $pending_quote_post->ID,
-				'title' => (string) $pending_quote_post->post_title,
+				'id'          => (int) $pending_quote_post->ID,
+				'title'       => (string) $pending_quote_post->post_title,
+				'designNames' => $quote_design_names,
+				'designCount' => count( $quote_design_names ),
 			);
 		}
 		return $screenprint_pending_quotes;
+	}
+
+	private function get_screenprint_quote_design_names( $quote_id ) {
+		$raw_prints = get_post_meta( (int) $quote_id, 'screenprint_quote_prints_json', true );
+		if ( is_array( $raw_prints ) ) {
+			$prints = $raw_prints;
+		} else {
+			$prints = json_decode( (string) $raw_prints, true );
+		}
+		if ( ! is_array( $prints ) || empty( $prints ) ) {
+			return array();
+		}
+		$design_names = array();
+		foreach ( $prints as $print ) {
+			if ( ! is_array( $print ) ) {
+				continue;
+			}
+			$design_name = isset( $print['designName'] ) ? sanitize_text_field( (string) $print['designName'] ) : '';
+			if ( '' === $design_name ) {
+				continue;
+			}
+			$design_names[ strtolower( $design_name ) ] = $design_name;
+		}
+
+		return array_values( $design_names );
 	}
 
 	private function build_screenprint_variation_payload( $product, $args = array() ) {
@@ -3573,6 +3601,8 @@ class TTA_ThreadDesk {
 			const i18nCreateLayout=<?php echo wp_json_encode( __( 'CREATE A LAYOUT', 'threaddesk' ) ); ?>;
 			const i18nCreateNewQuote=<?php echo wp_json_encode( __( 'CREATE NEW QUOTE', 'threaddesk' ) ); ?>;
 			const i18nCreateNewQuoteHint=<?php echo wp_json_encode( __( 'Start a brand new quote for this product.', 'threaddesk' ) ); ?>;
+			const i18nNoDesignsInQuote=<?php echo wp_json_encode( __( 'No designs in this quote yet.', 'threaddesk' ) ); ?>;
+			const i18nDesignCountLabel=<?php echo wp_json_encode( __( 'Design count', 'threaddesk' ) ); ?>;
 			const i18nPendingQuotePrefix=<?php echo wp_json_encode( __( 'PENDING QUOTE', 'threaddesk' ) ); ?>;
 			const i18nCreateLayoutHint=<?php echo wp_json_encode( __( 'Need a new layout? Start in the placements builder.', 'threaddesk' ) ); ?>;
 			const i18nGuestEmpty=<?php echo wp_json_encode( __( 'No saved layouts in this browser yet.', 'threaddesk' ) ); ?>;
@@ -4957,21 +4987,33 @@ class TTA_ThreadDesk {
 					quotes.forEach((quote)=>{
 						const quoteId=Number(quote&&quote.id||0);
 						if(!quoteId){return;}
+						const designNames=Array.isArray(quote&&quote.designNames)?quote.designNames.filter((name)=>String(name||'').trim()!==''):[];
+						const designCount=Number(quote&&quote.designCount||designNames.length||0);
 						const btn=document.createElement('button');
 						btn.type='button';
 						btn.className='threaddesk-screenprint-option threaddesk__card threaddesk__card--design';
 						const preview=document.createElement('div');
 						preview.className='threaddesk__card-design-preview';
-						const previewLabel=document.createElement('span');
-						previewLabel.className='threaddesk-layout-modal__image-fallback';
-						previewLabel.textContent='#'+String(quoteId);
-						preview.appendChild(previewLabel);
+						const designList=document.createElement('ul');
+						designList.className='threaddesk-screenprint-option__design-list';
+						if(designNames.length){
+							designNames.forEach((designName)=>{
+								const listItem=document.createElement('li');
+								listItem.textContent=String(designName).trim();
+								designList.appendChild(listItem);
+							});
+						}else{
+							const listItem=document.createElement('li');
+							listItem.textContent=i18nNoDesignsInQuote||'No designs in this quote yet.';
+							designList.appendChild(listItem);
+						}
+						preview.appendChild(designList);
 						const title=document.createElement('h5');
 						title.className='threaddesk-screenprint-option__title';
 						title.textContent=String((quote&&quote.title)||'').trim()||((i18nPendingQuotePrefix||'PENDING QUOTE')+' #'+String(quoteId));
 						const meta=document.createElement('p');
 						meta.className='threaddesk__card-design-color-count';
-						meta.textContent=(i18nPendingQuotePrefix||'PENDING QUOTE')+' #'+String(quoteId);
+						meta.textContent=(i18nDesignCountLabel||'Design count')+': '+String(designCount);
 						btn.appendChild(preview);
 						btn.appendChild(title);
 						btn.appendChild(meta);
