@@ -4119,6 +4119,12 @@ class TTA_ThreadDesk {
 				quoteDesigns.hidden=false;
 			};
 			const variationPreloadByColor={};
+			const variationRowsByColorKey={};
+			const getVariationColorCacheKey=(colorKey,colorLabel='')=>{
+				const normalizedKey=normalizeColorValue(colorKey);
+				if(normalizedKey){return normalizedKey;}
+				return normalizeColorValue(colorLabel||'default')||'default';
+			};
 			const getVariationRowsForColor=()=>{
 				return (Array.isArray(variationRows)?variationRows:[]).filter((row)=>{
 					const rowColorKey=normalizeColorValue(row&&row.colorKey);
@@ -4182,16 +4188,63 @@ class TTA_ThreadDesk {
 					variationLoading=false;
 				}
 			};
+			const loadVariationsForColor=async(colorKey,colorLabel)=>{
+				const requestedColorKey=String(colorKey||'').trim();
+				const requestedColorLabel=String(colorLabel||'').trim();
+				const cacheKey=getVariationColorCacheKey(requestedColorKey,requestedColorLabel);
+				const cached=variationRowsByColorKey[cacheKey];
+				if(cached&&Array.isArray(cached.rows)&&cached.rows.length){
+					variationRows=cached.rows.slice();
+					variationRowsMode='full';
+					variationReturned=Number(cached.returned||variationRows.length||0);
+					variationTotal=Number(cached.total||variationRows.length||0);
+					variationHasMore=false;
+					return variationRows;
+				}
+				variationLoading=true;
+				try{
+					const nextRows=[];
+					let offset=0;
+					let hasMore=true;
+					let total=0;
+					while(hasMore){
+						const payload=new URLSearchParams();
+						payload.set('action','tta_threaddesk_screenprint_variations');
+						payload.set('nonce',screenprintVariationNonce||'');
+						payload.set('productId',String(screenprintProductId||0));
+						payload.set('colorKey',requestedColorKey);
+						payload.set('colorLabel',requestedColorLabel);
+						payload.set('inStockOnly','1');
+						payload.set('offset',String(offset));
+						payload.set('limit',String(variationPageLimit));
+						payload.set('fields','full');
+						const response=await fetch(screenprintQuoteAjaxUrl,{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/x-www-form-urlencoded; charset=UTF-8'},body:payload.toString()});
+						const data=await response.json();
+						if(!data||!data.success){throw new Error((data&&data.data&&data.data.message)?String(data.data.message):'Unable to load variants');}
+						const rows=(data&&data.data&&Array.isArray(data.data.variations))?data.data.variations:[];
+						if(rows.length){nextRows.push(...rows);}
+						total=Number((data&&data.data&&data.data.total)||nextRows.length||0);
+						hasMore=!!(data&&data.data&&data.data.hasMore);
+						offset=nextRows.length;
+						if(!rows.length){hasMore=false;}
+					}
+					variationRows=nextRows;
+					variationRowsMode='full';
+					variationReturned=nextRows.length;
+					variationTotal=Number.isFinite(total)&&total>=0?total:nextRows.length;
+					variationHasMore=false;
+					variationRowsByColorKey[cacheKey]={rows:nextRows.slice(),returned:variationReturned,total:variationTotal,hasMore:false};
+					return variationRows;
+				}finally{
+					variationLoading=false;
+				}
+			};
 			const ensureVariationsReadyForSelectedColor=async()=>{
-				const colorKey=normalizeColorValue(selectedColor||getSelectedColorLabel()||'default');
+				const colorLabel=String(getSelectedColorLabel()||'').trim();
+				const colorKey=getVariationColorCacheKey(selectedColor,colorLabel);
 				if(variationPreloadByColor[colorKey]){await variationPreloadByColor[colorKey];return;}
 				variationPreloadByColor[colorKey]=(async()=>{
-					if(variationRowsMode!=='full'){
-						await loadVariationsForSelectedColor('full');
-					}
-					while(variationHasMore){
-						await loadMoreVariations();
-					}
+					await loadVariationsForColor(selectedColor,colorLabel);
 				})();
 				try{
 					await variationPreloadByColor[colorKey];
@@ -4900,7 +4953,7 @@ class TTA_ThreadDesk {
 							event.preventDefault();
 							openQuantitiesButton.disabled=true;
 							try{
-								await ensureVariationsReadyForSelectedColor();
+								await loadVariationsForColor(selectedColor,getSelectedColorLabel());
 								renderVariationQuantities();
 								setStep('quantities');
 							}finally{
@@ -4920,7 +4973,7 @@ class TTA_ThreadDesk {
 						event.preventDefault();
 						trigger.disabled=true;
 						try{
-							await ensureVariationsReadyForSelectedColor();
+							await loadVariationsForColor(selectedColor,getSelectedColorLabel());
 							renderVariationQuantities();
 							setStep('quantities');
 						}finally{
@@ -4967,7 +5020,7 @@ class TTA_ThreadDesk {
 				btn.style.boxShadow='0 0 0 1px #2271b1';
 				openScreenprintChooserModal();
 				syncCartSelection();
-				loadVariationsForSelectedColor('keys');
+				loadVariationsForColor(selectedColor,getSelectedColorLabel()).catch((error)=>{console.error('[ThreadDesk screenprint color load]',error);});
 			};
 			root.querySelectorAll('[data-threaddesk-screenprint-open-color]').forEach((btn)=>{
 				btn.addEventListener('click',()=>{onScreenprintColorClick(btn);});
