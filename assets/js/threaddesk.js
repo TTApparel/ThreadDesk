@@ -921,6 +921,10 @@ jQuery(function ($) {
 		const closeLayoutModal = function (modalEl) {
 			const scopedModal = modalEl && modalEl.length ? modalEl : layoutModal;
 			if (!scopedModal.hasClass('is-active')) { return; }
+			const activeElement = document.activeElement;
+			if (activeElement && scopedModal.get(0) && scopedModal.get(0).contains(activeElement) && typeof activeElement.blur === 'function') {
+				try { activeElement.blur(); } catch (e) {}
+			}
 			scopedModal.removeClass('is-active').attr('aria-hidden', 'true');
 			syncBodyModalState();
 			showChooserStep(scopedModal);
