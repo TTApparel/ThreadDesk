@@ -1028,13 +1028,15 @@ jQuery(function ($) {
 		});
 
 		$(document).on('threaddesk:open-layout-modal', function (event, externalData) {
-			const builderModal = findLayoutBuilderModals().first();
+			const request = externalData && typeof externalData === 'object' ? externalData : {};
+			const scopeTarget = request.scopeElement && request.scopeElement.nodeType === 1 ? $(request.scopeElement) : $();
+			const scopedRoot = scopeTarget.length ? scopeTarget.closest('.product') : $();
+			const builderModal = scopedRoot.length ? findLayoutBuilderModals(scopedRoot).first() : findLayoutBuilderModals().first();
 			if (!builderModal.length) {
 				console.warn('[ThreadDesk] Builder layout modal not found for threaddesk:open-layout-modal. Selector:', layoutBuilderModalSelector + ' + ' + layoutBuilderStepSelector);
 				return;
 			}
 
-			const request = externalData && typeof externalData === 'object' ? externalData : {};
 			const requestedCategory = String(request.category || '').trim();
 			const requestedCategoryId = Number(request.categoryId || 0);
 			const forceViewer = !!request.forceViewer;
