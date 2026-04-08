@@ -142,22 +142,12 @@ jQuery(function ($) {
 
 	if (layoutModal.length) {
 		let lastLayoutTrigger = null;
-		const stage = layoutModal.find('.threaddesk-layout-viewer__stage');
-		const mainImage = layoutModal.find('[data-threaddesk-layout-main-image]');
-		const layoutViewer = layoutModal.find('.threaddesk-layout-viewer');
-		const angleButtons = layoutModal.find('[data-threaddesk-layout-angle]');
-		const angleButtonsByKey = {
-			front: layoutModal.find('[data-threaddesk-layout-angle="front"]'),
-			left: layoutModal.find('[data-threaddesk-layout-angle="left"]'),
-			back: layoutModal.find('[data-threaddesk-layout-angle="back"]'),
-			right: layoutModal.find('[data-threaddesk-layout-angle="right"]'),
-		};
-		const angleImages = {
-			front: layoutModal.find('[data-threaddesk-layout-angle-image="front"]'),
-			left: layoutModal.find('[data-threaddesk-layout-angle-image="left"]'),
-			back: layoutModal.find('[data-threaddesk-layout-angle-image="back"]'),
-			right: layoutModal.find('[data-threaddesk-layout-angle-image="right"]'),
-		};
+		let stage = $();
+		let mainImage = $();
+		let layoutViewer = $();
+		let angleButtons = $();
+		let angleButtonsByKey = { front: $(), left: $(), back: $(), right: $() };
+		let angleImages = { front: $(), left: $(), back: $(), right: $() };
 
 		const syncAnglePreviewThumbs = function () {
 			angleImages.front.attr('src', currentAngles.front || '').css('transform', 'none');
@@ -165,45 +155,135 @@ jQuery(function ($) {
 			angleImages.left.attr('src', currentAngles.left || '').css('transform', sideConfiguredAsRight ? 'scaleX(-1)' : 'none');
 			angleImages.right.attr('src', currentAngles.right || '').css('transform', sideConfiguredAsRight ? 'none' : 'scaleX(-1)');
 		};
-		const placementList = layoutModal.find('[data-threaddesk-layout-placement-list]');
-		const placementEmpty = layoutModal.find('[data-threaddesk-layout-placement-empty]');
-		const saveLayoutForm = layoutModal.find('[data-threaddesk-layout-save-layout-form]');
-		const saveLayoutCategoryField = layoutModal.find('[data-threaddesk-layout-save-category]');
-		const saveLayoutCategoryIdField = layoutModal.find('[data-threaddesk-layout-save-category-id]');
-		const saveLayoutPayloadField = layoutModal.find('[data-threaddesk-layout-save-payload]');
-		const saveLayoutIdField = layoutModal.find('[data-threaddesk-layout-save-id]');
-		const placementPanelStep = layoutModal.find('[data-threaddesk-layout-panel-step="placements"]');
-		const designPanelStep = layoutModal.find('[data-threaddesk-layout-panel-step="designs"]');
-		const adjustPanelStep = layoutModal.find('[data-threaddesk-layout-panel-step="adjust"]');
-		layoutModal.find('[data-threaddesk-layout-save-layout-shortcut]').remove();
-		const designList = layoutModal.find('[data-threaddesk-layout-design-list]');
-		const designEmpty = layoutModal.find('[data-threaddesk-layout-design-empty]');
-		const designHeading = layoutModal.find('[data-threaddesk-layout-design-heading]');
-		layoutModal.find('[data-threaddesk-layout-design-overlay]').each(function () {
-			const overlay = $(this);
-			if (String(this.tagName || '').toLowerCase() === 'img') {
-				return;
-			}
-			const replacement = $('<img src="" alt="" class="threaddesk-layout-viewer__design-overlay" data-threaddesk-layout-design-overlay hidden />');
-			replacement.attr('style', overlay.attr('style') || '');
-			overlay.replaceWith(replacement);
-		});
-		const designOverlay = layoutModal.find('[data-threaddesk-layout-design-overlay]');
-		const sizeSlider = layoutModal.find('[data-threaddesk-layout-size-slider]');
-		const sizeReading = layoutModal.find('[data-threaddesk-layout-size-reading]');
-		const selectedDesignNameEl = layoutModal.find('[data-threaddesk-layout-selected-design]');
-		const adjustHeading = layoutModal.find('[data-threaddesk-layout-adjust-heading]');
-		const adjustPaletteLabel = layoutModal.find('[data-threaddesk-layout-adjust-palette-label]');
-		const adjustPalette = layoutModal.find('[data-threaddesk-layout-adjust-palette]');
-		const adjustPaletteOptionsLabel = layoutModal.find('[data-threaddesk-layout-adjust-palette-options-label]');
-		const adjustPaletteOptions = layoutModal.find('[data-threaddesk-layout-adjust-palette-options]');
-		const removePlacementButton = layoutModal.find('[data-threaddesk-layout-remove-placement]');
-		const saveLayoutSubmitButton = saveLayoutForm.find('[data-threaddesk-layout-save-layout]');
-		const quickRemoveButton = $('<button type="button" class="threaddesk-layout-viewer__save-layout-button threaddesk-layout-viewer__remove-button" data-threaddesk-layout-quick-remove>Remove Design</button>').hide();
-		if (saveLayoutForm.length) { saveLayoutForm.append(quickRemoveButton); }
-		const layoutDesignsRaw = layoutModal.attr('data-threaddesk-layout-designs') || '[]';
+		let placementList = $();
+		let placementEmpty = $();
+		let saveLayoutForm = $();
+		let saveLayoutCategoryField = $();
+		let saveLayoutCategoryIdField = $();
+		let saveLayoutPayloadField = $();
+		let saveLayoutIdField = $();
+		let placementPanelStep = $();
+		let designPanelStep = $();
+		let adjustPanelStep = $();
+		let designList = $();
+		let designEmpty = $();
+		let designHeading = $();
+		let designOverlay = $();
+		let sizeSlider = $();
+		let sizeReading = $();
+		let selectedDesignNameEl = $();
+		let adjustHeading = $();
+		let adjustPaletteLabel = $();
+		let adjustPalette = $();
+		let adjustPaletteOptionsLabel = $();
+		let adjustPaletteOptions = $();
+		let removePlacementButton = $();
+		let saveLayoutSubmitButton = $();
+		let quickRemoveButton = $();
 		let layoutDesigns = [];
-		try { layoutDesigns = JSON.parse(layoutDesignsRaw); } catch (e) { layoutDesigns = []; }
+
+		const getLayoutContext = function (modalEl) {
+			const scopedModal = modalEl && modalEl.length ? modalEl.first() : layoutModal;
+			const scopedSaveLayoutForm = scopedModal.find('[data-threaddesk-layout-save-layout-form]');
+			let scopedQuickRemoveButton = scopedSaveLayoutForm.find('[data-threaddesk-layout-quick-remove]');
+			if (!scopedQuickRemoveButton.length) {
+				scopedQuickRemoveButton = $('<button type="button" class="threaddesk-layout-viewer__save-layout-button threaddesk-layout-viewer__remove-button" data-threaddesk-layout-quick-remove>Remove Design</button>').hide();
+				if (scopedSaveLayoutForm.length) { scopedSaveLayoutForm.append(scopedQuickRemoveButton); }
+			}
+			scopedModal.find('[data-threaddesk-layout-save-layout-shortcut]').remove();
+			scopedModal.find('[data-threaddesk-layout-design-overlay]').each(function () {
+				const overlay = $(this);
+				if (String(this.tagName || '').toLowerCase() === 'img') { return; }
+				const replacement = $('<img src="" alt="" class="threaddesk-layout-viewer__design-overlay" data-threaddesk-layout-design-overlay hidden />');
+				replacement.attr('style', overlay.attr('style') || '');
+				overlay.replaceWith(replacement);
+			});
+			const layoutDesignsRaw = scopedModal.attr('data-threaddesk-layout-designs') || '[]';
+			let scopedLayoutDesigns = [];
+			try { scopedLayoutDesigns = JSON.parse(layoutDesignsRaw); } catch (e) { scopedLayoutDesigns = []; }
+			return {
+				modal: scopedModal,
+				stage: scopedModal.find('.threaddesk-layout-viewer__stage'),
+				mainImage: scopedModal.find('[data-threaddesk-layout-main-image]'),
+				layoutViewer: scopedModal.find('.threaddesk-layout-viewer'),
+				angleButtons: scopedModal.find('[data-threaddesk-layout-angle]'),
+				angleButtonsByKey: {
+					front: scopedModal.find('[data-threaddesk-layout-angle="front"]'),
+					left: scopedModal.find('[data-threaddesk-layout-angle="left"]'),
+					back: scopedModal.find('[data-threaddesk-layout-angle="back"]'),
+					right: scopedModal.find('[data-threaddesk-layout-angle="right"]'),
+				},
+				angleImages: {
+					front: scopedModal.find('[data-threaddesk-layout-angle-image="front"]'),
+					left: scopedModal.find('[data-threaddesk-layout-angle-image="left"]'),
+					back: scopedModal.find('[data-threaddesk-layout-angle-image="back"]'),
+					right: scopedModal.find('[data-threaddesk-layout-angle-image="right"]'),
+				},
+				placementList: scopedModal.find('[data-threaddesk-layout-placement-list]'),
+				placementEmpty: scopedModal.find('[data-threaddesk-layout-placement-empty]'),
+				saveLayoutForm: scopedSaveLayoutForm,
+				saveLayoutCategoryField: scopedModal.find('[data-threaddesk-layout-save-category]'),
+				saveLayoutCategoryIdField: scopedModal.find('[data-threaddesk-layout-save-category-id]'),
+				saveLayoutPayloadField: scopedModal.find('[data-threaddesk-layout-save-payload]'),
+				saveLayoutIdField: scopedModal.find('[data-threaddesk-layout-save-id]'),
+				placementPanelStep: scopedModal.find('[data-threaddesk-layout-panel-step="placements"]'),
+				designPanelStep: scopedModal.find('[data-threaddesk-layout-panel-step="designs"]'),
+				adjustPanelStep: scopedModal.find('[data-threaddesk-layout-panel-step="adjust"]'),
+				designList: scopedModal.find('[data-threaddesk-layout-design-list]'),
+				designEmpty: scopedModal.find('[data-threaddesk-layout-design-empty]'),
+				designHeading: scopedModal.find('[data-threaddesk-layout-design-heading]'),
+				designOverlay: scopedModal.find('[data-threaddesk-layout-design-overlay]'),
+				sizeSlider: scopedModal.find('[data-threaddesk-layout-size-slider]'),
+				sizeReading: scopedModal.find('[data-threaddesk-layout-size-reading]'),
+				selectedDesignNameEl: scopedModal.find('[data-threaddesk-layout-selected-design]'),
+				adjustHeading: scopedModal.find('[data-threaddesk-layout-adjust-heading]'),
+				adjustPaletteLabel: scopedModal.find('[data-threaddesk-layout-adjust-palette-label]'),
+				adjustPalette: scopedModal.find('[data-threaddesk-layout-adjust-palette]'),
+				adjustPaletteOptionsLabel: scopedModal.find('[data-threaddesk-layout-adjust-palette-options-label]'),
+				adjustPaletteOptions: scopedModal.find('[data-threaddesk-layout-adjust-palette-options]'),
+				removePlacementButton: scopedModal.find('[data-threaddesk-layout-remove-placement]'),
+				saveLayoutSubmitButton: scopedSaveLayoutForm.find('[data-threaddesk-layout-save-layout]'),
+				quickRemoveButton: scopedQuickRemoveButton,
+				layoutDesigns: scopedLayoutDesigns,
+			};
+		};
+		const setActiveLayoutModal = function (modalEl) {
+			layoutModal = modalEl && modalEl.length ? modalEl.first() : pickPreferredLayoutModal();
+			const context = getLayoutContext(layoutModal);
+			stage = context.stage;
+			mainImage = context.mainImage;
+			layoutViewer = context.layoutViewer;
+			angleButtons = context.angleButtons;
+			angleButtonsByKey = context.angleButtonsByKey;
+			angleImages = context.angleImages;
+			placementList = context.placementList;
+			placementEmpty = context.placementEmpty;
+			saveLayoutForm = context.saveLayoutForm;
+			saveLayoutCategoryField = context.saveLayoutCategoryField;
+			saveLayoutCategoryIdField = context.saveLayoutCategoryIdField;
+			saveLayoutPayloadField = context.saveLayoutPayloadField;
+			saveLayoutIdField = context.saveLayoutIdField;
+			placementPanelStep = context.placementPanelStep;
+			designPanelStep = context.designPanelStep;
+			adjustPanelStep = context.adjustPanelStep;
+			designList = context.designList;
+			designEmpty = context.designEmpty;
+			designHeading = context.designHeading;
+			designOverlay = context.designOverlay;
+			sizeSlider = context.sizeSlider;
+			sizeReading = context.sizeReading;
+			selectedDesignNameEl = context.selectedDesignNameEl;
+			adjustHeading = context.adjustHeading;
+			adjustPaletteLabel = context.adjustPaletteLabel;
+			adjustPalette = context.adjustPalette;
+			adjustPaletteOptionsLabel = context.adjustPaletteOptionsLabel;
+			adjustPaletteOptions = context.adjustPaletteOptions;
+			removePlacementButton = context.removePlacementButton;
+			saveLayoutSubmitButton = context.saveLayoutSubmitButton;
+			quickRemoveButton = context.quickRemoveButton;
+			layoutDesigns = context.layoutDesigns;
+		};
+		setActiveLayoutModal(layoutModal);
 
 		let selectedCategorySlug = '';
 		let selectedCategoryId = 0;
@@ -909,6 +989,7 @@ jQuery(function ($) {
 
 		const openLayoutModal = function (triggerEl, modalEl) {
 			const scopedModal = modalEl && modalEl.length ? modalEl : layoutModal;
+			setActiveLayoutModal(scopedModal);
 			lastLayoutTrigger = triggerEl || document.activeElement || lastLayoutTrigger;
 			$('.threaddesk-auth-modal.is-active').removeClass('is-active').attr('aria-hidden', 'true');
 			scopedModal.addClass('is-active').attr('aria-hidden', 'false');
@@ -920,6 +1001,7 @@ jQuery(function ($) {
 
 		const closeLayoutModal = function (modalEl) {
 			const scopedModal = modalEl && modalEl.length ? modalEl : layoutModal;
+			setActiveLayoutModal(scopedModal);
 			if (!scopedModal.hasClass('is-active')) { return; }
 			const activeElement = document.activeElement;
 			if (activeElement && scopedModal.get(0) && scopedModal.get(0).contains(activeElement) && typeof activeElement.blur === 'function') {
@@ -970,8 +1052,21 @@ jQuery(function ($) {
 
 		showChooserStep();
 
+		const getLayoutModalForTrigger = function (triggerEl) {
+			const trigger = $(triggerEl);
+			const nearestScopedContainer = trigger.closest('[data-threaddesk-product], [data-threaddesk-layout-container], .threaddesk-product, .product');
+			if (nearestScopedContainer.length) {
+				const scopedMatch = pickPreferredLayoutModal(nearestScopedContainer);
+				if (scopedMatch.length) { return scopedMatch.first(); }
+			}
+			const nearestModal = trigger.closest('.threaddesk-layout-modal[data-threaddesk-layout-builder]');
+			if (nearestModal.length) { return nearestModal.first(); }
+			return pickPreferredLayoutModal().first();
+		};
+
 		$(document).on('click', '[data-threaddesk-layout-open]', function () {
-			openLayoutModal(this);
+			const triggerModal = getLayoutModalForTrigger(this);
+			openLayoutModal(this, triggerModal);
 			const trigger = $(this);
 			const savedPayload = parseLayoutPayloadFromAttribute(trigger.attr('data-threaddesk-layout-payload'));
 			const requestedCategory = String(trigger.attr('data-threaddesk-layout-category-open') || (savedPayload && savedPayload.category) || '').trim();
@@ -1052,8 +1147,11 @@ jQuery(function ($) {
 				console.warn('[ThreadDesk] Builder layout modal not found for threaddesk:open-layout-modal. Selector:', layoutBuilderModalSelector + ' + ' + layoutBuilderStepSelector);
 				return;
 			}
+			builderModal = builderModal.first();
+			if (requestModal.length && builderModal.get(0) !== requestModal.get(0)) {
+				console.warn('[ThreadDesk] threaddesk:open-layout-modal requested modal differs from resolved builder modal.', requestModal.get(0), builderModal.get(0));
+			}
 
-			const request = externalData && typeof externalData === 'object' ? externalData : {};
 			const requestedCategory = String(request.category || '').trim();
 			const requestedCategoryId = Number(request.categoryId || 0);
 			const forceViewer = !!request.forceViewer;
@@ -1061,7 +1159,7 @@ jQuery(function ($) {
 			const quickAdjustLock = !!request.lockPlacementSize;
 			const requestPayload = request.payload && typeof request.payload === 'object' ? request.payload : null;
 			const requestLayoutId = Number(request.layoutId || 0);
-			openLayoutModal(document.activeElement, layoutModal);
+			openLayoutModal(document.activeElement, builderModal);
 			if (requestLayoutId > 0) { saveLayoutIdField.val(String(requestLayoutId)); }
 			configureQuickAdjustMode({ placementKey: quickAdjustKey, lockSize: quickAdjustLock });
 
@@ -1078,7 +1176,7 @@ jQuery(function ($) {
 			if (categoryButton.length) {
 				categoryButton.trigger('click');
 			} else {
-				const firstCategoryButton = layoutModal.find('[data-threaddesk-layout-category]').first();
+				const firstCategoryButton = builderModal.find('[data-threaddesk-layout-category]').first();
 				if (firstCategoryButton.length) {
 					firstCategoryButton.trigger('click');
 				}
@@ -1091,11 +1189,11 @@ jQuery(function ($) {
 			}
 
 			if (forceViewer) {
-				showViewerStep(layoutModal);
+				showViewerStep(builderModal);
 				setPanelStep('placements');
 				if (visibleAngles.length) { setMainImage(String(request.currentAngle || 'front')); }
 				if (quickAdjustKey) {
-					const targetPlacement = layoutModal.find('.threaddesk-layout-viewer__placement-option[data-threaddesk-layout-placement-key="' + quickAdjustKey + '"]').first();
+					const targetPlacement = builderModal.find('.threaddesk-layout-viewer__placement-option[data-threaddesk-layout-placement-key="' + quickAdjustKey + '"]').first();
 					if (targetPlacement.length) { targetPlacement.trigger('click'); }
 				}
 			}
@@ -1105,6 +1203,7 @@ jQuery(function ($) {
 			closeLayoutModal($(this).closest('.threaddesk-layout-modal'));
 		});
 		$(document).on('click', '[data-threaddesk-layout-angle]', function (event) {
+			setActiveLayoutModal($(this).closest('.threaddesk-layout-modal'));
 			if (isAdjustMode) {
 				event.preventDefault();
 				return;
@@ -1113,6 +1212,7 @@ jQuery(function ($) {
 		});
 
 		$(document).on('click', '[data-threaddesk-layout-category]', function () {
+			setActiveLayoutModal($(this).closest('.threaddesk-layout-modal'));
 			selectedCategorySlug = String($(this).attr('data-threaddesk-layout-category') || '').trim();
 			selectedCategoryId = Number($(this).attr('data-threaddesk-layout-category-id') || 0);
 			saveLayoutCategoryField.val(selectedCategorySlug);
@@ -1146,6 +1246,7 @@ jQuery(function ($) {
 		});
 
 		$(document).on('click', '.threaddesk-layout-viewer__placement-option', function () {
+			setActiveLayoutModal($(this).closest('.threaddesk-layout-modal'));
 			selectedPlacementLabel = String($(this).attr('data-threaddesk-layout-placement-label') || '').trim();
 			selectedPlacementKey = String($(this).attr('data-threaddesk-layout-placement-key') || '').trim();
 			layoutModal.attr('data-threaddesk-current-placement', selectedPlacementKey);
@@ -1341,6 +1442,7 @@ jQuery(function ($) {
 		});
 
 		$(document).on('click', '[data-threaddesk-layout-save-placement]', function () {
+			setActiveLayoutModal($(this).closest('.threaddesk-layout-modal'));
 			if (!selectedDesignSourceUrl || !selectedPlacementKey) { return; }
 			const cfg = getOverlayConfig();
 			if (!cfg) { return; }
@@ -1383,6 +1485,7 @@ jQuery(function ($) {
 
 
 		$(document).on('click', '[data-threaddesk-layout-quick-remove]', function () {
+			setActiveLayoutModal($(this).closest('.threaddesk-layout-modal'));
 			const placementKey = String(quickAdjustPlacementKey || '').trim();
 			if (!placementKey) { return; }
 			const targetPlacement = layoutModal.find('.threaddesk-layout-viewer__placement-option[data-threaddesk-layout-placement-key="' + placementKey + '"]').first();
@@ -1395,6 +1498,7 @@ jQuery(function ($) {
 		});
 
 		$(document).on('click', '[data-threaddesk-layout-remove-placement]', function () {
+			setActiveLayoutModal($(this).closest('.threaddesk-layout-modal'));
 			const placementKey = String(selectedPlacementKey || '').trim();
 			if (!placementKey) { return; }
 			const targetAngle = getPlacementAngleTarget(placementKey);
@@ -1434,17 +1538,17 @@ jQuery(function ($) {
 		});
 
 
-		if (saveLayoutForm.length) {
-			saveLayoutForm.on('submit', function (event) {
-				event.preventDefault();
-				const payload = buildLayoutPayload();
-				if (!payload) { return; }
-				saveLayoutPayloadField.val(payload);
-				this.submit();
-			});
-		}
+		$(document).on('submit', '[data-threaddesk-layout-save-layout-form]', function (event) {
+			setActiveLayoutModal($(this).closest('.threaddesk-layout-modal'));
+			event.preventDefault();
+			const payload = buildLayoutPayload();
+			if (!payload) { return; }
+			saveLayoutPayloadField.val(payload);
+			this.submit();
+		});
 
 		$(document).on('click', '[data-threaddesk-layout-save-layout-shortcut]', function () {
+			setActiveLayoutModal($(this).closest('.threaddesk-layout-modal'));
 			if (!saveLayoutForm.length) { return; }
 			saveLayoutForm.trigger('submit');
 		});
