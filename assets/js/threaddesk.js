@@ -130,7 +130,15 @@ jQuery(function ($) {
 			return modal.find('[data-threaddesk-layout-step="chooser"]').length && modal.find('[data-threaddesk-layout-step="viewer"]').length;
 		});
 	};
-	const layoutModal = findLayoutBuilderModals().first();
+	const pickPreferredLayoutModal = function (scopeEl) {
+		const modals = findLayoutBuilderModals(scopeEl);
+		if (!modals.length) { return $(); }
+		const withCategories = modals.filter(function () {
+			return $(this).find('[data-threaddesk-layout-category]').length > 0;
+		});
+		return (withCategories.length ? withCategories : modals).first();
+	};
+	const layoutModal = pickPreferredLayoutModal();
 
 	if (layoutModal.length) {
 		let lastLayoutTrigger = null;
@@ -913,6 +921,10 @@ jQuery(function ($) {
 		const closeLayoutModal = function (modalEl) {
 			const scopedModal = modalEl && modalEl.length ? modalEl : layoutModal;
 			if (!scopedModal.hasClass('is-active')) { return; }
+			const activeElement = document.activeElement;
+			if (activeElement && scopedModal.get(0) && scopedModal.get(0).contains(activeElement) && typeof activeElement.blur === 'function') {
+				try { activeElement.blur(); } catch (e) {}
+			}
 			scopedModal.removeClass('is-active').attr('aria-hidden', 'true');
 			syncBodyModalState();
 			showChooserStep(scopedModal);
@@ -1028,7 +1040,7 @@ jQuery(function ($) {
 		});
 
 		$(document).on('threaddesk:open-layout-modal', function (event, externalData) {
-			const builderModal = findLayoutBuilderModals().first();
+			const builderModal = pickPreferredLayoutModal();
 			if (!builderModal.length) {
 				console.warn('[ThreadDesk] Builder layout modal not found for threaddesk:open-layout-modal. Selector:', layoutBuilderModalSelector + ' + ' + layoutBuilderStepSelector);
 				return;
