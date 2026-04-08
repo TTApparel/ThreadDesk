@@ -3407,6 +3407,8 @@ class TTA_ThreadDesk {
 		$instance_id                = 'threaddesk-screenprint-' . wp_rand( 1000, 99999 );
 		$screenprint_open_chooser   = isset( $_GET['td_screenprint_return'] ) && '1' === sanitize_text_field( wp_unslash( $_GET['td_screenprint_return'] ) );
 		$screenprint_return_url     = remove_query_arg( 'td_screenprint_return', get_permalink( $product_id ) );
+		$user_id                    = isset( $owner_context['user_id'] ) ? absint( $owner_context['user_id'] ) : get_current_user_id();
+		$saved_designs              = $this->build_screenprint_design_list_payload( $owner_context, $user_id );
 
 		wp_enqueue_style( 'threaddesk', THREDDESK_URL . 'assets/css/threaddesk.css', array(), THREDDESK_VERSION );
 		wp_enqueue_script( 'threaddesk', THREDDESK_URL . 'assets/js/threaddesk.js', array( 'jquery' ), THREDDESK_VERSION, true );
@@ -3861,7 +3863,7 @@ class TTA_ThreadDesk {
 				payload.set('action','tta_threaddesk_screenprint_bootstrap');
 				payload.set('nonce',screenprintBootstrapNonce||'');
 				payload.set('productId',String(screenprintProductId||0));
-				payload.set('datasets','layouts,designs,variations,quote_list');
+				payload.set('datasets','layouts,designs,quote_list');
 				const response=await fetch(screenprintQuoteAjaxUrl,{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/x-www-form-urlencoded; charset=UTF-8'},body:payload.toString()});
 				const data=await response.json();
 				if(!data||!data.success){throw new Error((data&&data.data&&data.data.message)?String(data.data.message):'Unable to load screenprint data');}
@@ -4126,6 +4128,7 @@ class TTA_ThreadDesk {
 				const colorState=getVariationStateForColor(getCurrentColorStateKey());
 				return Array.isArray(colorState.rows)?colorState.rows:[];
 			};
+			const hasVariationDataForActiveColor=()=>getVariationRowsForColor().length>0;
 			const loadMoreVariations=async()=>{
 				const colorState=getVariationStateForColor(getCurrentColorStateKey());
 				if(colorState.loadingPromise){await colorState.loadingPromise;return;}
@@ -4182,6 +4185,57 @@ class TTA_ThreadDesk {
 					colorState.hasMore=!!(data&&data.data&&data.data.hasMore);
 				})();
 				try{await colorState.loadingPromise;}finally{colorState.loadingPromise=null;}
+			};
+			const loadVariationsForColor=async(colorKey,colorLabel)=>{
+				const requestedColorKey=String(colorKey||'').trim();
+				const requestedColorLabel=String(colorLabel||'').trim();
+				const cacheKey=getVariationColorCacheKey(requestedColorKey,requestedColorLabel);
+				const cached=variationRowsByColorKey[cacheKey];
+				if(cached&&Array.isArray(cached.rows)&&cached.rows.length){
+					variationRows=cached.rows.slice();
+					variationRowsMode='full';
+					variationReturned=Number(cached.returned||variationRows.length||0);
+					variationTotal=Number(cached.total||variationRows.length||0);
+					variationHasMore=false;
+					return variationRows;
+				}
+				variationLoading=true;
+				try{
+					const nextRows=[];
+					let offset=0;
+					let hasMore=true;
+					let total=0;
+					while(hasMore){
+						const payload=new URLSearchParams();
+						payload.set('action','tta_threaddesk_screenprint_variations');
+						payload.set('nonce',screenprintVariationNonce||'');
+						payload.set('productId',String(screenprintProductId||0));
+						payload.set('colorKey',requestedColorKey);
+						payload.set('colorLabel',requestedColorLabel);
+						payload.set('inStockOnly','1');
+						payload.set('offset',String(offset));
+						payload.set('limit',String(variationPageLimit));
+						payload.set('fields','full');
+						const response=await fetch(screenprintQuoteAjaxUrl,{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/x-www-form-urlencoded; charset=UTF-8'},body:payload.toString()});
+						const data=await response.json();
+						if(!data||!data.success){throw new Error((data&&data.data&&data.data.message)?String(data.data.message):'Unable to load variants');}
+						const rows=(data&&data.data&&Array.isArray(data.data.variations))?data.data.variations:[];
+						if(rows.length){nextRows.push(...rows);}
+						total=Number((data&&data.data&&data.data.total)||nextRows.length||0);
+						hasMore=!!(data&&data.data&&data.data.hasMore);
+						offset=nextRows.length;
+						if(!rows.length){hasMore=false;}
+					}
+					variationRows=nextRows;
+					variationRowsMode='full';
+					variationReturned=nextRows.length;
+					variationTotal=Number.isFinite(total)&&total>=0?total:nextRows.length;
+					variationHasMore=false;
+					variationRowsByColorKey[cacheKey]={rows:nextRows.slice(),returned:variationReturned,total:variationTotal,hasMore:false};
+					return variationRows;
+				}finally{
+					variationLoading=false;
+				}
 			};
 			const ensureVariationsReadyForSelectedColor=async()=>{
 				const colorState=getVariationStateForColor(getCurrentColorStateKey());
@@ -4894,7 +4948,7 @@ class TTA_ThreadDesk {
 							event.preventDefault();
 							openQuantitiesButton.disabled=true;
 							try{
-								await ensureVariationsReadyForSelectedColor();
+								await loadVariationsForColor(selectedColor,getSelectedColorLabel());
 								renderVariationQuantities();
 								setStep('quantities');
 							}finally{
@@ -4914,7 +4968,7 @@ class TTA_ThreadDesk {
 						event.preventDefault();
 						trigger.disabled=true;
 						try{
-							await ensureVariationsReadyForSelectedColor();
+							await loadVariationsForColor(selectedColor,getSelectedColorLabel());
 							renderVariationQuantities();
 							setStep('quantities');
 						}finally{
@@ -4961,7 +5015,7 @@ class TTA_ThreadDesk {
 				btn.style.boxShadow='0 0 0 1px #2271b1';
 				openScreenprintChooserModal();
 				syncCartSelection();
-				loadVariationsForSelectedColor('keys');
+				loadVariationsForColor(selectedColor,getSelectedColorLabel()).catch((error)=>{console.error('[ThreadDesk screenprint color load]',error);});
 			};
 			root.querySelectorAll('[data-threaddesk-screenprint-open-color]').forEach((btn)=>{
 				btn.addEventListener('click',()=>{onScreenprintColorClick(btn);});
