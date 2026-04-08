@@ -4189,7 +4189,7 @@ class TTA_ThreadDesk {
 			const loadVariationsForColor=async(colorKey,colorLabel)=>{
 				const requestedColorKey=String(colorKey||'').trim();
 				const requestedColorLabel=String(colorLabel||'').trim();
-				const resolvedColorKey=normalizeColorValue(requestedColorKey||requestedColorLabel||'default');
+				const resolvedColorKey=(requestedColorKey?('key:'+requestedColorKey.toLowerCase()):('label:'+requestedColorLabel.toLowerCase()))||'default';
 				const colorState=getVariationStateForColor(resolvedColorKey);
 				if(colorState.loadingPromise){await colorState.loadingPromise;}
 				if(colorState.mode==='full'&&Array.isArray(colorState.rows)&&colorState.rows.length){
@@ -5012,7 +5012,7 @@ class TTA_ThreadDesk {
 				btn.style.boxShadow='0 0 0 1px #2271b1';
 				openScreenprintChooserModal();
 				syncCartSelection();
-				loadVariationsForColor(selectedColor,getSelectedColorLabel()).catch((error)=>{console.error('[ThreadDesk screenprint color load]',error);});
+				loadVariationsForSelectedColor('keys').catch((error)=>{console.error('[ThreadDesk screenprint color load]',error);});
 			};
 			root.querySelectorAll('[data-threaddesk-screenprint-open-color]').forEach((btn)=>{
 				btn.addEventListener('click',()=>{onScreenprintColorClick(btn);});
