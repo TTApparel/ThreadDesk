@@ -21,6 +21,7 @@ class TTA_ThreadDesk {
 	private $screenprint_dataset_request_cache = array();
 	private $screenprint_cache_group = 'tta_threaddesk_screenprint';
 	private $screenprint_variation_page_limit = 150;
+	private $screenprint_variation_initial_limit = 24;
 
 	public static function instance() {
 		if ( null === self::$instance ) {
@@ -2421,6 +2422,8 @@ class TTA_ThreadDesk {
 		$limit         = max( 1, min( $requested_raw, $this->screenprint_variation_page_limit ) );
 		$in_stock_only = isset( $_POST['inStockOnly'] ) && '1' === sanitize_text_field( wp_unslash( $_POST['inStockOnly'] ) );
 		$fields        = isset( $_POST['fields'] ) ? sanitize_key( wp_unslash( $_POST['fields'] ) ) : 'full';
+		$color_key     = isset( $_POST['colorKey'] ) ? sanitize_key( wp_unslash( $_POST['colorKey'] ) ) : '';
+		$color_label   = isset( $_POST['colorLabel'] ) ? sanitize_text_field( wp_unslash( $_POST['colorLabel'] ) ) : '';
 
 		if ( $product_id <= 0 || ! function_exists( 'wc_get_product' ) ) {
 			wp_send_json_error( array( 'message' => __( 'Invalid product.', 'threaddesk' ) ), 400 );
@@ -2435,6 +2438,8 @@ class TTA_ThreadDesk {
 			$product,
 			array(
 				'in_stock_only' => $in_stock_only,
+				'color_key'     => $color_key,
+				'color_label'   => $color_label,
 			)
 		);
 		$rows  = $this->build_screenprint_variation_payload(
@@ -2444,6 +2449,8 @@ class TTA_ThreadDesk {
 				'limit'         => $limit,
 				'in_stock_only' => $in_stock_only,
 				'fields'        => 'keys' === $fields ? 'keys' : 'full',
+				'color_key'     => $color_key,
+				'color_label'   => $color_label,
 			)
 		);
 
@@ -2546,7 +2553,8 @@ class TTA_ThreadDesk {
 		}
 
 		if ( 'variations' === $dataset ) {
-			$variation_limit = absint( apply_filters( 'tta_threaddesk_screenprint_variation_initial_limit', $this->screenprint_variation_page_limit, $product_id ) );
+			$initial_color_context = $this->get_screenprint_initial_color_context( $product_id, $product );
+			$variation_limit       = absint( apply_filters( 'tta_threaddesk_screenprint_variation_initial_limit', $this->screenprint_variation_initial_limit, $product_id ) );
 			$variation_limit = max( 1, min( $variation_limit, 500 ) );
 			$rows            = $this->build_screenprint_variation_payload(
 				$product,
@@ -2554,13 +2562,17 @@ class TTA_ThreadDesk {
 					'offset'        => 0,
 					'limit'         => $variation_limit,
 					'in_stock_only' => true,
-					'fields'        => 'full',
+					'fields'        => 'keys',
+					'color_key'     => $initial_color_context['key'],
+					'color_label'   => $initial_color_context['label'],
 				)
 			);
 			$total           = $this->count_screenprint_variations(
 				$product,
 				array(
 					'in_stock_only' => true,
+					'color_key'     => $initial_color_context['key'],
+					'color_label'   => $initial_color_context['label'],
 				)
 			);
 
@@ -2573,7 +2585,9 @@ class TTA_ThreadDesk {
 					'has_more'      => count( $rows ) < $total,
 					'limit'         => $variation_limit,
 					'in_stock_only' => true,
-					'fields'        => 'full',
+					'fields'        => 'keys',
+					'color_key'     => $initial_color_context['key'],
+					'color_label'   => $initial_color_context['label'],
 				),
 			);
 		}
@@ -2618,7 +2632,8 @@ class TTA_ThreadDesk {
 		$product_context          = $this->build_screenprint_product_category_context( $product_id );
 		$product_term_ids         = isset( $product_context['product_term_ids'] ) && is_array( $product_context['product_term_ids'] ) ? $product_context['product_term_ids'] : array();
 		$product_term_slugs       = isset( $product_context['product_term_slugs'] ) && is_array( $product_context['product_term_slugs'] ) ? $product_context['product_term_slugs'] : array();
-		$variation_limit          = absint( apply_filters( 'tta_threaddesk_screenprint_variation_initial_limit', $this->screenprint_variation_page_limit, $product_id ) );
+		$initial_color_context    = $this->get_screenprint_initial_color_context( $product_id, $product );
+		$variation_limit          = absint( apply_filters( 'tta_threaddesk_screenprint_variation_initial_limit', $this->screenprint_variation_initial_limit, $product_id ) );
 		$variation_limit          = max( 1, min( $variation_limit, 500 ) );
 		$screenprint_variations   = $this->build_screenprint_variation_payload(
 			$product,
@@ -2626,13 +2641,17 @@ class TTA_ThreadDesk {
 				'offset'        => 0,
 				'limit'         => $variation_limit,
 				'in_stock_only' => true,
-				'fields'        => 'full',
+				'fields'        => 'keys',
+				'color_key'     => $initial_color_context['key'],
+				'color_label'   => $initial_color_context['label'],
 			)
 		);
 		$screenprint_variation_total = $this->count_screenprint_variations(
 			$product,
 			array(
 				'in_stock_only' => true,
+				'color_key'     => $initial_color_context['key'],
+				'color_label'   => $initial_color_context['label'],
 			)
 		);
 
@@ -2648,7 +2667,7 @@ class TTA_ThreadDesk {
 				'has_more'    => count( $screenprint_variations ) < $screenprint_variation_total,
 				'limit'       => $variation_limit,
 				'in_stock_only' => true,
-				'fields'      => 'full',
+				'fields'      => 'keys',
 			),
 			'print_pricing_settings'     => wp_parse_args( (array) get_option( 'tta_threaddesk_print_pricing', array() ), $this->get_default_print_pricing_settings() ),
 		);
@@ -2935,6 +2954,8 @@ class TTA_ThreadDesk {
 				'limit'         => 0,
 				'in_stock_only' => false,
 				'fields'        => 'full',
+				'color_key'     => '',
+				'color_label'   => '',
 			)
 		);
 
@@ -2948,6 +2969,8 @@ class TTA_ThreadDesk {
 		$processed            = 0;
 		$garment_name         = is_callable( array( $product, 'get_name' ) ) ? (string) $product->get_name() : '';
 		$fields_mode          = 'keys' === $args['fields'] ? 'keys' : 'full';
+		$requested_color_key  = sanitize_key( (string) $args['color_key'] );
+		$requested_color_name = sanitize_title( (string) $args['color_label'] );
 		foreach ( $available_variations as $available_variation ) {
 			$variation_id = isset( $available_variation['variation_id'] ) ? absint( $available_variation['variation_id'] ) : 0;
 			if ( $variation_id <= 0 ) {
@@ -3003,6 +3026,15 @@ class TTA_ThreadDesk {
 				'color'       => '' !== $color_label ? $color_label : __( 'N/A', 'threaddesk' ),
 				'colorKey'    => '' !== $color_key ? $color_key : '',
 			);
+			if ( '' !== $requested_color_key || '' !== $requested_color_name ) {
+				$row_color_key   = sanitize_key( (string) $row['colorKey'] );
+				$row_color_label = sanitize_title( (string) $row['color'] );
+				$matches_key     = '' !== $requested_color_key && '' !== $row_color_key && $requested_color_key === $row_color_key;
+				$matches_label   = '' !== $requested_color_name && '' !== $row_color_label && $requested_color_name === $row_color_label;
+				if ( ! $matches_key && ! $matches_label ) {
+					continue;
+				}
+			}
 			if ( 'full' === $fields_mode ) {
 				$max_qty         = isset( $available_variation['max_qty'] ) && '' !== $available_variation['max_qty'] ? (int) $available_variation['max_qty'] : null;
 				$inventory_label = $in_stock ? __( 'In stock', 'threaddesk' ) : __( 'Out of stock', 'threaddesk' );
@@ -3087,8 +3119,17 @@ class TTA_ThreadDesk {
 		if ( ! $product || ! is_callable( array( $product, 'is_type' ) ) || ! $product->is_type( 'variable' ) ) {
 			return 0;
 		}
-		$args                 = wp_parse_args( (array) $args, array( 'in_stock_only' => false ) );
+		$args                 = wp_parse_args(
+			(array) $args,
+			array(
+				'in_stock_only' => false,
+				'color_key'     => '',
+				'color_label'   => '',
+			)
+		);
 		$available_variations = is_callable( array( $product, 'get_available_variations' ) ) ? $product->get_available_variations() : array();
+		$requested_color_key  = sanitize_key( (string) $args['color_key'] );
+		$requested_color_name = sanitize_title( (string) $args['color_label'] );
 		$total                = 0;
 		foreach ( $available_variations as $available_variation ) {
 			$variation_id = isset( $available_variation['variation_id'] ) ? absint( $available_variation['variation_id'] ) : 0;
@@ -3098,9 +3139,55 @@ class TTA_ThreadDesk {
 			if ( ! empty( $args['in_stock_only'] ) && empty( $available_variation['is_in_stock'] ) ) {
 				continue;
 			}
+			if ( '' !== $requested_color_key || '' !== $requested_color_name ) {
+				$attributes       = isset( $available_variation['attributes'] ) && is_array( $available_variation['attributes'] ) ? $available_variation['attributes'] : array();
+				$variation_color  = '';
+				$variation_label  = '';
+				foreach ( $attributes as $attribute_key => $attribute_value ) {
+					$key = sanitize_key( str_replace( 'attribute_', '', (string) $attribute_key ) );
+					if ( false === strpos( $key, 'color' ) ) {
+						continue;
+					}
+					$raw_value = sanitize_text_field( (string) $attribute_value );
+					if ( '' === $variation_color ) {
+						$variation_color = sanitize_key( $raw_value );
+					}
+					if ( '' === $variation_label ) {
+						$variation_label = sanitize_title( $raw_value );
+					}
+				}
+				$matches_key   = '' !== $requested_color_key && '' !== $variation_color && $requested_color_key === $variation_color;
+				$matches_label = '' !== $requested_color_name && '' !== $variation_label && $requested_color_name === $variation_label;
+				if ( ! $matches_key && ! $matches_label ) {
+					continue;
+				}
+			}
 			$total++;
 		}
 		return $total;
+	}
+
+	private function get_screenprint_initial_color_context( $product_id, $product ) {
+		$payload = $this->build_screenprint_color_payload( $product_id, $product );
+		$key     = isset( $payload['initial_color_key'] ) ? sanitize_key( (string) $payload['initial_color_key'] ) : '';
+		$label   = '';
+		$choices = isset( $payload['screenprint_color_choices'] ) && is_array( $payload['screenprint_color_choices'] ) ? $payload['screenprint_color_choices'] : array();
+		foreach ( $choices as $choice ) {
+			if ( ! is_array( $choice ) ) {
+				continue;
+			}
+			$choice_key = isset( $choice['key'] ) ? sanitize_key( (string) $choice['key'] ) : '';
+			if ( '' === $choice_key || $choice_key !== $key ) {
+				continue;
+			}
+			$label = isset( $choice['label'] ) ? sanitize_text_field( (string) $choice['label'] ) : '';
+			break;
+		}
+
+		return array(
+			'key'   => $key,
+			'label' => $label,
+		);
 	}
 
 	private function build_screenprint_color_payload( $product_id, $product ) {
@@ -3585,6 +3672,7 @@ class TTA_ThreadDesk {
 			let variationTotal=0;
 			let variationReturned=0;
 			let variationHasMore=false;
+			let variationRowsMode='keys';
 			const variationPageLimit=<?php echo (int) $this->screenprint_variation_page_limit; ?>;
 			let variationLoading=false;
 			let pricingSettings=<?php echo wp_json_encode( wp_parse_args( (array) get_option( 'tta_threaddesk_print_pricing', array() ), $this->get_default_print_pricing_settings() ) ); ?>||{};
@@ -3730,6 +3818,7 @@ class TTA_ThreadDesk {
 				if(datasets.quote_list&&Array.isArray(datasets.quote_list.items)){pendingQuotes=datasets.quote_list.items;}
 				if(datasets.variations){
 					variationRows=Array.isArray(datasets.variations.items)?datasets.variations.items:[];
+					variationRowsMode='keys';
 					const variationMeta=datasets.variations.meta&&typeof datasets.variations.meta==='object'?datasets.variations.meta:{};
 					const total=Number(variationMeta.total||variationRows.length||0);
 					variationTotal=Number.isFinite(total)&&total>=0?total:variationRows.length;
@@ -3787,7 +3876,6 @@ class TTA_ThreadDesk {
 				if(hadCache){
 					renderQuoteOptions();
 					renderLayoutOptions();
-					renderVariationQuantities();
 				}
 				try{
 					const datasets=await fetchBootstrapDatasets();
@@ -3796,7 +3884,6 @@ class TTA_ThreadDesk {
 					bootstrapLoaded=true;
 					renderQuoteOptions();
 					renderLayoutOptions();
-					renderVariationQuantities();
 				}catch(error){
 					console.error('[ThreadDesk screenprint bootstrap]',error);
 				}
@@ -4051,7 +4138,9 @@ class TTA_ThreadDesk {
 					payload.set('offset',String(Array.isArray(variationRows)?variationRows.length:0));
 					payload.set('limit',String(variationPageLimit));
 					payload.set('inStockOnly','1');
-					payload.set('fields','full');
+					payload.set('fields',variationRowsMode==='full'?'full':'keys');
+					payload.set('colorKey',String(selectedColor||''));
+					payload.set('colorLabel',String(getSelectedColorLabel()||''));
 					const response=await fetch(screenprintQuoteAjaxUrl,{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/x-www-form-urlencoded; charset=UTF-8'},body:payload.toString()});
 					const data=await response.json();
 					if(!data||!data.success){throw new Error((data&&data.data&&data.data.message)?String(data.data.message):'Unable to load more variants');}
@@ -4067,15 +4156,41 @@ class TTA_ThreadDesk {
 					variationLoading=false;
 				}
 			};
+			const loadVariationsForSelectedColor=async(fields='full')=>{
+				variationLoading=true;
+				try{
+					const payload=new URLSearchParams();
+					payload.set('action','tta_threaddesk_screenprint_variations');
+					payload.set('nonce',screenprintVariationNonce||'');
+					payload.set('productId',String(screenprintProductId||0));
+					payload.set('offset','0');
+					payload.set('limit',String(variationPageLimit));
+					payload.set('inStockOnly','1');
+					payload.set('fields',fields==='keys'?'keys':'full');
+					payload.set('colorKey',String(selectedColor||''));
+					payload.set('colorLabel',String(getSelectedColorLabel()||''));
+					const response=await fetch(screenprintQuoteAjaxUrl,{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/x-www-form-urlencoded; charset=UTF-8'},body:payload.toString()});
+					const data=await response.json();
+					if(!data||!data.success){throw new Error((data&&data.data&&data.data.message)?String(data.data.message):'Unable to load variants');}
+					variationRows=(data&&data.data&&Array.isArray(data.data.variations))?data.data.variations:[];
+					variationRowsMode=fields==='keys'?'keys':'full';
+					variationReturned=Number((data&&data.data&&data.data.returned)||variationRows.length||0);
+					const receivedTotal=Number((data&&data.data&&data.data.total)||variationRows.length||0);
+					variationTotal=Number.isFinite(receivedTotal)&&receivedTotal>=0?receivedTotal:variationRows.length;
+					variationHasMore=!!(data&&data.data&&data.data.hasMore);
+				}finally{
+					variationLoading=false;
+				}
+			};
 			const ensureVariationsReadyForSelectedColor=async()=>{
 				const colorKey=normalizeColorValue(selectedColor||getSelectedColorLabel()||'default');
-				if(!variationHasMore){return;}
 				if(variationPreloadByColor[colorKey]){await variationPreloadByColor[colorKey];return;}
 				variationPreloadByColor[colorKey]=(async()=>{
+					if(variationRowsMode!=='full'){
+						await loadVariationsForSelectedColor('full');
+					}
 					while(variationHasMore){
 						await loadMoreVariations();
-						const hasRowsForColor=getVariationRowsForColor().length>0;
-						if(hasRowsForColor&&!variationHasMore){break;}
 					}
 				})();
 				try{
@@ -4770,7 +4885,7 @@ class TTA_ThreadDesk {
 				btn.style.boxShadow='0 0 0 1px #2271b1';
 				openScreenprintChooserModal();
 				syncCartSelection();
-				ensureVariationsReadyForSelectedColor();
+				loadVariationsForSelectedColor('keys');
 			};
 			root.querySelectorAll('[data-threaddesk-screenprint-open-color]').forEach((btn)=>{
 				btn.addEventListener('click',()=>{onScreenprintColorClick(btn);});
