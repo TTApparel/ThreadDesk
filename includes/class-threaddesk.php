@@ -3916,6 +3916,12 @@ class TTA_ThreadDesk {
 					if(nextFocus&&typeof nextFocus.focus==='function'){window.requestAnimationFrame(()=>{nextFocus.focus();});}
 				}
 			};
+			const blurActiveElement=()=>{
+				const activeElement=document.activeElement;
+				if(activeElement&&activeElement!==document.body&&typeof activeElement.blur==='function'){
+					activeElement.blur();
+				}
+			};
 			const openScreenprintChooserModal=()=>{
 				if(!modal){return;}
 				modal.classList.add('is-active');
@@ -3926,13 +3932,13 @@ class TTA_ThreadDesk {
 			};
 			const closeScreenprintModal=()=>{
 				if(!modal){return;}
-				const activeElement=document.activeElement;
-				if(activeElement&&modal.contains(activeElement)&&typeof activeElement.blur==='function'){activeElement.blur();}
+				blurActiveElement();
 				modal.classList.remove('is-active');
 				modal.setAttribute('aria-hidden','true');
 				document.body.classList.remove('threaddesk-modal-open');
 				const shouldPromptQuoteSelection=isAuthenticated&&Array.isArray(pendingQuotes)&&pendingQuotes.length>0;
 				setStep(shouldPromptQuoteSelection?'quotes':'chooser',false);
+				root.dispatchEvent(new CustomEvent('tta:screenprint-modal-closed'));
 			};
 			const syncScreenprintPanelHeight=()=>{
 				if(!viewerStep||viewerStep.hidden||!stage){return;}
@@ -5242,8 +5248,7 @@ class TTA_ThreadDesk {
 				createBtn.appendChild(createTitle);
 				createBtn.appendChild(createMeta);
 					createBtn.addEventListener('click',()=>{
-						if(typeof createBtn.blur==='function'){createBtn.blur();}
-						if(modal){modal.classList.remove('is-active');modal.setAttribute('aria-hidden','true');}
+						blurActiveElement();
 						const localScope=root.closest('.product')||document;
 						const layoutOpen=
 							root.querySelector('[data-threaddesk-screenprint-layout-open]')||
@@ -5254,8 +5259,10 @@ class TTA_ThreadDesk {
 						if(!layoutOpen){return;}
 						if(createLayoutCategory){layoutOpen.setAttribute('data-threaddesk-layout-category-open', createLayoutCategory);}
 						if(createLayoutCategoryId>0){layoutOpen.setAttribute('data-threaddesk-layout-category-id-open', String(createLayoutCategoryId));}
-						document.body.classList.remove('threaddesk-modal-open');
-						window.setTimeout(()=>{layoutOpen.click();},0);
+						root.addEventListener('tta:screenprint-modal-closed',()=>{
+							window.requestAnimationFrame(()=>{layoutOpen.click();});
+						},{once:true});
+						closeScreenprintModal();
 					});
 					options.appendChild(createBtn);
 					}
