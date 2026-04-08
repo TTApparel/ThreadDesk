@@ -4776,7 +4776,13 @@ class TTA_ThreadDesk {
 				btn.addEventListener('click',()=>{onScreenprintColorClick(btn);});
 			});
 			root.querySelectorAll('[data-threaddesk-screenprint-close]').forEach((el)=>{
-				el.addEventListener('click',()=>{closeScreenprintModal();});
+				el.addEventListener('click',(event)=>{
+					if(event){
+						event.preventDefault();
+						event.stopPropagation();
+					}
+					closeScreenprintModal();
+				});
 			});
 			root.querySelectorAll('[data-threaddesk-screenprint-back]').forEach((el)=>{
 				el.addEventListener('click',()=>{setStep('chooser');});
