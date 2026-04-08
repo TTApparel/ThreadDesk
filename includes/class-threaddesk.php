@@ -3946,7 +3946,14 @@ class TTA_ThreadDesk {
 				if(stageHeight>0){viewerStep.style.setProperty('--threaddesk-screenprint-stage-rendered-height',stageHeight+'px');}
 			};
 			const normalizeColorValue=(value)=>String(value||'').trim().toLowerCase().replace(/\s+/g,'-');
-			const getCurrentColorStateKey=()=>normalizeColorValue(selectedColor||getSelectedColorLabel()||'default');
+			const getVariationStateKey=(colorKey,colorLabel)=>{
+				const normalizedColorKey=String(colorKey||'').trim().toLowerCase();
+				if(normalizedColorKey){return 'key:'+normalizedColorKey;}
+				const normalizedColorLabel=String(colorLabel||'').trim().toLowerCase();
+				if(normalizedColorLabel){return 'label:'+normalizedColorLabel;}
+				return 'default';
+			};
+			const getCurrentColorStateKey=()=>getVariationStateKey(selectedColor,getSelectedColorLabel());
 			const getVariationStateForColor=(rawColorKey)=>{
 				const key=normalizeColorValue(rawColorKey||'default')||'default';
 				if(!variationStateByColor[key]){
@@ -4195,7 +4202,7 @@ class TTA_ThreadDesk {
 			const loadVariationsForColor=async(colorKey,colorLabel)=>{
 				const requestedColorKey=String(colorKey||'').trim();
 				const requestedColorLabel=String(colorLabel||'').trim();
-				const resolvedColorKey=(requestedColorKey?('key:'+requestedColorKey.toLowerCase()):('label:'+requestedColorLabel.toLowerCase()))||'default';
+				const resolvedColorKey=getVariationStateKey(requestedColorKey,requestedColorLabel);
 				const colorState=getVariationStateForColor(resolvedColorKey);
 				if(colorState.loadingPromise){await colorState.loadingPromise;}
 				if(colorState.mode==='full'&&Array.isArray(colorState.rows)&&colorState.rows.length){
