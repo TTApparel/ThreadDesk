@@ -5317,7 +5317,6 @@ class TTA_ThreadDesk {
 				createBtn.appendChild(createMeta);
 					createBtn.addEventListener('click',()=>{
 						if(typeof createBtn.blur==='function'){createBtn.blur();}
-						if(modal){modal.classList.remove('is-active');modal.setAttribute('aria-hidden','true');}
 						const localScope=root.closest('.product')||document;
 						const layoutOpen=
 							root.querySelector('[data-threaddesk-screenprint-layout-open]')||
@@ -5329,7 +5328,6 @@ class TTA_ThreadDesk {
 							if(createLayoutCategory){layoutOpen.setAttribute('data-threaddesk-layout-category-open', createLayoutCategory);}
 							if(createLayoutCategoryId>0){layoutOpen.setAttribute('data-threaddesk-layout-category-id-open', String(createLayoutCategoryId));}
 							layoutOpen.setAttribute('data-threaddesk-layout-force-viewer-open','1');
-							document.body.classList.remove('threaddesk-modal-open');
 							window.setTimeout(()=>{
 								layoutOpen.click();
 								window.requestAnimationFrame(()=>{
