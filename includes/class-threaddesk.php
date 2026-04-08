@@ -4863,20 +4863,102 @@ class TTA_ThreadDesk {
 					window.setTimeout(()=>{showAllWrap.hidden=true;showAllWrap.style.display='none';showAllWrap.classList.remove('is-hiding');showAllWrap.classList.add('hide-colors--hidden');},300);
 				}
 			};
+			let screenprintInitialized=false;
+			let screenprintEventsBound=false;
+			let screenprintBootstrapLoading=false;
+			const initScreenprint=()=>{
+				if(screenprintInitialized){return;}
+				screenprintInitialized=true;
+				if(!screenprintEventsBound){
+					screenprintEventsBound=true;
+					window.addEventListener('resize',()=>{if(showAllWrap&&!showAllWrap.hidden&&!colorsExpanded){setupCollapsedColors();}});
+					window.addEventListener('resize',syncScreenprintPanelHeight);
+					if(showAllBtn){
+						showAllBtn.addEventListener('click',(event)=>{
+							event.preventDefault();
+							initScreenprint();
+							expandColors();
+						});
+					}
+					root.querySelectorAll('[data-threaddesk-screenprint-close]').forEach((el)=>{
+						el.addEventListener('click',(event)=>{
+							if(event){
+								event.preventDefault();
+								event.stopPropagation();
+							}
+							closeScreenprintModal();
+						});
+					});
+					root.querySelectorAll('[data-threaddesk-screenprint-back]').forEach((el)=>{
+						el.addEventListener('click',()=>{setStep('chooser');});
+					});
+					if(backToQuotesButton){
+						backToQuotesButton.addEventListener('click',()=>{setStep('quotes');});
+					}
+					if(openQuantitiesButton){
+						openQuantitiesButton.addEventListener('click',async(event)=>{
+							event.preventDefault();
+							openQuantitiesButton.disabled=true;
+							try{
+								await ensureVariationsReadyForSelectedColor();
+								renderVariationQuantities();
+								setStep('quantities');
+							}finally{
+								openQuantitiesButton.disabled=false;
+							}
+						});
+					}
+					if(addToQuoteButton){
+						addToQuoteButton.addEventListener('click',(event)=>{
+							event.preventDefault();
+							submitAddToQuote();
+						});
+					}
+					root.addEventListener('click',async(event)=>{
+						const trigger=event.target&&event.target.closest?event.target.closest('[data-threaddesk-screenprint-open-quantities]'):null;
+						if(!trigger){return;}
+						event.preventDefault();
+						trigger.disabled=true;
+						try{
+							await ensureVariationsReadyForSelectedColor();
+							renderVariationQuantities();
+							setStep('quantities');
+						}finally{
+							trigger.disabled=false;
+						}
+					});
+					root.querySelectorAll('[data-threaddesk-screenprint-back-to-viewer]').forEach((el)=>{
+						el.addEventListener('click',()=>{setStep('viewer');});
+					});
+					root.querySelectorAll('[data-threaddesk-screenprint-angle]').forEach((btn)=>btn.addEventListener('click',()=>{
+						angle=btn.getAttribute('data-threaddesk-screenprint-angle')||'front';
+						root.querySelectorAll('[data-threaddesk-screenprint-angle]').forEach((item)=>item.classList.remove('is-active'));
+						btn.classList.add('is-active');
+						render();
+					}));
+					document.addEventListener('threaddesk:auth-success',()=>{
+						if(!screenprintInitialized){return;}
+						if(screenprintBootstrapLoading){return;}
+						screenprintBootstrapLoading=true;
+						loadBootstrapDatasets().finally(()=>{screenprintBootstrapLoading=false;});
+					});
+					console.debug('[ThreadDesk] screenprint listeners bound');
+				}
+				renderQuoteOptions();
+				renderLayoutOptions();
+				window.requestAnimationFrame(setupCollapsedColors);
+				if(!screenprintBootstrapLoading){
+					screenprintBootstrapLoading=true;
+					loadBootstrapDatasets().finally(()=>{screenprintBootstrapLoading=false;});
+				}
+			};
 			syncAngleThumbs();
 			renderSelectedColorLabel();
-			window.requestAnimationFrame(setupCollapsedColors);
-			window.addEventListener('resize',()=>{if(showAllWrap&&!showAllWrap.hidden&&!colorsExpanded){setupCollapsedColors();}});
-			if(showAllBtn){
-				showAllBtn.addEventListener('click',(event)=>{
-					event.preventDefault();
-					expandColors();
-				});
-			}
 			if(shouldOpenChooser&&modal){
-				window.setTimeout(()=>{openScreenprintChooserModal();},1000);
+				window.setTimeout(()=>{initScreenprint();openScreenprintChooserModal();},1000);
 			}
 			const onScreenprintColorClick=(btn)=>{
+				initScreenprint();
 				selectedColor=String(btn.getAttribute('data-threaddesk-screenprint-open-color')||'').trim();
 				images=(imageMap&&imageMap[selectedColor])?imageMap[selectedColor]:{};
 				syncAngleThumbs();
@@ -4890,57 +4972,6 @@ class TTA_ThreadDesk {
 			root.querySelectorAll('[data-threaddesk-screenprint-open-color]').forEach((btn)=>{
 				btn.addEventListener('click',()=>{onScreenprintColorClick(btn);});
 			});
-			root.querySelectorAll('[data-threaddesk-screenprint-close]').forEach((el)=>{
-				el.addEventListener('click',(event)=>{
-					if(event){
-						event.preventDefault();
-						event.stopPropagation();
-					}
-					closeScreenprintModal();
-				});
-			});
-			root.querySelectorAll('[data-threaddesk-screenprint-back]').forEach((el)=>{
-				el.addEventListener('click',()=>{setStep('chooser');});
-			});
-			if(backToQuotesButton){
-				backToQuotesButton.addEventListener('click',()=>{setStep('quotes');});
-			}
-			if(openQuantitiesButton){
-				openQuantitiesButton.addEventListener('click',async(event)=>{
-					event.preventDefault();
-					openQuantitiesButton.disabled=true;
-					try{
-						await ensureVariationsReadyForSelectedColor();
-						renderVariationQuantities();
-						setStep('quantities');
-					}finally{
-						openQuantitiesButton.disabled=false;
-					}
-				});
-			}
-			if(addToQuoteButton){
-				addToQuoteButton.addEventListener('click',(event)=>{
-					event.preventDefault();
-					submitAddToQuote();
-				});
-			}
-			root.addEventListener('click',async(event)=>{
-				const trigger=event.target&&event.target.closest?event.target.closest('[data-threaddesk-screenprint-open-quantities]'):null;
-				if(!trigger){return;}
-				event.preventDefault();
-				trigger.disabled=true;
-				try{
-					await ensureVariationsReadyForSelectedColor();
-					renderVariationQuantities();
-					setStep('quantities');
-				}finally{
-					trigger.disabled=false;
-				}
-			});
-			root.querySelectorAll('[data-threaddesk-screenprint-back-to-viewer]').forEach((el)=>{
-				el.addEventListener('click',()=>{setStep('viewer');});
-			});
-			console.debug('[ThreadDesk] screenprint listeners bound');
 			const lockStageRatio=(src)=>{
 				if(stageRatioLocked||!stage||!src){return;}
 				const probe=new Image();
@@ -5076,7 +5107,6 @@ class TTA_ThreadDesk {
 			document.addEventListener('mouseup',()=>{dragState=null;});
 			document.addEventListener('touchend',()=>{dragState=null;});
 			document.addEventListener('touchcancel',()=>{dragState=null;});
-			window.addEventListener('resize',syncScreenprintPanelHeight);
 				const renderQuoteOptions=()=>{
 					if(!quoteOptions){return;}
 					quoteOptions.innerHTML='';
@@ -5242,19 +5272,6 @@ class TTA_ThreadDesk {
 						emptyState.hidden=Array.isArray(layouts)&&layouts.length>0;
 					}
 				};
-				renderQuoteOptions();
-				renderLayoutOptions();
-				if(window.requestIdleCallback){window.requestIdleCallback(()=>{loadBootstrapDatasets();});}
-				else{window.setTimeout(()=>{loadBootstrapDatasets();},0);}
-				document.addEventListener('threaddesk:auth-success',()=>{
-					loadBootstrapDatasets();
-				});
-				root.querySelectorAll('[data-threaddesk-screenprint-angle]').forEach((btn)=>btn.addEventListener('click',()=>{
-				angle=btn.getAttribute('data-threaddesk-screenprint-angle')||'front';
-				root.querySelectorAll('[data-threaddesk-screenprint-angle]').forEach((item)=>item.classList.remove('is-active'));
-				btn.classList.add('is-active');
-				render();
-			}));
 		})();
 		</script>
 		<?php
