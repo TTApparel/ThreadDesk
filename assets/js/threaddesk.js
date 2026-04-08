@@ -1042,7 +1042,6 @@ jQuery(function ($) {
 				return;
 			}
 
-			const request = externalData && typeof externalData === 'object' ? externalData : {};
 			const requestedCategory = String(request.category || '').trim();
 			const requestedCategoryId = Number(request.categoryId || 0);
 			const forceViewer = !!request.forceViewer;
