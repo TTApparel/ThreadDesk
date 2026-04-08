@@ -1500,6 +1500,11 @@ body.threaddesk-modal-open {
 	align-self: center;
 }
 
+.threaddesk-layout-modal [data-threaddesk-screenprint-step="viewer"].is-active .threaddesk-screenprint__quantities-loading {
+	grid-column: 1 / -1;
+	grid-row: 3;
+}
+
 .threaddesk-layout-viewer__design-panel h4 {
 	margin: 0;
 	text-transform: uppercase;
