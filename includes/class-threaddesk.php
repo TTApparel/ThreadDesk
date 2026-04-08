@@ -5054,19 +5054,14 @@ class TTA_ThreadDesk {
 					createBtn.addEventListener('click',()=>{
 						if(typeof createBtn.blur==='function'){createBtn.blur();}
 						if(modal){modal.classList.remove('is-active');modal.setAttribute('aria-hidden','true');}
-						if(window.jQuery&&typeof window.jQuery.fn==='object'){
-							const scopeElement=root.closest('.product')||root;
-							window.jQuery(document).trigger('threaddesk:open-layout-modal',[{category:createLayoutCategory,categoryId:createLayoutCategoryId,forceViewer:true,scopeElement:scopeElement}]);
-							return;
-						}
 						const localScope=root.closest('.product')||document;
-					const layoutOpen=localScope.querySelector('[data-threaddesk-layout-open]')||document.querySelector('[data-threaddesk-layout-open]');
-					if(!layoutOpen){return;}
-					if(createLayoutCategory){layoutOpen.setAttribute('data-threaddesk-layout-category-open', createLayoutCategory);}
-					if(createLayoutCategoryId>0){layoutOpen.setAttribute('data-threaddesk-layout-category-id-open', String(createLayoutCategoryId));}
-					document.body.classList.remove('threaddesk-modal-open');
-					window.setTimeout(()=>{layoutOpen.click();},0);
-				});
+						const layoutOpen=localScope.querySelector('[data-threaddesk-layout-open]')||document.querySelector('[data-threaddesk-layout-open]');
+						if(!layoutOpen){return;}
+						if(createLayoutCategory){layoutOpen.setAttribute('data-threaddesk-layout-category-open', createLayoutCategory);}
+						if(createLayoutCategoryId>0){layoutOpen.setAttribute('data-threaddesk-layout-category-id-open', String(createLayoutCategoryId));}
+						document.body.classList.remove('threaddesk-modal-open');
+						window.setTimeout(()=>{layoutOpen.click();},0);
+					});
 					options.appendChild(createBtn);
 					}
 					(layouts||[]).forEach((layout)=>{
