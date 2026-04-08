@@ -3674,7 +3674,7 @@ class TTA_ThreadDesk {
 			let variationTotal=0;
 			let variationReturned=0;
 			let variationHasMore=false;
-			let variationRowsMode='keys';
+			let variationRowsMode='full';
 			const variationPageLimit=<?php echo (int) $this->screenprint_variation_page_limit; ?>;
 			let variationLoading=false;
 			let pricingSettings=<?php echo wp_json_encode( wp_parse_args( (array) get_option( 'tta_threaddesk_print_pricing', array() ), $this->get_default_print_pricing_settings() ) ); ?>||{};
@@ -3818,16 +3818,6 @@ class TTA_ThreadDesk {
 				if(datasets.layouts&&Array.isArray(datasets.layouts.items)){layouts=datasets.layouts.items;}
 				if(datasets.designs&&Array.isArray(datasets.designs.items)){savedDesigns=datasets.designs.items;}
 				if(datasets.quote_list&&Array.isArray(datasets.quote_list.items)){pendingQuotes=datasets.quote_list.items;}
-				if(datasets.variations){
-					variationRows=Array.isArray(datasets.variations.items)?datasets.variations.items:[];
-					variationRowsMode='keys';
-					const variationMeta=datasets.variations.meta&&typeof datasets.variations.meta==='object'?datasets.variations.meta:{};
-					const total=Number(variationMeta.total||variationRows.length||0);
-					variationTotal=Number.isFinite(total)&&total>=0?total:variationRows.length;
-					const returned=Number(variationMeta.returned||variationRows.length||0);
-					variationReturned=Number.isFinite(returned)&&returned>=0?returned:variationRows.length;
-					variationHasMore=!!variationMeta.has_more;
-				}
 			};
 			const getSessionBootstrapCache=()=>{
 				if(!window.sessionStorage){return null;}
@@ -3867,7 +3857,7 @@ class TTA_ThreadDesk {
 				payload.set('action','tta_threaddesk_screenprint_bootstrap');
 				payload.set('nonce',screenprintBootstrapNonce||'');
 				payload.set('productId',String(screenprintProductId||0));
-				payload.set('datasets','layouts,designs,variations,quote_list');
+				payload.set('datasets','layouts,designs,quote_list');
 				const response=await fetch(screenprintQuoteAjaxUrl,{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/x-www-form-urlencoded; charset=UTF-8'},body:payload.toString()});
 				const data=await response.json();
 				if(!data||!data.success){throw new Error((data&&data.data&&data.data.message)?String(data.data.message):'Unable to load screenprint data');}
@@ -4129,6 +4119,7 @@ class TTA_ThreadDesk {
 					return normalizeColorValue(row&&row.color)===normalizeColorValue(getSelectedColorLabel());
 				});
 			};
+			const hasVariationDataForActiveColor=()=>getVariationRowsForColor().length>0;
 			const loadMoreVariations=async()=>{
 				if(variationLoading||!variationHasMore){return;}
 				variationLoading=true;
@@ -4903,7 +4894,9 @@ class TTA_ThreadDesk {
 							openQuantitiesButton.disabled=true;
 							try{
 								await ensureVariationsReadyForSelectedColor();
-								renderVariationQuantities();
+								if(hasVariationDataForActiveColor()){
+									renderVariationQuantities();
+								}
 								setStep('quantities');
 							}finally{
 								openQuantitiesButton.disabled=false;
@@ -4923,7 +4916,9 @@ class TTA_ThreadDesk {
 						trigger.disabled=true;
 						try{
 							await ensureVariationsReadyForSelectedColor();
-							renderVariationQuantities();
+							if(hasVariationDataForActiveColor()){
+								renderVariationQuantities();
+							}
 							setStep('quantities');
 						}finally{
 							trigger.disabled=false;
